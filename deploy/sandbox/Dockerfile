@@ -1,4 +1,4 @@
-ARG GO_IMAGE=golang:1.26.5-alpine
+ARG GO_IMAGE=golang:1.26.6-alpine
 FROM ${GO_IMAGE}
 RUN apk add --no-cache git nodejs npm python3 py3-pytest cargo \
     && addgroup -S -g 10001 forgeflow \

@@ -1247,7 +1247,7 @@ Execution Plane:
 
 ### 阶段 0：工程基线与文档（1～2 天）
 
-> 状态：已完成（2026-08-13 复核）。仓库已在 `main` 分支初始化；配置、结构化日志、统一错误、Makefile、PowerShell 验证脚本、GitHub CI、Issue/PR 模板、分支规范和 4 份 ADR 已落地。CI 包含格式、测试、Linux race、vet、Staticcheck 2026.1、govulncheck、Migration、PostgreSQL 集成、前端和浏览器门禁。项目工具链基线已升至 Go 1.26.5。首次 Git commit 保留给仓库所有者确认后执行。
+> 状态：已完成（2026-08-18 复核）。仓库已在 `main` 分支初始化；配置、结构化日志、统一错误、Makefile、PowerShell 验证脚本、GitHub CI、Issue/PR 模板、分支规范和 4 份 ADR 已落地。CI 包含格式、测试、Linux race、vet、Staticcheck 2026.1、govulncheck、Migration、PostgreSQL 集成、前端和浏览器门禁。项目工具链基线已升至 Go 1.26.6，并已完成首次人工提交和上传。
 
 任务：
 

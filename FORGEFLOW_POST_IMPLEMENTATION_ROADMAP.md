@@ -1,6 +1,6 @@
 # ForgeFlow 实施手册完成后的分阶段任务路线图
 
-> 文档版本：2026-08-14  
+> 文档版本：2026-08-19
 > 前置文档：`FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md`  
 > 当前审计：`docs/completion-audit.md`
 
@@ -27,8 +27,8 @@
 - [x] Eval 数据结构、Grader、报告、治理 API 和 Eval 页面已实现。
 - [x] Staging Compose、HTTPS、监控、告警、备份和回滚资产已建立。
 - [x] Go 测试、Vet、Staticcheck、govulncheck 和前端检查通过。
-- [ ] 项目已有首个 Git commit 和可解析的 `HEAD`。
-- [ ] 代码已由仓库所有者手动上传到 GitHub。
+- [x] 项目已有首个 Git commit 和可解析的 `HEAD`（`11473a7`）。
+- [x] 代码已由仓库所有者手动上传到 GitHub。
 - [ ] 30 个 Eval Case 已绑定真实 fixture commit。
 - [ ] 三种模式的真实 Eval 报告已生成。
 - [ ] 公网 Staging 已完成验收。
@@ -68,7 +68,7 @@
 
 ## 4. 阶段 0：本地封板审查
 
-> 当前状态：阻塞（2026-08-18 技术审查、Apache-2.0 接入和所有者文件复核已完成；等待仓库所有者确认第三方依赖条件）  
+> 当前状态：已完成（2026-08-19 仓库所有者已确认第三方依赖使用条件，全部退出门槛通过）
 > 进入条件：`FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md` 中可在本地完成的工程任务已完成。  
 > 本阶段不包含：Git commit、GitHub 上传和服务器部署。
 
@@ -111,14 +111,14 @@ git status --ignored --short
 - [x] `.gitignore`、`.dockerignore`、高置信度 Secret 扫描和第三方依赖许可证清单已完成技术检查。
 - [x] 仓库所有者已人工阅读最终待提交文件，并确认可以提交（2026-08-18）。
 - [x] 仓库所有者已选择 Apache-2.0，根目录许可证及项目元数据已更新。
-- [ ] 仓库所有者已确认第三方依赖使用条件。
+- [x] 仓库所有者已阅读 `docs/third-party-dependency-review.md` 并确认第三方依赖使用条件（2026-08-19）。
 
 ---
 
 ## 5. 阶段 1：手动建立 Git 和 GitHub 基线
 
-> 当前状态：未开始  
-> 进入条件：阶段 0 的退出门槛全部通过。  
+> 当前状态：进行中（2026-08-18 已完成人工首次提交和上传；三个 Actions 工作流已识别。首次 CI 因 Go 1.26.5 标准库新漏洞公告失败，本地已升级到 Go 1.26.6 并复验通过，等待人工提交和上传修复；`main` 分支保护仍未配置）
+> 进入条件：已满足（阶段 0 于 2026-08-19 完成）。
 > 人工操作：本阶段所有提交、建仓、上传和 GitHub Settings 操作都必须手动完成。
 
 ### 5.1 手动创建首次 Git commit
@@ -178,10 +178,10 @@ git push -u origin main
 
 上传完成后，在 GitHub 网页人工确认：
 
-- [ ] 最新 commit SHA 与本地一致。
-- [ ] `.env`、`.forgeflow`、Secret 文件和构建产物没有出现。
-- [ ] Actions 已识别 `ci.yml`、`deployment.yml` 和 `eval.yml`。
-- [ ] README 和文档可以正常浏览。
+- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`11473a7`；当前另有 Go 1.26.6 修复尚未提交）。
+- [x] `.env`、`.forgeflow`、Secret 文件和构建产物没有出现在已上传提交中。
+- [x] Actions 已识别 `ci.yml`、`deployment.yml` 和 `eval.yml`。
+- [x] README 和文档可以正常浏览。
 
 如果错误上传 Secret，不要只删除最新文件；应立即撤销并轮换 Secret，然后按事故流程清理 Git 历史。
 
@@ -224,16 +224,17 @@ git push -u origin main
 
 - 本地首个 commit SHA。
 - GitHub 主仓库地址和与本地一致的远端 commit SHA。
+- GitHub 基线审计记录：`docs/stage-1-github-baseline-audit.md`。
 - `main` Ruleset/Branch Protection 配置截图或审计记录。
 - 必需 CI 检查清单。
 - GitHub Environment 和 Secret 所有者记录；不得记录 Secret 值。
 
 ### 5.7 阶段 1 退出门槛
 
-- [ ] 本地存在可解析的 `HEAD`。
-- [ ] 代码已由仓库所有者手动上传到 GitHub。
-- [ ] 远端 commit SHA 与本地一致。
-- [ ] GitHub 上不存在 Secret、运行数据、二进制和私有 Evidence。
+- [x] 本地存在可解析的 `HEAD`（`11473a7`）。
+- [x] 代码已由仓库所有者手动上传到 GitHub。
+- [x] 最新已上传 commit 的远端 SHA 与本地 `HEAD` 一致（当前工作区另有待提交修复）。
+- [x] GitHub 上不存在 Secret、运行数据、二进制和私有 Evidence。
 - [ ] `main` 禁止直接推送并要求 Pull Request。
 - [ ] 必需 CI 在 GitHub Linux Runner 上全部通过，包括 Race Detector。
 - [ ] 分支保护、Secret scanning 和依赖安全功能已人工确认。
@@ -901,8 +902,8 @@ Release 应包含：
 
 | 阶段 | 状态 | 负责人 | 开始日期 | 完成日期 | 证据位置 |
 |---|---|---|---|---|---|
-| 0 本地封板审查 | 阻塞 | 仓库所有者 | 2026-08-18 |  | `docs/stage-0-seal-audit.md` |
-| 1 Git 与 GitHub 基线 | 未开始 | 待填写 |  |  |  |
+| 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
+| 1 Git 与 GitHub 基线 | 进行中 | 仓库所有者 | 2026-08-18 |  | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 未开始 | 待填写 |  |  |  |
 | 3 三基线 Eval | 未开始 | 待填写 |  |  |  |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
@@ -912,4 +913,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前仍处于**阶段 0：本地封板审查**。技术检查、Apache-2.0 接入和所有者文件复核已完成，仅等待仓库所有者确认第三方依赖条件。阶段 0 通过后，由仓库所有者手动完成阶段 1 的首次提交和 GitHub 上传；不要直接跳到 Eval、服务器部署或版本发布。
+当前处于**阶段 1：Git 与 GitHub 基线**。阶段 0 已全部完成；阶段 1 已完成人工首次提交和上传，下一步由仓库所有者手动提交并上传 Go 1.26.6 修复，等待必需 CI 通过，再配置并确认 `main` Ruleset、Secret scanning 和依赖安全功能。阶段 1 全部门槛通过前不要进入 Eval、服务器部署或版本发布。

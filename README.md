@@ -72,7 +72,7 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
 - OpenTelemetry HTTP/Run/Node/Model/Tool span、W3C Trace Context 与无 Collector 安全降级
 - Prometheus 低基数指标：Run、节点、模型成本、工具、审批、Queue、认证和 429
 - 固定 30 Case 软件 Eval、确定性 Grader、三基线 JSON/Markdown 报告和 Prompt/模型 Promotion 门禁
-- Go 1.26.5 多阶段 API/Worker/CLI 镜像、受 CSP/HSTS 保护的静态 Web 镜像
+- Go 1.26.6 多阶段 API/Worker/CLI 镜像、受 CSP/HSTS 保护的静态 Web 镜像
 - Caddy 自动 HTTPS、内部 Compose 网络、Docker Secret `_FILE` 注入和 API/Worker 权限隔离
 - Prometheus/Alertmanager/OTel Collector、备份校验、隔离恢复演练和 Schema 安全回滚
 - Threat Model、Operations、Security Review、Demo、ADR 和故障演练复盘

@@ -28,7 +28,7 @@ ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的
 5. Agent Patch 硬保护已覆盖策略源码、版本化 Prompt 和内置 Eval 数据，Agent 不能修改自己的治理边界。
 6. CI 新增 Staticcheck、govulncheck、OpenAPI 生成差异、Migration 合约及真实 PostgreSQL 集成任务。
 7. Eval CLI 新增 `--fixture-repository`，明确区分“数据结构合法”和“30 个真实 commit 均存在”。
-8. govulncheck 初次发现 12 个可达漏洞后，项目基线升级到 Go 1.26.5，并升级 pgx 5.9.2、OpenTelemetry 1.44.0 及安全修复后的传递依赖；复扫结果为 0 个可达漏洞。
+8. govulncheck 初次发现 12 个可达漏洞后，项目升级 pgx 5.9.2、OpenTelemetry 1.44.0 及安全修复后的传递依赖；2026-08-18 GitHub CI 又识别出 Go 1.26.5 标准库的新公告，因此工具链基线继续升级到 Go 1.26.6，复扫结果为 0 个可达漏洞。
 
 ## 本轮验证结果
 
