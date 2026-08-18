@@ -2,14 +2,7 @@ name: deployment-assets
 
 on:
   pull_request:
-    paths:
-      - Dockerfile
-      - .dockerignore
-      - web/Dockerfile
-      - web/nginx.conf
-      - deploy/**
-      - scripts/staging-*.ps1
-      - .github/workflows/deployment.yml
+    branches: [main]
   workflow_dispatch:
 
 permissions:

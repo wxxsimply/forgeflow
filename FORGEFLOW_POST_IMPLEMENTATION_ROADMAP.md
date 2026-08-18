@@ -117,7 +117,7 @@ git status --ignored --short
 
 ## 5. 阶段 1：手动建立 Git 和 GitHub 基线
 
-> 当前状态：进行中（2026-08-18 已完成人工首次提交和上传；三个 Actions 工作流已识别。首次 CI 因 Go 1.26.5 标准库新漏洞公告失败，本地已升级到 Go 1.26.6 并复验通过，等待人工提交和上传修复；`main` 分支保护仍未配置）
+> 当前状态：进行中（2026-08-19 Go 1.26.6 修复已人工上传，Linux CI 的 Go、Web、PostgreSQL 三个 Job 全部通过；等待人工运行 `deployment-assets`、启用 Dependabot 并配置 `main` Ruleset）
 > 进入条件：已满足（阶段 0 于 2026-08-19 完成）。
 > 人工操作：本阶段所有提交、建仓、上传和 GitHub Settings 操作都必须手动完成。
 
@@ -178,7 +178,7 @@ git push -u origin main
 
 上传完成后，在 GitHub 网页人工确认：
 
-- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`11473a7`；当前另有 Go 1.26.6 修复尚未提交）。
+- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`6b67b095b9482cefb31614196e6adba7e2f70fdc`）。
 - [x] `.env`、`.forgeflow`、Secret 文件和构建产物没有出现在已上传提交中。
 - [x] Actions 已识别 `ci.yml`、`deployment.yml` 和 `eval.yml`。
 - [x] README 和文档可以正常浏览。
@@ -196,6 +196,7 @@ git push -u origin main
 - 至少一名审查人批准。
 - 安全、Prompt、Policy、Auth、Migration 和 Sandbox 修改不得由作者自批。
 - 要求 CI、Web、PostgreSQL Integration 和 Deployment Assets 检查通过。
+- `deployment-assets` 必须对所有指向 `main` 的 Pull Request 运行，避免路径过滤使必需检查永久等待。
 - 禁止强制推送和删除 `main`。
 - 建议要求线性历史和对话已解决。
 
@@ -231,12 +232,13 @@ git push -u origin main
 
 ### 5.7 阶段 1 退出门槛
 
-- [x] 本地存在可解析的 `HEAD`（`11473a7`）。
+- [x] 本地存在可解析的 `HEAD`（`6b67b09`）。
 - [x] 代码已由仓库所有者手动上传到 GitHub。
-- [x] 最新已上传 commit 的远端 SHA 与本地 `HEAD` 一致（当前工作区另有待提交修复）。
+- [x] 最新已上传 commit 的远端 SHA 与本地 `HEAD` 一致。
 - [x] GitHub 上不存在 Secret、运行数据、二进制和私有 Evidence。
 - [ ] `main` 禁止直接推送并要求 Pull Request。
-- [ ] 必需 CI 在 GitHub Linux Runner 上全部通过，包括 Race Detector。
+- [x] `ci` 在 GitHub Linux Runner 上全部通过，包括 Race Detector、浏览器 E2E 和 PostgreSQL Integration（Run `32161234214`）。
+- [ ] `deployment-assets` Workflow 修复已人工上传，且手动运行通过。
 - [ ] 分支保护、Secret scanning 和依赖安全功能已人工确认。
 
 ---
