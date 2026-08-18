@@ -1,0 +1,789 @@
+openapi: 3.1.0
+info:
+  title: ForgeFlow Control Plane API
+  version: 0.10.0
+  description: Cookie-session API. Send X-CSRF-Token on every authenticated non-GET request.
+servers:
+  - url: /api/v1
+security:
+  - sessionCookie: []
+paths:
+  /auth/login:
+    post:
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200':
+          description: Authenticated
+          content: {application/json: {schema: {$ref: '#/components/schemas/LoginResponse'}}}
+        '401': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /auth/logout:
+    post:
+      operationId: logout
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      responses: {'204': {description: Logged out}, '403': {$ref: '#/components/responses/Error'}}
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user
+          content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}
+        '401': {$ref: '#/components/responses/Error'}
+  /auth/sessions:
+    get:
+      operationId: listSessions
+      responses:
+        '200':
+          description: Sessions
+          content: {application/json: {schema: {$ref: '#/components/schemas/SessionList'}}}
+  /auth/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+        - {$ref: '#/components/parameters/CSRF'}
+      responses: {'204': {description: Revoked}, '404': {$ref: '#/components/responses/Error'}}
+  /repositories:
+    get:
+      operationId: listRepositories
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Repository page
+          content: {application/json: {schema: {$ref: '#/components/schemas/RepositoryPage'}}}
+    post:
+      operationId: createRepository
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateRepositoryRequest'}}}
+      responses:
+        '201':
+          description: Created
+          content: {application/json: {schema: {$ref: '#/components/schemas/Repository'}}}
+        '403': {$ref: '#/components/responses/Error'}
+  /repositories/{repositoryId}:
+    get:
+      operationId: getRepository
+      parameters: [{$ref: '#/components/parameters/RepositoryId'}]
+      responses:
+        '200':
+          description: Repository
+          content: {application/json: {schema: {$ref: '#/components/schemas/Repository'}}}
+        '404': {$ref: '#/components/responses/Error'}
+    delete:
+      operationId: deleteRepository
+      parameters: [{$ref: '#/components/parameters/RepositoryId'}, {$ref: '#/components/parameters/CSRF'}]
+      responses: {'204': {description: Deleted}}
+  /repositories/{repositoryId}/validate:
+    post:
+      operationId: validateRepository
+      parameters: [{$ref: '#/components/parameters/RepositoryId'}, {$ref: '#/components/parameters/CSRF'}]
+      responses: {'200': {description: Repository summary}}
+  /runs:
+    get:
+      operationId: listRuns
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Run page
+          content: {application/json: {schema: {$ref: '#/components/schemas/RunPage'}}}
+    post:
+      operationId: createRun
+      parameters:
+        - {$ref: '#/components/parameters/CSRF'}
+        - {name: Idempotency-Key, in: header, schema: {type: string, maxLength: 128}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateRunRequest'}}}
+      responses:
+        '202':
+          description: Queued
+          content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}
+        '409': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /runs/{runId}:
+    get:
+      operationId: getRun
+      parameters: [{$ref: '#/components/parameters/RunId'}]
+      responses:
+        '200':
+          description: Run
+          content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}
+        '404': {$ref: '#/components/responses/Error'}
+  /runs/{runId}/events:
+    get:
+      operationId: listRunEvents
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/EventCursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200':
+          description: Sequenced events
+          content: {application/json: {schema: {$ref: '#/components/schemas/EventPage'}}}
+  /runs/{runId}/stream:
+    get:
+      operationId: streamRunEvents
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/EventCursor'}]
+      responses:
+        '200':
+          description: SSE stream; reconnect with Last-Event-ID
+          content: {text/event-stream: {schema: {type: string}}}
+  /runs/{runId}/pause:
+    post:
+      operationId: pauseRun
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/CSRF'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/RunMutationRequest'}}}
+      responses:
+        '200': {description: Paused, content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /runs/{runId}/resume:
+    post:
+      operationId: resumeRun
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/CSRF'}]
+      responses:
+        '200': {description: Resumed, content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /runs/{runId}/cancel:
+    post:
+      operationId: cancelRun
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/CSRF'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/RunMutationRequest'}}}
+      responses:
+        '200': {description: Cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /runs/{runId}/artifacts:
+    get:
+      operationId: listRunArtifacts
+      parameters: [{$ref: '#/components/parameters/RunId'}]
+      responses:
+        '200': {description: Artifact metadata, content: {application/json: {schema: {$ref: '#/components/schemas/ArtifactList'}}}}
+  /runs/{runId}/report:
+    get:
+      operationId: getRunReport
+      parameters: [{$ref: '#/components/parameters/RunId'}]
+      responses:
+        '200': {description: Run report, content: {application/json: {schema: {$ref: '#/components/schemas/RunReport'}}}}
+  /approvals:
+    get:
+      operationId: listApprovals
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, approved, rejected]}}]
+      responses:
+        '200': {description: Accessible approvals, content: {application/json: {schema: {$ref: '#/components/schemas/ApprovalList'}}}}
+  /approvals/{approvalId}:
+    get:
+      operationId: getApproval
+      parameters: [{$ref: '#/components/parameters/ApprovalId'}]
+      responses:
+        '200':
+          description: Approval with ETag
+          headers: {ETag: {schema: {type: string}}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Approval'}}}
+  /approvals/{approvalId}/decision:
+    post:
+      operationId: decideApproval
+      parameters:
+        - {$ref: '#/components/parameters/ApprovalId'}
+        - {$ref: '#/components/parameters/CSRF'}
+        - {name: If-Match, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ApprovalDecision'}}}
+      responses:
+        '200': {description: Decided, content: {application/json: {schema: {$ref: '#/components/schemas/Run'}}}}
+        '409': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /evals/runs:
+    get:
+      operationId: listEvalRuns
+      parameters: [{$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Stored comparison reports, content: {application/json: {schema: {$ref: '#/components/schemas/EvalRunList'}}}}
+    post:
+      operationId: createEvalRun
+      description: Admin-only import. The server re-grades all three 30-case evidence runs.
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/EvidenceFile'}}}
+      responses:
+        '201': {description: Graded report, content: {application/json: {schema: {$ref: '#/components/schemas/EvalRun'}}}}
+        '400': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+  /evals/runs/{evalRunId}:
+    get:
+      operationId: getEvalRun
+      parameters: [{$ref: '#/components/parameters/EvalRunId'}]
+      responses:
+        '200': {description: Comparison report, content: {application/json: {schema: {$ref: '#/components/schemas/EvalRun'}}}}
+        '404': {$ref: '#/components/responses/Error'}
+  /agents:
+    get:
+      operationId: listAgents
+      responses:
+        '200': {description: Runtime agent catalog, content: {application/json: {schema: {$ref: '#/components/schemas/AgentList'}}}}
+  /prompts:
+    get:
+      operationId: listPrompts
+      responses:
+        '200': {description: Embedded prompts and immutable release history, content: {application/json: {schema: {$ref: '#/components/schemas/PromptCatalog'}}}}
+  /prompts/{agent}/{version}/promote:
+    post:
+      operationId: promotePrompt
+      description: Admin-only promotion after deterministic regression checks.
+      parameters:
+        - {$ref: '#/components/parameters/AgentName'}
+        - {$ref: '#/components/parameters/PromptVersion'}
+        - {$ref: '#/components/parameters/CSRF'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PromptPromotionRequest'}}}
+      responses:
+        '201': {description: Prompt release, content: {application/json: {schema: {$ref: '#/components/schemas/PromptRelease'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /prompts/{agent}/rollback:
+    post:
+      operationId: rollbackPrompt
+      parameters:
+        - {$ref: '#/components/parameters/AgentName'}
+        - {$ref: '#/components/parameters/CSRF'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PromptRollbackRequest'}}}
+      responses:
+        '201': {description: Immutable rollback release, content: {application/json: {schema: {$ref: '#/components/schemas/PromptRelease'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    sessionCookie: {type: apiKey, in: cookie, name: forgeflow_session}
+  parameters:
+    CSRF: {name: X-CSRF-Token, in: header, required: true, schema: {type: string}}
+    Cursor: {name: cursor, in: query, schema: {type: string}}
+    EventCursor: {name: after, in: query, schema: {type: integer, format: int64, minimum: 0}}
+    Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+    RunId: {name: runId, in: path, required: true, schema: {type: string, format: uuid}}
+    RepositoryId: {name: repositoryId, in: path, required: true, schema: {type: string, format: uuid}}
+    ApprovalId: {name: approvalId, in: path, required: true, schema: {type: string, format: uuid}}
+    SessionId: {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+    EvalRunId: {name: evalRunId, in: path, required: true, schema: {type: string, format: uuid}}
+    AgentName: {name: agent, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9_-]{1,63}$'}}
+    PromptVersion: {name: version, in: path, required: true, schema: {type: string, pattern: '^v[1-9][0-9]*$'}}
+  schemas:
+    # Types below are the browser-facing projection. Additional Run fields may be
+    # returned by the server and remain forward-compatible.
+    Role:
+      type: string
+      enum: [admin, operator, viewer]
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, email, role, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        role: {$ref: '#/components/schemas/Role'}
+        status: {type: string, enum: [active, disabled]}
+        createdAt: {type: string, format: date-time}
+    Session:
+      type: object
+      additionalProperties: false
+      required: [id, sourceIp, userAgent, createdAt, lastSeenAt, expiresAt, idleExpiresAt]
+      properties:
+        id: {type: string, format: uuid}
+        sourceIp: {type: string}
+        userAgent: {type: string}
+        createdAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        idleExpiresAt: {type: string, format: date-time}
+        revokedAt: {type: string, format: date-time}
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [user, session, csrfToken]
+      properties:
+        user: {$ref: '#/components/schemas/User'}
+        session: {$ref: '#/components/schemas/Session'}
+        csrfToken: {type: string}
+    SessionList:
+      type: object
+      additionalProperties: false
+      required: [items, currentSessionId]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Session'}}
+        currentSessionId: {type: string, format: uuid}
+    Repository:
+      type: object
+      additionalProperties: false
+      required: [id, ownerId, name, localPath, defaultBranch, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        ownerId: {type: string, format: uuid}
+        name: {type: string}
+        localPath: {type: string}
+        defaultBranch: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    RepositoryPage:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Repository'}}
+        nextCursor: {type: string}
+    RunStatus:
+      type: string
+      enum: [created, planning, waiting_for_plan_approval, preparing_workspace, implementing, evaluating, waiting_for_action_approval, paused, repairing, completed, failed, cancelled]
+    RunBudget:
+      type: object
+      additionalProperties: false
+      properties:
+        maxIterations: {type: integer}
+        maxNodeCalls: {type: integer}
+        maxModelCalls: {type: integer}
+        maxToolCalls: {type: integer}
+        maxToolOutputBytes: {type: integer, format: int64}
+        maxChangedFiles: {type: integer}
+        maxDiffBytes: {type: integer, format: int64}
+        maxDiffLines: {type: integer}
+        maxRepairs: {type: integer}
+        maxInputTokens: {type: integer}
+        maxOutputTokens: {type: integer}
+        maxEstimatedCostUsd: {type: number}
+        maxDuration: {type: integer, format: int64, description: Nanoseconds}
+        nodeCalls: {type: integer}
+        estimatedCostUsd: {type: number}
+        modelCalls: {type: integer}
+        toolCalls: {type: integer}
+        toolOutputBytes: {type: integer, format: int64}
+        inputTokens: {type: integer}
+        outputTokens: {type: integer}
+    PlanStep:
+      type: object
+      required: [id, description, acceptanceCriteria, dependsOn]
+      properties:
+        id: {type: string}
+        description: {type: string}
+        acceptanceCriteria: {type: array, items: {type: string}}
+        dependsOn: {type: array, items: {type: string}}
+    PlanRisk:
+      type: object
+      required: [level, description]
+      properties:
+        level: {type: string, enum: [low, medium, high]}
+        description: {type: string}
+    ExecutionPlan:
+      type: object
+      required: [summary, assumptions, filesLikelyAffected, steps, risks, testStrategy]
+      properties:
+        summary: {type: string}
+        assumptions: {type: array, items: {type: string}}
+        filesLikelyAffected: {type: array, items: {type: string}}
+        steps: {type: array, items: {$ref: '#/components/schemas/PlanStep'}}
+        risks: {type: array, items: {$ref: '#/components/schemas/PlanRisk'}}
+        testStrategy: {type: array, items: {type: string}}
+    ImplementationResult:
+      type: object
+      required: [summary, patch, changedFiles, evidence, unresolvedIssues, requestedApprovals]
+      properties:
+        summary: {type: string}
+        patch: {type: string}
+        changedFiles: {type: array, items: {type: string}}
+        evidence: {type: array, items: {type: string}}
+        unresolvedIssues: {type: array, items: {type: string}}
+        requestedApprovals: {type: array, items: {type: string}}
+    DiffArtifact:
+      type: object
+      required: [patch, sha256, size, changedFiles]
+      properties:
+        patch: {type: string}
+        sha256: {type: string}
+        size: {type: integer, format: int64}
+        changedFiles: {type: array, items: {type: string}}
+    TestAssessment:
+      type: object
+      required: [toolCallId, program, args, exitCode, stdout, stderr, duration, truncated, passed, completedAt]
+      properties:
+        toolCallId: {type: string}
+        program: {type: string}
+        args: {type: array, items: {type: string}}
+        exitCode: {type: integer}
+        stdout: {type: string}
+        stderr: {type: string}
+        duration: {type: integer, format: int64, description: Nanoseconds}
+        truncated: {type: boolean}
+        passed: {type: boolean}
+        completedAt: {type: string, format: date-time}
+    Finding:
+      type: object
+      additionalProperties: true
+      required: [id, severity, file, title, evidence, recommendation, confirmed]
+      properties:
+        id: {type: string}
+        severity: {type: string, enum: [info, low, medium, high, critical, blocking]}
+        file: {type: string}
+        line: {type: integer}
+        title: {type: string}
+        evidence: {type: string}
+        recommendation: {type: string}
+        failureMode: {type: string}
+        impact: {type: string}
+        confirmed: {type: boolean}
+        humanReview: {type: boolean}
+    AssessmentResult:
+      type: object
+      required: [summary, findings]
+      properties:
+        summary: {type: string}
+        findings: {type: array, items: {$ref: '#/components/schemas/Finding'}}
+    JudgeDecision:
+      type: object
+      required: [version, action, reasons, findingIds, inputSha256, decidedAt]
+      properties:
+        version: {type: string}
+        action: {type: string, enum: [pass, pass_with_approval, repair, human_review, fail]}
+        reasons: {type: array, items: {type: string}}
+        findingIds: {type: array, items: {type: string}}
+        inputSha256: {type: string}
+        decidedAt: {type: string, format: date-time}
+    ApprovalRequest:
+      type: object
+      required: [approvalId, runId, actionType, reason, scope, risk, status, requestedAt]
+      properties:
+        approvalId: {type: string, format: uuid}
+        runId: {type: string, format: uuid}
+        actionType: {type: string}
+        reason: {type: string}
+        scope: {type: array, items: {type: string}}
+        risk: {type: string, enum: [low, medium, high]}
+        status: {type: string, enum: [pending, approved, rejected]}
+        comment: {type: string}
+        requestedAt: {type: string, format: date-time}
+        resolvedAt: {type: string, format: date-time}
+        toolCallId: {type: string}
+        toolName: {type: string}
+        toolVersion: {type: string}
+        inputSha256: {type: string}
+        workspaceId: {type: string}
+        policyVersion: {type: string}
+    ModelInvocation:
+      type: object
+      additionalProperties: true
+      properties:
+        agent: {type: string}
+        nodeId: {type: string}
+        provider: {type: string}
+        model: {type: string}
+        promptVersion: {type: string}
+        promptSha256: {type: string}
+        status: {type: string}
+        inputTokens: {type: integer}
+        outputTokens: {type: integer}
+        latencyMilliseconds: {type: integer, format: int64}
+        estimatedCostUsd: {type: number}
+        createdAt: {type: string, format: date-time}
+    ToolCallAudit:
+      type: object
+      additionalProperties: true
+      properties:
+        callId: {type: string}
+        nodeId: {type: string}
+        agent: {type: string}
+        toolName: {type: string}
+        toolVersion: {type: string}
+        policyAction: {type: string}
+        policyRuleId: {type: string}
+        status: {type: string}
+        outputBytes: {type: integer, format: int64}
+        latencyMilliseconds: {type: integer, format: int64}
+        createdAt: {type: string, format: date-time}
+    Run:
+      type: object
+      additionalProperties: true
+      required: [runId, traceId, version, status, task, repositoryPath, baseRevision, currentNodeId, createdAt, updatedAt]
+      properties:
+        runId: {type: string, format: uuid}
+        traceId: {type: string, format: uuid}
+        ownerId: {type: string, format: uuid}
+        repositoryId: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        status: {$ref: '#/components/schemas/RunStatus'}
+        task: {type: string}
+        repositoryPath: {type: string}
+        baseRevision: {type: string}
+        currentNodeId: {type: string}
+        completedNodeIds: {type: array, items: {type: string}}
+        plan: {$ref: '#/components/schemas/ExecutionPlan'}
+        implementation: {$ref: '#/components/schemas/ImplementationResult'}
+        diff: {$ref: '#/components/schemas/DiffArtifact'}
+        testAssessment: {$ref: '#/components/schemas/TestAssessment'}
+        reviewResult: {$ref: '#/components/schemas/AssessmentResult'}
+        securityResult: {$ref: '#/components/schemas/AssessmentResult'}
+        judgeDecision: {$ref: '#/components/schemas/JudgeDecision'}
+        modelInvocations: {type: array, items: {$ref: '#/components/schemas/ModelInvocation'}}
+        toolCallAudits: {type: array, items: {$ref: '#/components/schemas/ToolCallAudit'}}
+        changedFiles: {type: array, items: {type: string}}
+        pendingApproval: {$ref: '#/components/schemas/ApprovalRequest'}
+        iteration: {type: integer}
+        maxIterations: {type: integer}
+        budget: {$ref: '#/components/schemas/RunBudget'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        error:
+          type: object
+          properties: {code: {type: string}, message: {type: string}}
+    RunPage:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Run'}}
+        nextCursor: {type: string}
+    RunEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, traceId, type, message, createdAt]
+      properties:
+        eventId: {type: string, format: uuid}
+        runId: {type: string, format: uuid}
+        traceId: {type: string, format: uuid}
+        type: {type: string}
+        nodeId: {type: string}
+        message: {type: string}
+        createdAt: {type: string, format: date-time}
+    SequencedEvent:
+      type: object
+      additionalProperties: false
+      required: [sequence, event]
+      properties:
+        sequence: {type: integer, format: int64}
+        event: {$ref: '#/components/schemas/RunEvent'}
+    EventPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SequencedEvent'}}
+        nextCursor: {type: integer, format: int64}
+    Approval:
+      type: object
+      required: [request, runVersion]
+      properties:
+        request: {$ref: '#/components/schemas/ApprovalRequest'}
+        runVersion: {type: integer, format: int64}
+    ApprovalList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Approval'}}
+    Artifact:
+      type: object
+      required: [id, runId, kind, storageKey, sha256, size, contentType, attributes, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        runId: {type: string, format: uuid}
+        kind: {type: string, enum: [patch, test_evidence, run_report, log]}
+        storageKey: {type: string}
+        sha256: {type: string}
+        size: {type: integer, format: int64}
+        contentType: {type: string}
+        attributes: {type: object, additionalProperties: {type: string}}
+        createdAt: {type: string, format: date-time}
+    ArtifactList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Artifact'}}
+    RunReport:
+      type: object
+      required: [runId, status]
+      properties:
+        runId: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/RunStatus'}
+        plan: {$ref: '#/components/schemas/ExecutionPlan'}
+        implementation: {$ref: '#/components/schemas/ImplementationResult'}
+        tests: {$ref: '#/components/schemas/TestAssessment'}
+        review: {$ref: '#/components/schemas/AssessmentResult'}
+        security: {$ref: '#/components/schemas/AssessmentResult'}
+        decision: {$ref: '#/components/schemas/JudgeDecision'}
+        error:
+          type: object
+          properties: {code: {type: string}, message: {type: string}}
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties: {email: {type: string, format: email}, password: {type: string}, remember: {type: boolean}}
+    CreateRepositoryRequest:
+      type: object
+      additionalProperties: false
+      required: [name, localPath]
+      properties: {name: {type: string}, localPath: {type: string}, defaultBranch: {type: string, default: HEAD}}
+    CreateRunRequest:
+      type: object
+      additionalProperties: false
+      required: [repositoryId, task]
+      properties: {repositoryId: {type: string, format: uuid}, task: {type: string, maxLength: 20000}, baseRevision: {type: string}, maxIterations: {type: integer, minimum: 1, maximum: 10}}
+    RunMutationRequest:
+      type: object
+      additionalProperties: false
+      properties: {reason: {type: string, maxLength: 2000}}
+    ApprovalDecision:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties: {decision: {type: string, enum: [approve, reject]}, comment: {type: string}}
+    EvalMode:
+      type: string
+      enum: [single_agent, planner_developer, forgeflow]
+    EvalMetrics:
+      type: object
+      required: [completionRate, hiddenTestPassRate, regressionRate, humanInterventionRate]
+      properties:
+        completionRate: {type: number}
+        hiddenTestPassRate: {type: number}
+        regressionRate: {type: number}
+        humanInterventionRate: {type: number}
+        averageCostUsd: {type: [number, 'null']}
+        p95LatencyMs: {type: [number, 'null']}
+    EvalConfiguration:
+      type: object
+      required: [mode, modelVersions, promptVersions, policyVersion, toolVersions, gitCommit]
+      properties:
+        mode: {$ref: '#/components/schemas/EvalMode'}
+        modelVersions: {type: object, additionalProperties: {type: string}}
+        promptVersions: {type: object, additionalProperties: {type: string}}
+        policyVersion: {type: string}
+        toolVersions: {type: object, additionalProperties: {type: string}}
+        gitCommit: {type: string, pattern: '^[a-f0-9]{40}$'}
+    EvalReport:
+      type: object
+      required: [schemaVersion, dataset, datasetVersion, generatedAt, configuration, total, passed, grades, metrics, unavailableMetrics]
+      properties:
+        schemaVersion: {type: string}
+        dataset: {type: string}
+        datasetVersion: {type: string}
+        generatedAt: {type: string, format: date-time}
+        configuration: {$ref: '#/components/schemas/EvalConfiguration'}
+        total: {type: integer}
+        passed: {type: integer}
+        grades: {type: array, items: {type: object, additionalProperties: true}}
+        metrics: {$ref: '#/components/schemas/EvalMetrics'}
+        unavailableMetrics: {type: array, items: {type: string}}
+    ComparisonReport:
+      type: object
+      required: [schemaVersion, dataset, generatedAt, reports]
+      properties:
+        schemaVersion: {type: string}
+        dataset: {type: string}
+        generatedAt: {type: string, format: date-time}
+        reports: {type: array, minItems: 3, maxItems: 3, items: {$ref: '#/components/schemas/EvalReport'}}
+    EvalRun:
+      type: object
+      required: [id, createdBy, dataset, datasetVersion, status, report, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        createdBy: {type: string, format: uuid}
+        dataset: {type: string}
+        datasetVersion: {type: string}
+        status: {type: string, enum: [completed, failed]}
+        report: {$ref: '#/components/schemas/ComparisonReport'}
+        createdAt: {type: string, format: date-time}
+    EvalRunList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/EvalRun'}}}
+    Observation:
+      type: object
+      additionalProperties: true
+      required: [caseId, decision, patchApplicable, changedFiles, buildPassed, explicitTestsPassed, hiddenTestResults, secretDetected, dangerousCommandExecuted, iterations, diffLines, regression, humanIntervention]
+      properties:
+        caseId: {type: string}
+        decision: {type: string, enum: [implement, clarify, deny, require_approval]}
+        patchApplicable: {type: boolean}
+        changedFiles: {type: array, items: {type: string}}
+        buildPassed: {type: boolean}
+        explicitTestsPassed: {type: boolean}
+        hiddenTestResults: {type: object, additionalProperties: {type: boolean}}
+        secretDetected: {type: boolean}
+        dangerousCommandExecuted: {type: boolean}
+        iterations: {type: integer}
+        diffLines: {type: integer}
+        costUsd: {type: number}
+        durationMs: {type: integer, format: int64}
+        regression: {type: boolean}
+        humanIntervention: {type: boolean}
+    Evidence:
+      type: object
+      required: [dataset, configuration, observedAt, observations]
+      properties:
+        dataset: {type: string}
+        configuration: {$ref: '#/components/schemas/EvalConfiguration'}
+        observedAt: {type: string, format: date-time}
+        observations: {type: array, minItems: 30, maxItems: 30, items: {$ref: '#/components/schemas/Observation'}}
+    EvidenceFile:
+      type: object
+      additionalProperties: false
+      required: [runs]
+      properties: {runs: {type: array, minItems: 3, maxItems: 3, items: {$ref: '#/components/schemas/Evidence'}}}
+    Agent:
+      type: object
+      required: [name, version, model, promptVersion, role]
+      properties: {name: {type: string}, version: {type: string}, model: {type: string}, promptVersion: {type: string}, role: {type: string}}
+    AgentList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Agent'}}}
+    Prompt:
+      type: object
+      required: [agent, version, sha256, configured]
+      properties: {agent: {type: string}, version: {type: string}, sha256: {type: string}, configured: {type: boolean}}
+    PromptRelease:
+      type: object
+      required: [id, agent, version, promptSha256, evalRunId, promotedBy, comment, active, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        agent: {type: string}
+        version: {type: string}
+        promptSha256: {type: string}
+        evalRunId: {type: string, format: uuid}
+        promotedBy: {type: string, format: uuid}
+        rollbackOf: {type: string, format: uuid}
+        comment: {type: string}
+        active: {type: boolean}
+        createdAt: {type: string, format: date-time}
+    PromptCatalog:
+      type: object
+      required: [items, releases]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Prompt'}}
+        releases: {type: array, items: {$ref: '#/components/schemas/PromptRelease'}}
+    PromptPromotionRequest:
+      type: object
+      additionalProperties: false
+      required: [evalRunId]
+      properties: {evalRunId: {type: string, format: uuid}, comment: {type: string, maxLength: 2000}}
+    PromptRollbackRequest:
+      type: object
+      additionalProperties: false
+      required: [releaseId]
+      properties: {releaseId: {type: string, format: uuid}, comment: {type: string, maxLength: 2000}}
+    Error:
+      type: object
+      required: [code, message, requestId, details]
+      properties: {code: {type: string}, message: {type: string}, requestId: {type: string}, details: {type: object}}
+  responses:
+    Error:
+      description: Error response
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}

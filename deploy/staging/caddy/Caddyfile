@@ -1,0 +1,39 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+	http_port 8080
+	https_port 8443
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$FORGEFLOW_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+		-Server
+	}
+
+	@api path /api/* /healthz
+	handle @api {
+		reverse_proxy api:8080 {
+			flush_interval -1
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 30s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+}

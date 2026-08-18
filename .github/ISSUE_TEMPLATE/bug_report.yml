@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible ForgeFlow defect.
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reproducible steps and safe sample input.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Include sanitized logs, run status, and error codes. Never include secrets.
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and data impact
+      description: Could this affect isolation, authorization, secrets, source code, or data integrity?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true

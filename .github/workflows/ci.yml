@@ -1,0 +1,141 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          files="$(gofmt -l ./cmd ./internal ./migrations)"
+          if [ -n "$files" ]; then
+            echo "The following files need gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run minimum deterministic eval gate
+        run: go run ./cmd/forgeflow eval --suite software/v1 --validate-only --limit 6
+
+      - name: Run race detector
+        run: go test -race ./...
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run Staticcheck
+        uses: dominikh/staticcheck-action@v1
+        with:
+          version: "2026.1"
+          install-go: false
+
+      - name: Run Go vulnerability analysis
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+      - name: Validate paired database migrations
+        run: go test ./migrations -run TestEmbeddedMigrations
+
+      - name: Build processes
+        run: |
+          go build -trimpath -o bin/forgeflow ./cmd/forgeflow
+          go build -trimpath -o bin/forgeflow-api ./cmd/forgeflow-api
+          go build -trimpath -o bin/forgeflow-worker ./cmd/forgeflow-worker
+
+  web:
+    name: Web verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck, test, and build
+        working-directory: web
+        run: npm run check
+
+      - name: Reject stale generated OpenAPI client
+        working-directory: web
+        run: |
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E
+        working-directory: web
+        run: npm run test:e2e
+
+  database:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: forgeflow_test
+          POSTGRES_USER: forgeflow
+          POSTGRES_PASSWORD: forgeflow-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forgeflow -d forgeflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FORGEFLOW_TEST_POSTGRES_DSN: postgres://forgeflow:forgeflow-test-only@127.0.0.1:5432/forgeflow_test?sslmode=disable
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Apply migrations and run database integration tests
+        run: go test -p 1 ./internal/postgres ./internal/httpapi

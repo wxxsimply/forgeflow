@@ -1,0 +1,15 @@
+.git
+.cache
+.forgeflow
+.idea
+.vscode
+bin
+docs
+evals
+*.log
+.env
+deploy/staging/secrets
+web/node_modules
+web/dist
+web/playwright-report
+web/test-results

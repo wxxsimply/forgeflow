@@ -1,0 +1,15 @@
+.forgeflow/
+.cache/
+.idea/
+.vscode/
+.env
+bin/
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+coverage.out
+*.log
+deploy/staging/staging.env
+deploy/staging/secrets/*
+!deploy/staging/secrets/README.md

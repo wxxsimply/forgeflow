@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a scoped ForgeFlow capability.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user or engineering problem, not only a preferred solution.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List measurable completion criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: State what this issue must not expand into.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Highest expected risk
+      options: [read, write, execute, network, external_side_effect]
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: Unit, integration, security, and evaluation coverage required.
+    validations:
+      required: true

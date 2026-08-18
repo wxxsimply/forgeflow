@@ -1,0 +1,72 @@
+groups:
+  - name: forgeflow-availability
+    rules:
+      - alert: ForgeFlowAPIDown
+        expr: up{job="forgeflow-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: ForgeFlow API is unavailable
+          runbook: docs/operations.md#api-or-worker-down
+      - alert: ForgeFlowWorkerDown
+        expr: up{job="forgeflow-worker"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: ForgeFlow worker is unavailable
+          runbook: docs/operations.md#api-or-worker-down
+      - alert: ForgeFlowHighHTTP5xxRate
+        expr: sum(rate(forgeflow_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(forgeflow_http_requests_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: More than 5 percent of API requests are failing
+          runbook: docs/operations.md#high-api-error-rate
+
+  - name: forgeflow-execution
+    rules:
+      - alert: ForgeFlowQueueBacklog
+        expr: forgeflow_queue_depth > 20
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: ForgeFlow worker queue is backlogged
+          runbook: docs/operations.md#queue-backlog
+      - alert: ForgeFlowBudgetExhaustions
+        expr: increase(forgeflow_budget_exhaustions_total[15m]) > 3
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Multiple runs exhausted safety budgets
+          runbook: docs/operations.md#budget-exhaustion-spike
+      - alert: ForgeFlowToolPolicyDenials
+        expr: sum(increase(forgeflow_tool_calls_total{policy_action="deny"}[15m])) > 10
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Tool policy denials are elevated
+          runbook: docs/operations.md#tool-policy-denial-spike
+      - alert: ForgeFlowApprovalWaitTooLong
+        expr: histogram_quantile(0.95, sum by (le) (rate(forgeflow_approval_wait_duration_seconds_bucket[30m]))) > 1800
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: P95 approval wait exceeds 30 minutes
+          runbook: docs/operations.md#approval-wait
+
+  - name: forgeflow-security
+    rules:
+      - alert: ForgeFlowLoginFailures
+        expr: sum(increase(forgeflow_auth_attempts_total{outcome=~"failure|rate_limited"}[10m])) > 20
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Login failures or rate limits are elevated
+          runbook: docs/operations.md#login-failure-spike
+      - alert: ForgeFlowRateLimitSpike
+        expr: sum(increase(forgeflow_rate_limit_rejections_total[10m])) > 30
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: API rate-limit rejections are elevated
+          runbook: docs/operations.md#rate-limit-spike

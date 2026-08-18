@@ -1,0 +1,339 @@
+name: forgeflow-staging
+
+x-forgeflow-common: &forgeflow-common
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,noexec,nosuid,nodev
+
+x-app-environment: &app-environment
+  FORGEFLOW_ENV: staging
+  FORGEFLOW_LOG_LEVEL: ${FORGEFLOW_LOG_LEVEL:-info}
+  FORGEFLOW_SERVICE_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+  FORGEFLOW_POSTGRES_ENABLED: "true"
+  FORGEFLOW_POSTGRES_DSN_FILE: /run/secrets/postgres_dsn
+  FORGEFLOW_OTEL_ENDPOINT: http://otel-collector:4318/v1/traces
+  FORGEFLOW_OTEL_SAMPLE_RATIO: ${FORGEFLOW_OTEL_SAMPLE_RATIO:-0.1}
+  FORGEFLOW_METRICS_ENABLED: "true"
+  FORGEFLOW_DATA_DIR: /var/lib/forgeflow
+  FORGEFLOW_ARTIFACT_ROOT: /var/lib/forgeflow/artifacts
+  FORGEFLOW_REPOSITORY_ROOTS: /repositories
+  FORGEFLOW_WORKFLOW_MODE: ${FORGEFLOW_WORKFLOW_MODE:-planning}
+  FORGEFLOW_PLANNER_MODE: ${FORGEFLOW_PLANNER_MODE:-mock}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: forgeflow
+      POSTGRES_DB: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGDATA: /var/lib/postgresql/17/docker
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeflow -d forgeflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-cli:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: cli
+    command: ["db", "migrate"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    environment:
+      <<: *app-environment
+    secrets:
+      - postgres_dsn
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *forgeflow-common
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      <<: *app-environment
+      FORGEFLOW_HTTP_ADDRESS: 0.0.0.0:8080
+      FORGEFLOW_HTTP_COOKIE_SECURE: "true"
+      FORGEFLOW_HTTP_COOKIE_DOMAIN: ${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
+      FORGEFLOW_HTTP_ALLOWED_ORIGINS: https://${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
+    secrets:
+      - postgres_dsn
+    volumes:
+      - type: bind
+        source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
+        target: /repositories
+        read_only: true
+      - artifacts:/var/lib/forgeflow/artifacts
+      - type: volume
+        source: workspaces
+        target: /var/lib/forgeflow/workspaces
+        read_only: true
+    networks:
+      - app
+      - data
+      - monitoring
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 20s
+
+  worker:
+    <<: *forgeflow-common
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-worker:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: worker
+    environment:
+      <<: *app-environment
+      FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091
+      FORGEFLOW_SANDBOX_WORKSPACE_ROOT: /var/lib/forgeflow/workspaces
+      FORGEFLOW_DOCKER_ENABLED: ${FORGEFLOW_DOCKER_ENABLED:-false}
+      FORGEFLOW_SANDBOX_IMAGE: ${FORGEFLOW_SANDBOX_IMAGE:-}
+    secrets:
+      - postgres_dsn
+    volumes:
+      - type: bind
+        source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
+        target: /repositories
+      - artifacts:/var/lib/forgeflow/artifacts
+      - workspaces:/var/lib/forgeflow/workspaces
+    networks:
+      - data
+      - monitoring
+      - worker-egress
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9091/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 90s
+
+  web:
+    <<: *forgeflow-common
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-web:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile
+      target: web
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-caddy:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    build:
+      context: ./caddy
+      dockerfile: Dockerfile
+      args:
+        CADDY_BASE_IMAGE: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
+    restart: unless-stopped
+    environment:
+      FORGEFLOW_DOMAIN: ${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    ports:
+      - "80:8080"
+      - "443:8443"
+      - "443:8443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+      - app
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    stop_grace_period: 20s
+
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector:0.157.0}
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    networks:
+      - monitoring
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    restart: unless-stopped
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.12.0}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - monitoring
+    depends_on:
+      - alertmanager
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.32.1}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yaml
+      - --storage.path=/alertmanager
+      - --enable-feature=utf8-strict-mode
+    secrets:
+      - alert_webhook_url
+    volumes:
+      - ./alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - monitoring
+      - alert-egress
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
+  backup:
+    profiles: ["ops"]
+    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    entrypoint: ["/bin/sh", "/ops/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: forgeflow
+      PGDATABASE: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    secrets:
+      - postgres_password
+    volumes:
+      - ./ops:/ops:ro
+      - ${FORGEFLOW_BACKUP_PATH:-./backups}:/backups
+    networks: [data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
+  restore-drill:
+    profiles: ["ops"]
+    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    entrypoint: ["/bin/sh", "/ops/restore-drill.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: forgeflow
+      RESTORE_DATABASE: ${FORGEFLOW_RESTORE_DATABASE:-forgeflow_restore_drill}
+      BACKUP_FILE: ${FORGEFLOW_BACKUP_FILE:-}
+      CONFIRM_RESTORE: ${FORGEFLOW_CONFIRM_RESTORE:-}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - ./ops:/ops:ro
+      - ${FORGEFLOW_BACKUP_PATH:-./backups}:/backups:ro
+    networks: [data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  postgres_dsn:
+    file: ./secrets/postgres_dsn
+  alert_webhook_url:
+    file: ./secrets/alert_webhook_url
+
+volumes:
+  postgres-data:
+  artifacts:
+  workspaces:
+  caddy-data:
+  caddy-config:
+  prometheus-data:
+  alertmanager-data:
+
+networks:
+  edge:
+  app:
+    internal: true
+  data:
+    internal: true
+  monitoring:
+    internal: true
+  worker-egress:
+  alert-egress:

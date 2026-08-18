@@ -1,0 +1,60 @@
+name: deployment-assets
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - web/Dockerfile
+      - web/nginx.conf
+      - deploy/**
+      - scripts/staging-*.ps1
+      - .github/workflows/deployment.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare non-sensitive validation inputs
+        shell: bash
+        run: |
+          mkdir -p deploy/staging/secrets .cache
+          printf '%s' 'ci-password-not-for-use' > deploy/staging/secrets/postgres_password
+          printf '%s' 'postgres://forgeflow:ci-password-not-for-use@postgres:5432/forgeflow?sslmode=disable' > deploy/staging/secrets/postgres_dsn
+          printf '%s' 'https://example.invalid/forgeflow-alert' > deploy/staging/secrets/alert_webhook_url
+          cat > .cache/staging-ci.env <<EOF
+          FORGEFLOW_RELEASE=0.0.0-ci
+          FORGEFLOW_DOMAIN=forgeflow-ci.example.invalid
+          ACME_EMAIL=ci@example.invalid
+          FORGEFLOW_REPOSITORY_PATH=${GITHUB_WORKSPACE}
+          EOF
+
+      - name: Validate Compose isolation contract
+        run: docker compose --env-file .cache/staging-ci.env -f deploy/staging/compose.yaml config --quiet
+
+      - name: Validate Caddy configuration
+        run: docker run --rm -e FORGEFLOW_DOMAIN=forgeflow-ci.example.invalid -e ACME_EMAIL=ci@example.invalid -v "$PWD/deploy/staging/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Validate Prometheus and alert rules
+        run: docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/staging/prometheus:/etc/prometheus:ro" prom/prometheus:v3.12.0 check config /etc/prometheus/prometheus.yaml
+
+      - name: Validate Alertmanager configuration
+        run: docker run --rm --entrypoint /bin/amtool -v "$PWD/deploy/staging/alertmanager:/etc/alertmanager:ro" -v "$PWD/deploy/staging/secrets/alert_webhook_url:/run/secrets/alert_webhook_url:ro" prom/alertmanager:v0.32.1 check-config /etc/alertmanager/alertmanager.yaml
+
+      - name: Validate OpenTelemetry Collector configuration
+        run: docker run --rm -v "$PWD/deploy/staging/otel-collector.yaml:/etc/otelcol/config.yaml:ro" otel/opentelemetry-collector:0.157.0 validate --config=/etc/otelcol/config.yaml
+
+      - name: Build API, Worker, and Web images with attestations
+        run: |
+          docker buildx build --load --provenance=true --sbom=true --target api -t forgeflow-api:ci .
+          docker buildx build --load --provenance=true --sbom=true --target worker -t forgeflow-worker:ci .
+          docker buildx build --load --provenance=true --sbom=true --target web -f web/Dockerfile -t forgeflow-web:ci .
+          docker buildx build --load --provenance=true --sbom=true -t forgeflow-caddy:ci deploy/staging/caddy
+          docker buildx build --load --provenance=true --sbom=true -t forgeflow-sandbox:ci deploy/sandbox

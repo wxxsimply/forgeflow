@@ -1,0 +1,29 @@
+name: full-eval-contract
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 18 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-eval:
+    name: Validate all 30 fixed cases
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run planner contract eval
+        run: go run ./cmd/forgeflow eval --suite planner/v1
+      - name: Validate the complete software dataset
+        run: go run ./cmd/forgeflow eval --suite software/v1 --validate-only
+      - name: Run deterministic grader and promotion tests
+        run: go test ./internal/eval -run "Test(Comparison|Promotion|Deterministic|Software)"

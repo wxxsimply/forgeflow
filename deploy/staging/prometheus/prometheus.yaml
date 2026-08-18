@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: staging
+    service: forgeflow
+
+rule_files:
+  - /etc/prometheus/alerts.yaml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: forgeflow-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8080"]
+  - job_name: forgeflow-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9091"]
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]

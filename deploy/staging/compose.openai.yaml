@@ -1,0 +1,54 @@
+services:
+  worker:
+    environment:
+      FORGEFLOW_WORKFLOW_MODE: development
+      FORGEFLOW_PLANNER_MODE: openai
+      FORGEFLOW_DOCKER_ENABLED: "true"
+      DOCKER_HOST: tcp://sandbox-engine:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+    secrets:
+      - openai_api_key
+    volumes:
+      - sandbox-docker-certs:/certs/client:ro
+    networks:
+      - worker-execution
+    depends_on:
+      sandbox-engine:
+        condition: service_healthy
+
+  sandbox-engine:
+    image: ${DOCKER_DIND_IMAGE:-docker:28.4-dind}
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+      HEALTHCHECK_TCP_PORT: "2376"
+    volumes:
+      - sandbox-docker-data:/var/lib/docker
+      - sandbox-docker-certs:/certs/client
+      - workspaces:/var/lib/forgeflow/workspaces
+    networks:
+      - worker-execution
+      - worker-egress
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  worker-execution:
+    internal: true
+
+volumes:
+  sandbox-docker-data:
+  sandbox-docker-certs:
+
+secrets:
+  openai_api_key:
+    file: ./secrets/openai_api_key
