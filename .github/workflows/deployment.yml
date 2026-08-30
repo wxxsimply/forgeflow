@@ -44,10 +44,16 @@ jobs:
       - name: Validate OpenTelemetry Collector configuration
         run: docker run --rm -v "$PWD/deploy/staging/otel-collector.yaml:/etc/otelcol/config.yaml:ro" otel/opentelemetry-collector:0.157.0 validate --config=/etc/otelcol/config.yaml
 
-      - name: Build API, Worker, and Web images with attestations
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Build OCI images with attestations
         run: |
-          docker buildx build --load --provenance=true --sbom=true --target api -t forgeflow-api:ci .
-          docker buildx build --load --provenance=true --sbom=true --target worker -t forgeflow-worker:ci .
-          docker buildx build --load --provenance=true --sbom=true --target web -f web/Dockerfile -t forgeflow-web:ci .
-          docker buildx build --load --provenance=true --sbom=true -t forgeflow-caddy:ci deploy/staging/caddy
-          docker buildx build --load --provenance=true --sbom=true -t forgeflow-sandbox:ci deploy/sandbox
+          mkdir -p .cache/oci
+          docker buildx build --provenance=true --sbom=true --target api -t forgeflow-api:ci --output=type=oci,dest=.cache/oci/forgeflow-api.tar .
+          docker buildx build --provenance=true --sbom=true --target worker -t forgeflow-worker:ci --output=type=oci,dest=.cache/oci/forgeflow-worker.tar .
+          docker buildx build --provenance=true --sbom=true --target web -f web/Dockerfile -t forgeflow-web:ci --output=type=oci,dest=.cache/oci/forgeflow-web.tar .
+          docker buildx build --provenance=true --sbom=true -t forgeflow-caddy:ci --output=type=oci,dest=.cache/oci/forgeflow-caddy.tar deploy/staging/caddy
+          docker buildx build --provenance=true --sbom=true -t forgeflow-sandbox:ci --output=type=oci,dest=.cache/oci/forgeflow-sandbox.tar deploy/sandbox

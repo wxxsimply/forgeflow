@@ -78,23 +78,25 @@ gh workflow run deployment.yml --repo wxxsimply/forgeflow --ref main
 
 等待运行结束，确认 Compose、Caddy、Prometheus、Alertmanager、OpenTelemetry Collector 和五类镜像构建全部通过。
 
-首次手动运行 `32163878250` 已结束但失败。失败发生在 OpenTelemetry Collector 配置校验：0.157.0 不再接受旧的 `service.telemetry.metrics.address`。本地已依据该版本官方示例迁移为 `metrics.readers.pull.exporter.prometheus`，继续暴露 `0.0.0.0:8888` 给 Prometheus。由于本机 Docker Desktop 未运行，最终验证必须在修复上传后通过同一 GitHub Workflow 重跑完成。
+首次手动运行 `32163878250` 已结束但失败。失败发生在 OpenTelemetry Collector 配置校验：0.157.0 不再接受旧的 `service.telemetry.metrics.address`。该问题已在提交 `0d633da` 中迁移为 `metrics.readers.pull.exporter.prometheus`，继续暴露 `0.0.0.0:8888`；后续 Run `33305238725` 已通过 Collector 配置校验。
 
-人工提交该修复：
+Run `33305238725` 随后在镜像构建阶段失败：默认 Docker driver 配合 `--load` 不支持 provenance/SBOM attestations。Workflow 已在本地改为使用 `docker/setup-buildx-action@v3` 创建 docker-container builder，并将五类构建结果输出为 OCI archive，使 attestation 能随 OCI image index 导出。
+
+人工提交 Buildx/OCI 修复：
 
 ```powershell
 git status --short
 git diff --check
 git diff
-git add deploy/staging/otel-collector.yaml FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md docs/stage-1-github-baseline-audit.md
+git add .github/workflows/deployment.yml FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md docs/stage-1-github-baseline-audit.md
 git diff --cached --check
-git commit -m "fix: migrate collector telemetry metrics config"
+git commit -m "ci: export attested images as OCI archives"
 git push origin main
 ```
 
 随后再次执行 `gh workflow run deployment.yml --repo wxxsimply/forgeflow --ref main`。
 
-Workflow 修复已经上传。当前 OpenTelemetry 配置修复应作为启用分支保护前最后一次直接更新 `main`；上传并验证后再配置 Ruleset，后续修改全部通过分支和 Pull Request。
+OpenTelemetry 配置修复已经上传。当前 Buildx/OCI 修复应作为启用分支保护前最后一次直接更新 `main`；上传并验证后再配置 Ruleset，后续修改全部通过分支和 Pull Request。
 
 ### 4.3 配置仓库治理
 
