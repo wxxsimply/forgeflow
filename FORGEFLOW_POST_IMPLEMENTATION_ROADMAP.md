@@ -117,7 +117,7 @@ git status --ignored --short
 
 ## 5. 阶段 1：手动建立 Git 和 GitHub 基线
 
-> 当前状态：进行中（GitHub CI、`deployment-assets` 和 `main` Ruleset 已通过；13 个 Dependabot 告警均指向 `golang.org/x/crypto v0.51.0`，本地安全分支已升级至 `v0.52.0`，等待人工提交并通过受保护 Pull Request 合并）
+> 当前状态：已完成（2026-08-30，PR #2 已合并，四项必需检查全部通过，Dependabot 未关闭告警为 0）
 > 进入条件：已满足（阶段 0 于 2026-08-19 完成）。
 > 人工操作：本阶段所有提交、建仓、上传和 GitHub Settings 操作都必须手动完成。
 
@@ -242,17 +242,17 @@ git push -u origin main
 - [x] OpenTelemetry 配置修复已人工上传并通过 Collector 0.157.0 校验（`0d633da`）。
 - [x] Buildx/OCI attestation 修复已人工上传，且 `deployment-assets` 手动重跑通过（Run `33305656504`）。
 - [x] Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已确认启用。
-- [ ] `golang.org/x/crypto v0.52.0` 安全升级已通过受保护 Pull Request 合并，13 个 Dependabot 告警已关闭。
+- [x] `golang.org/x/crypto v0.52.0` 安全升级已通过受保护 Pull Request #2 合并，13 个 Dependabot 告警已关闭（合并提交 `acae145`）。
 
 ---
 
 ## 6. 阶段 2：建立真实 Eval Fixture
 
-> 当前状态：未开始  
+> 当前状态：进行中（本地已生成 30 个真实 Fixture commit 和隔离私有 Grader，双向审计全部通过；等待仓库所有者人工创建并上传两个 Private GitHub 仓库、配置保护和访问控制）
 > 进入条件：阶段 1 完成，主仓库已受保护且 CI 通过。  
 > 本阶段目标：把 30 条任务定义变成 30 个可执行、不可变、可重复验证的真实 Case。
 
-当前 `software/v1` 有 30 条任务定义，但 `fixtureCommit` 是占位 SHA。首先应建立独立 fixture 仓库。
+当前 `software/v1` 的 30 条任务定义已经回填为本地独立 Fixture 仓库中的真实 commit；固定映射见 `evals/software-v1-fixtures.lock.json`。在人工上传 Private GitHub 仓库并验证远端访问控制前，阶段 2 仍保持进行中。
 
 ### 6.1 Fixture 仓库设计
 
@@ -303,11 +303,11 @@ go run ./cmd/forgeflow eval `
 
 验收标准：
 
-- [ ] 30 个 SHA 全部能由 `git cat-file` 解析为 commit。
-- [ ] 没有占位 SHA。
-- [ ] Agent 无法读取隐藏测试。
-- [ ] 每个 Case 能在干净 worktree 中重复运行。
-- [ ] Fixture 仓库没有真实用户数据和 Secret。
+- [x] 30 个 SHA 全部能由 `git cat-file` 解析为 commit。
+- [x] 没有占位 SHA，且 30 个 Case 使用 30 个唯一 commit。
+- [x] 隐藏测试位于独立本地 Grader 仓库，不在 Fixture commit 和 Agent worktree 中。
+- [x] 每个 Case 已在干净 clone 中运行公开验证，并通过基线拒绝/正确实现接受的双向审计。
+- [x] Fixture 仓库没有真实用户数据、Secret 和隐藏 Grader 源码。
 
 ### 6.5 阶段交付物
 
@@ -319,10 +319,10 @@ go run ./cmd/forgeflow eval `
 
 ### 6.6 阶段 2 退出门槛
 
-- [ ] `--fixture-repository` 对全部 30 个 Case 验证通过。
-- [ ] 占位 SHA 数量为 0。
-- [ ] 30 个 Case 均能从干净 worktree 启动。
-- [ ] 隐藏测试不在 Agent 可读目录和模型上下文中。
+- [x] `--fixture-repository` 对全部 30 个 Case 验证通过。
+- [x] 占位 SHA 数量为 0。
+- [x] 30 个 Case 均能从干净 worktree 启动。
+- [x] 本地验证中隐藏测试不在 Agent worktree 和公开 Fixture 仓库中。
 - [ ] ForgeFlow Agent 对 Fixture 和隐藏测试仓库没有写权限。
 - [ ] Fixture 变更必须经过人工 Pull Request 审查。
 
@@ -908,8 +908,8 @@ Release 应包含：
 | 阶段 | 状态 | 负责人 | 开始日期 | 完成日期 | 证据位置 |
 |---|---|---|---|---|---|
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
-| 1 Git 与 GitHub 基线 | 进行中 | 仓库所有者 | 2026-08-18 |  | `docs/stage-1-github-baseline-audit.md` |
-| 2 真实 Eval Fixture | 未开始 | 待填写 |  |  |  |
+| 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
+| 2 真实 Eval Fixture | 进行中 | 仓库所有者 | 2026-08-30 |  | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json` |
 | 3 三基线 Eval | 未开始 | 待填写 |  |  |  |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
@@ -918,4 +918,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 1：Git 与 GitHub 基线**。阶段 0 已全部完成；阶段 1 已完成人工首次提交和上传，下一步由仓库所有者手动提交并上传 Go 1.26.6 修复，等待必需 CI 通过，再配置并确认 `main` Ruleset、Secret scanning 和依赖安全功能。阶段 1 全部门槛通过前不要进入 Eval、服务器部署或版本发布。
+当前处于**阶段 2：真实 Eval Fixture**。阶段 1 已全部完成；阶段 2 的本地 Fixture、30 个真实 commit、隔离 Grader 和双向验证已经完成。下一步由仓库所有者人工创建并上传两个 Private GitHub 仓库，配置不可变分支/标签与最小权限；这些远端门禁确认前不要进入三基线 Eval、服务器部署或版本发布。

@@ -1,0 +1,7 @@
+{
+  "name": "forgeflow-eval-fixture",
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix web test"
+  }
+}

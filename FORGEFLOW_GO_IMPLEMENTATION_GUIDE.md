@@ -1332,7 +1332,7 @@ Execution Plane:
 
 ### 阶段 10：Observability 与 Eval（5～7 天）
 
-> 状态：部分完成（2026-08-13 复核）。OpenTelemetry、Metrics、确定性 Grader、三基线报告格式、Eval 报告持久化/API/Web 页面、Prompt Promotion/不可变回滚记录及门禁代码均已完成。CLI 新增 `--fixture-repository`，可验证每个 SHA 确实是 Git commit。当前数据集虽有 30 条任务定义，但 `fixtureCommit` 仍是占位 SHA，也没有三种模式的真实 Provider evidence，因此阶段最终门槛未通过，不记录虚构成绩。
+> 状态：部分完成（2026-08-30 复核）。OpenTelemetry、Metrics、确定性 Grader、三基线报告格式、Eval 报告持久化/API/Web 页面、Prompt Promotion/不可变回滚记录及门禁代码均已完成。30 个 `fixtureCommit` 已替换为本地独立 Fixture 仓库中的真实 commit，并通过隔离 Grader 双向审计；两个 Private 仓库的人工上传、远端权限复验和三种模式的真实 Provider evidence 尚未完成，因此阶段最终门槛未通过，不记录虚构成绩。
 
 任务：OpenTelemetry、Metrics、成本、30 个任务、Grader、Baseline 和 Prompt Promotion。
 
@@ -1384,7 +1384,7 @@ Execution Plane:
 
 ## 21. 当前立刻要做的下一轮
 
-截至 2026-08-13 的完整审计见 `docs/completion-audit.md`。阶段 0～9 的工程实现已完成；阶段 10、11 仅完成可在仓库内交付和验证的部分。当前工作区尚无可解析的 Git `HEAD`，30 条 Eval 的 `fixtureCommit` 仍是占位 SHA，且未配置真实 Provider、域名、Registry、服务器和 Secret，因此不得伪造“真实三基线成绩”或“Staging 已上线”。
+截至 2026-08-30 的更新审计见 `docs/completion-audit.md`。阶段 0～9 的工程实现和 GitHub 基线已完成；阶段 10 的本地真实 Fixture 与隔离 Grader已完成，阶段 11 仍只完成可在仓库内交付和验证的部分。当前尚未完成两个 Private Eval 仓库的远端权限复验，也未配置真实 Provider、域名、Registry、服务器和 Secret，因此不得伪造“真实三基线成绩”或“Staging 已上线”。
 
 阶段 10 已完成的实现项：
 
@@ -1445,7 +1445,7 @@ Execution Plane:
 
 ### 评测与运维
 
-- [ ] 至少 30 个固定 Eval Case（已有 30 条任务定义，但 commit 仍是占位 SHA）。
+- [x] 至少 30 个固定 Eval Case（本地 30 个真实唯一 commit 已通过 CLI 和隔离 Grader 验证；远端 Private 仓库权限复验仍按后续路线图执行）。
 - [ ] 单 Agent、简化流程、ForgeFlow 对比报告。
 - [ ] Prompt/模型升级门禁和回滚完成。
 - [ ] HTTPS、备份、恢复、监控、告警、发布回滚完成。

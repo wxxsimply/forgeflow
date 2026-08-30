@@ -1,0 +1,7 @@
+{
+  "name": "forgeflow-eval-web-fixture",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/test.mjs"
+  }
+}
