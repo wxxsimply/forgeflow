@@ -1,6 +1,6 @@
 # ForgeFlow 实施手册完成后的分阶段任务路线图
 
-> 文档版本：2026-08-19
+> 文档版本：2026-08-30
 > 前置文档：`FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md`  
 > 当前审计：`docs/completion-audit.md`
 
@@ -117,7 +117,7 @@ git status --ignored --short
 
 ## 5. 阶段 1：手动建立 Git 和 GitHub 基线
 
-> 当前状态：进行中（2026-08-30 Linux CI 和 OpenTelemetry Collector 配置校验已通过；`deployment-assets` 又暴露出默认 Docker driver 不支持 attestation，本地已改用 Buildx docker-container builder 和 OCI 输出；等待人工上传并重跑，`main` Ruleset 仍待配置）
+> 当前状态：进行中（GitHub CI、`deployment-assets` 和 `main` Ruleset 已通过；13 个 Dependabot 告警均指向 `golang.org/x/crypto v0.51.0`，本地安全分支已升级至 `v0.52.0`，等待人工提交并通过受保护 Pull Request 合并）
 > 进入条件：已满足（阶段 0 于 2026-08-19 完成）。
 > 人工操作：本阶段所有提交、建仓、上传和 GitHub Settings 操作都必须手动完成。
 
@@ -178,7 +178,7 @@ git push -u origin main
 
 上传完成后，在 GitHub 网页人工确认：
 
-- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`0d633da`；当前另有 Buildx/OCI 修复待提交）。
+- [x] 最新已上传 commit SHA 与升级分支创建前的本地 `main` 一致（`589256a0b910d272f91e2f5bb989b3ce789e4348`）。
 - [x] `.env`、`.forgeflow`、Secret 文件和构建产物没有出现在已上传提交中。
 - [x] Actions 已识别 `ci.yml`、`deployment.yml` 和 `eval.yml`。
 - [x] README 和文档可以正常浏览。
@@ -193,8 +193,8 @@ git push -u origin main
 
 - 禁止直接推送到 `main`。
 - 必须通过 Pull Request 合并。
-- 至少一名审查人批准。
-- 安全、Prompt、Policy、Auth、Migration 和 Sandbox 修改不得由作者自批。
+- 单维护者阶段允许审批数为 0，由必需检查阻止不合格变更；引入协作者后应提升为至少 1 名非作者批准。
+- 安全、Prompt、Policy、Auth、Migration 和 Sandbox 修改在多人维护阶段不得由作者自批。
 - 要求 CI、Web、PostgreSQL Integration 和 Deployment Assets 检查通过。
 - `deployment-assets` 必须对所有指向 `main` 的 Pull Request 运行，避免路径过滤使必需检查永久等待。
 - 禁止强制推送和删除 `main`。
@@ -232,16 +232,17 @@ git push -u origin main
 
 ### 5.7 阶段 1 退出门槛
 
-- [x] 本地存在可解析的 `HEAD`（`0d633da`）。
+- [x] 本地存在可解析的 `HEAD`（升级分支基线 `589256a`）。
 - [x] 代码已由仓库所有者手动上传到 GitHub。
 - [x] 最新已上传 commit 的远端 SHA 与本地 `HEAD` 一致。
 - [x] GitHub 上不存在 Secret、运行数据、二进制和私有 Evidence。
-- [ ] `main` 禁止直接推送并要求 Pull Request。
-- [x] 最新 `ci` 在 GitHub Linux Runner 上全部通过，包括 Race Detector、浏览器 E2E 和 PostgreSQL Integration（Run `32163866073`）。
+- [x] `main` 已由 Active Ruleset `forgeflow`（ID `21852556`）禁止直接推送，并要求 Pull Request。
+- [x] 最新 `ci` 在 GitHub Linux Runner 上全部通过，包括 Race Detector、浏览器 E2E 和 PostgreSQL Integration（Run `33305651867`）。
 - [x] `deployment-assets` 已对所有指向 `main` 的 Pull Request 运行（`a0751a5`）。
 - [x] OpenTelemetry 配置修复已人工上传并通过 Collector 0.157.0 校验（`0d633da`）。
-- [ ] Buildx/OCI attestation 修复已人工上传，且 `deployment-assets` 手动重跑通过。
+- [x] Buildx/OCI attestation 修复已人工上传，且 `deployment-assets` 手动重跑通过（Run `33305656504`）。
 - [x] Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已确认启用。
+- [ ] `golang.org/x/crypto v0.52.0` 安全升级已通过受保护 Pull Request 合并，13 个 Dependabot 告警已关闭。
 
 ---
 
