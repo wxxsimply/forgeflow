@@ -248,11 +248,11 @@ git push -u origin main
 
 ## 6. 阶段 2：建立真实 Eval Fixture
 
-> 当前状态：进行中（本地已生成 30 个真实 Fixture commit 和隔离私有 Grader，双向审计全部通过；等待仓库所有者人工创建并上传两个 Private GitHub 仓库、配置保护和访问控制）
+> 当前状态：已完成（2026-08-30；两个仓库均为 Private + Archived，Fixture 使用仓库级只读 Deploy Key 且无法访问 Grader，远端干净 clone 和双向审计通过）
 > 进入条件：阶段 1 完成，主仓库已受保护且 CI 通过。  
 > 本阶段目标：把 30 条任务定义变成 30 个可执行、不可变、可重复验证的真实 Case。
 
-当前 `software/v1` 的 30 条任务定义已经回填为本地独立 Fixture 仓库中的真实 commit；固定映射见 `evals/software-v1-fixtures.lock.json`。在人工上传 Private GitHub 仓库并验证远端访问控制前，阶段 2 仍保持进行中。
+当前 `software/v1` 的 30 条任务定义已经回填为独立 Private Fixture 仓库中的真实 commit；固定映射见 `evals/software-v1-fixtures.lock.json`。GitHub Free 不支持 Private Ruleset，因此采用 Private + Archived 等效控制：仓库归档后代码、分支、标签和权限对所有用户只读，新数据集版本必须先解除归档、完成人工审计并重新归档。
 
 ### 6.1 Fixture 仓库设计
 
@@ -298,7 +298,7 @@ git push -u origin main
 go run ./cmd/forgeflow eval `
   --suite software/v1 `
   --validate-only `
-  --fixture-repository D:\fixtures\forgeflow-eval
+  --fixture-repository D:\fixtures\forgeflow-eval-fixtures
 ```
 
 验收标准：
@@ -322,9 +322,9 @@ go run ./cmd/forgeflow eval `
 - [x] `--fixture-repository` 对全部 30 个 Case 验证通过。
 - [x] 占位 SHA 数量为 0。
 - [x] 30 个 Case 均能从干净 worktree 启动。
-- [x] 本地验证中隐藏测试不在 Agent worktree 和公开 Fixture 仓库中。
-- [ ] ForgeFlow Agent 对 Fixture 和隐藏测试仓库没有写权限。
-- [ ] Fixture 变更必须经过人工 Pull Request 审查。
+- [x] 本地及远端干净 clone 验证中，隐藏测试均不在 Agent worktree 和 Fixture 仓库中。
+- [x] ForgeFlow Agent 的仓库级 Deploy Key 对 Fixture 只读，并已验证同一密钥无法访问 Grader。
+- [x] 两个 Private 仓库均已 Archived；写入 dry-run 返回 HTTP 403，新版本必须解除归档、人工审计并重新归档。
 
 ---
 
@@ -909,7 +909,7 @@ Release 应包含：
 |---|---|---|---|---|---|
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
-| 2 真实 Eval Fixture | 进行中 | 仓库所有者 | 2026-08-30 |  | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json` |
+| 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 未开始 | 待填写 |  |  |  |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
@@ -918,4 +918,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 2：真实 Eval Fixture**。阶段 1 已全部完成；阶段 2 的本地 Fixture、30 个真实 commit、隔离 Grader 和双向验证已经完成。下一步由仓库所有者人工创建并上传两个 Private GitHub 仓库，配置不可变分支/标签与最小权限；这些远端门禁确认前不要进入三基线 Eval、服务器部署或版本发布。
+当前处于**阶段 3：真实三基线 Eval 的准备入口**。阶段 0～2 已全部完成；阶段 2 使用 GitHub Free 可执行的 Private + Archived 只读控制替代 Private Ruleset，并通过只读 Deploy Key、Grader 拒绝访问、远端干净 clone 和写入拒绝验证。下一步开始配置真实 Provider 和三条执行链，但仍不得伪造 Token、成本、延迟或模型成绩。
