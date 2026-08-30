@@ -1,14 +1,14 @@
 # ForgeFlow Eval evidence and baselines
 
-`internal/eval/datasets/software_v1.json` defines the immutable 30-case `software/v1` dataset contract. At present its `fixtureCommit` values are explicit placeholder SHAs; the dataset shape is usable for contract tests, but it is **not yet an executable baseline suite**.
+`internal/eval/datasets/software_v1.json` defines the immutable 30-case `software/v1` dataset contract. Version `2026-08-30` points to 30 real, unique commits generated in the dedicated local Fixture repository. The reviewed mapping is recorded in `evals/software-v1-fixtures.lock.json`.
 
-Before collecting evidence, create a dedicated fixture repository, replace every placeholder with a real immutable commit, and prove that all selected commits exist:
+Before collecting evidence, manually upload the Fixture and private Grader repositories, enforce their access controls, clone the Fixture repository into the execution environment, and prove that all selected commits exist:
 
 ```powershell
-go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval
+go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
 ```
 
-Without `--fixture-repository`, `--validate-only` validates only schema, category counts, grader inputs, and budgets. Its output contains `"fixturesVerified": false`; it must never be cited as a completed 30-case run.
+Without `--fixture-repository`, `--validate-only` validates only schema, category counts, grader inputs, and budgets. Its output contains `"fixturesVerified": false`; it must never be cited as a completed 30-case run. Local Fixture verification is not a substitute for the pending manual GitHub access-control and clean remote-clone audit.
 
 Real executor observations should be stored outside source control while they may contain repository details, then passed to:
 

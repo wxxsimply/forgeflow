@@ -1,0 +1,156 @@
+{
+  "dataset": "software/v1",
+  "version": "2026-08-30",
+  "cases": [
+    {
+      "id": "feature-01",
+      "commit": "b5d054fb94d56c37a8af69e3aff79599f49cc3d1",
+      "ref": "refs/tags/software-v1/feature-01"
+    },
+    {
+      "id": "feature-02",
+      "commit": "bfa6337ad38ed54c9e39dee05903abebbe0f9390",
+      "ref": "refs/tags/software-v1/feature-02"
+    },
+    {
+      "id": "feature-03",
+      "commit": "6f0fc01158ac214f8a5a01dea213b2f2a7e35dec",
+      "ref": "refs/tags/software-v1/feature-03"
+    },
+    {
+      "id": "feature-04",
+      "commit": "a61af97b2b3b7a6e09427f14f27e0e7580c0150b",
+      "ref": "refs/tags/software-v1/feature-04"
+    },
+    {
+      "id": "feature-05",
+      "commit": "8bf291806221bb1af349f1a160f8de8a9210526e",
+      "ref": "refs/tags/software-v1/feature-05"
+    },
+    {
+      "id": "feature-06",
+      "commit": "ff9fa82cf8f4781941a3da818360993bdf0df5c9",
+      "ref": "refs/tags/software-v1/feature-06"
+    },
+    {
+      "id": "feature-07",
+      "commit": "ca23bd01457b345db20836ca0f1940a43e6269ba",
+      "ref": "refs/tags/software-v1/feature-07"
+    },
+    {
+      "id": "feature-08",
+      "commit": "4b6ca78b670c811feed6daca1444f60b5fbf72e2",
+      "ref": "refs/tags/software-v1/feature-08"
+    },
+    {
+      "id": "bugfix-01",
+      "commit": "7a44b8614f0b1903e5872995bd36852e0a553b78",
+      "ref": "refs/tags/software-v1/bugfix-01"
+    },
+    {
+      "id": "bugfix-02",
+      "commit": "e8f22443cc5c8381194a76f6e9a1ea31ac88bed9",
+      "ref": "refs/tags/software-v1/bugfix-02"
+    },
+    {
+      "id": "bugfix-03",
+      "commit": "9349ac625c6bf8557e70d665b74d746a588311fe",
+      "ref": "refs/tags/software-v1/bugfix-03"
+    },
+    {
+      "id": "bugfix-04",
+      "commit": "da47b978c6481ace921e46a41cb847574a1f496c",
+      "ref": "refs/tags/software-v1/bugfix-04"
+    },
+    {
+      "id": "bugfix-05",
+      "commit": "6d7f411277705142aa6900896e2652c67aed4e3b",
+      "ref": "refs/tags/software-v1/bugfix-05"
+    },
+    {
+      "id": "bugfix-06",
+      "commit": "789e8b1a1f5da137aca767bf51895899e33f2bda",
+      "ref": "refs/tags/software-v1/bugfix-06"
+    },
+    {
+      "id": "tests-01",
+      "commit": "88aedad99258a9a954115c37f65851754a863669",
+      "ref": "refs/tags/software-v1/tests-01"
+    },
+    {
+      "id": "tests-02",
+      "commit": "b18b1f188f1bce76b176c78d66536d0b4b92c24a",
+      "ref": "refs/tags/software-v1/tests-02"
+    },
+    {
+      "id": "tests-03",
+      "commit": "dab3bedf29b47249a7bd7127b95da3484c709d10",
+      "ref": "refs/tags/software-v1/tests-03"
+    },
+    {
+      "id": "tests-04",
+      "commit": "7c1e4e4a65e0095e5b7379591df62f82501a869a",
+      "ref": "refs/tags/software-v1/tests-04"
+    },
+    {
+      "id": "security-01",
+      "commit": "a9176733290aac870c10b2f13c760badd8576134",
+      "ref": "refs/tags/software-v1/security-01"
+    },
+    {
+      "id": "security-02",
+      "commit": "3eac9c6677d6b66584b8e84d917f507d80df3228",
+      "ref": "refs/tags/software-v1/security-02"
+    },
+    {
+      "id": "security-03",
+      "commit": "77358232139471da55da79b7131f5c3750387e4e",
+      "ref": "refs/tags/software-v1/security-03"
+    },
+    {
+      "id": "security-04",
+      "commit": "f6f6cbf65308d67778aa31a539264b49e5c1a248",
+      "ref": "refs/tags/software-v1/security-04"
+    },
+    {
+      "id": "refactor-01",
+      "commit": "a4e20187775c65efe23262ddd16b4be0425e8ba7",
+      "ref": "refs/tags/software-v1/refactor-01"
+    },
+    {
+      "id": "refactor-02",
+      "commit": "98ef1ace0bcf079bb3024f030f8f55b2b567f35f",
+      "ref": "refs/tags/software-v1/refactor-02"
+    },
+    {
+      "id": "refactor-03",
+      "commit": "68c3db890f1fe57837c16a8dcf4931829d48cc31",
+      "ref": "refs/tags/software-v1/refactor-03"
+    },
+    {
+      "id": "ambiguous-01",
+      "commit": "802a7d3a86aad1012076037ce50648abacf33665",
+      "ref": "refs/tags/software-v1/ambiguous-01"
+    },
+    {
+      "id": "ambiguous-02",
+      "commit": "6531020912c82948e6f3839e2b1a46727c3d9888",
+      "ref": "refs/tags/software-v1/ambiguous-02"
+    },
+    {
+      "id": "dangerous-01",
+      "commit": "cfdd764ce98484dd30a14622c041502a858990d8",
+      "ref": "refs/tags/software-v1/dangerous-01"
+    },
+    {
+      "id": "dangerous-02",
+      "commit": "4742f0ca97573887d39f11c509c6f114f90bc551",
+      "ref": "refs/tags/software-v1/dangerous-02"
+    },
+    {
+      "id": "dangerous-03",
+      "commit": "e029f7690e4ea581e1e6856276df871821c50fdf",
+      "ref": "refs/tags/software-v1/dangerous-03"
+    }
+  ]
+}

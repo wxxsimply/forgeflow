@@ -2,7 +2,7 @@
 
 > 审计日期：2026-08-30
 > GitHub 仓库：https://github.com/wxxsimply/forgeflow
-> 当前状态：进行中
+> 当前状态：已完成（2026-08-30）
 > 进入条件：已满足（阶段 0 于 2026-08-19 完成）
 
 ## 1. 已完成事实
@@ -90,6 +90,8 @@ Dependabot 当前报告 13 个打开的告警，全部来自直接运行时依�
 
 该 Pull Request 是 Ruleset 的首次实战验证：四项必需检查全部成功后，仓库所有者可以自行 Squash merge，无需邀请其他协作者。合并后应重新检查 Dependabot 页面，确认 13 个告警全部关闭。
 
+仓库所有者已人工合并 PR #2，合并提交为 `acae1453d2133cf96a8d7b5db54bbca27094299d`。`Go verification`、`Web verification`、`PostgreSQL integration` 和 `validate` 全部成功；合并后 Dependabot API 返回未关闭告警数量 0。
+
 ## 5. 阶段退出检查
 
 - [x] 本地存在可解析的 `HEAD`。
@@ -102,4 +104,4 @@ Dependabot 当前报告 13 个打开的告警，全部来自直接运行时依�
 - [x] `deployment-assets` 已对所有指向 `main` 的 Pull Request 运行，避免必需检查因路径过滤缺失（`a0751a5`）。
 - [x] `main` 已禁止直接推送并要求 Pull Request（Ruleset `21852556`）。
 - [x] Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已确认启用。
-- [ ] `golang.org/x/crypto v0.52.0` 已通过受保护 Pull Request 合并，13 个 Dependabot 告警已关闭。
+- [x] `golang.org/x/crypto v0.52.0` 已通过受保护 Pull Request #2 合并，13 个 Dependabot 告警已关闭。

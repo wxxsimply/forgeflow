@@ -34,7 +34,7 @@ go run ./cmd/forgeflow eval --suite software/v1 --validate-only --limit 6
 go run ./cmd/forgeflow eval --suite software/v1 --validate-only
 
 # 只有此命令通过，才能声称 30 个 fixture 已经真实固定
-go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval
+go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
 
 # 使用三条执行链采集的真实 evidence 生成对比报告
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evidence.json --format json --output .forgeflow/evals/comparison.json
@@ -44,4 +44,4 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evid
 go run ./cmd/forgeflow eval --promote-current .forgeflow/evals/current.json --promote-candidate .forgeflow/evals/candidate.json --approve
 ```
 
-Evidence 文件契约和历史报告保存规则见 `evals/README.md`。当前数据集的 30 个 `fixtureCommit` 仍为占位 SHA；真实三基线执行需要先替换为固定 fixture 仓库中的真实 commit，再提供可用模型配置及实际 Token/延迟记录。在这些证据不存在时，Runner 会拒绝生成宣传性数字。因此，工程能力已接入，但不能把仅通过普通 `--validate-only` 误称为真实 Baseline 成绩。
+Evidence 文件契约和历史报告保存规则见 `evals/README.md`。当前数据集的 30 个 `fixtureCommit` 已替换为本地独立 Fixture 仓库中的真实 commit，并通过正式 CLI 和私有 Grader 双向审计；仍需由仓库所有者人工上传两个 Private GitHub 仓库、配置最小权限并完成远端干净 clone 复验。完成这些操作后，还要提供真实模型配置及实际 Token、成本和延迟证据，才能运行三基线 Eval；不得把本地 Fixture 验证误称为真实 Baseline 成绩。

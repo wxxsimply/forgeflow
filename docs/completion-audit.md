@@ -1,12 +1,12 @@
-# ForgeFlow 完成度审计（2026-08-13）
+# ForgeFlow 完成度审计（2026-08-30 更新）
 
 ## 结论
 
-ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的核心代码和部署资产已落地，但项目目前仍不满足 `v1.0.0` 最终发布条件。不能完成的部分不是通过补几行代码即可消除：仓库没有可引用的首个 Git HEAD，30 个 Eval fixture SHA 仍是占位值，同时缺少真实模型凭据、域名、Registry、服务器 Secret 和公网 Staging 验收环境。
+ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的核心代码和部署资产已落地，但项目目前仍不满足 `v1.0.0` 最终发布条件。Git/GitHub 基线已经完成，30 个 Eval fixture SHA 已替换为本地独立仓库中的真实 commit，并通过隔离 Grader 双向审计；仍缺少两个 Private Eval 仓库的人工上传与远端权限复验、真实三基线模型证据、域名、Registry、服务器 Secret 和公网 Staging 验收环境。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
-| 0 工程基线 | 工程完成 | format/test/vet/build 与 CI 已配置；首次 commit 仍由仓库所有者决定 |
+| 0 工程基线 | 完成 | format/test/vet/build、首次 commit、受保护 `main` 与 GitHub CI 已完成 |
 | 1 Graph Runtime | 完成 | 乐观锁、Checkpoint、超时、重试、幂等、并行、取消/恢复及预算测试 |
 | 2 Repository Harness | 完成 | worktree、路径/链接边界、Diff/Artifact 与真实 Git fixture 测试 |
 | 3 Model/Planner | 完成 | Provider、严格 Schema、版本化 Prompt、预算和审批 |
@@ -16,7 +16,7 @@ ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的
 | 7 PostgreSQL/Queue | 完成 | Migration、Outbox、租约、恢复、暂停/取消与数据库集成测试；CI 新增 PostgreSQL service 验证 |
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
-| 10 Observability/Eval | 部分完成 | 指标、Trace、Grader、报告、治理 API/UI 已完成；30 个真实 fixture 与三基线 evidence 未完成 |
+| 10 Observability/Eval | 部分完成 | 指标、Trace、Grader、报告、治理 API/UI 和 30 个本地真实 fixture 已完成；远端隔离复验与三基线 evidence 未完成 |
 | 11 部署/安全 | 部分完成 | Compose、mTLS 沙箱引擎、HTTPS、备份/恢复/告警/回滚脚本与文档已完成；真实 Staging 验收未完成 |
 
 ## 本轮补齐的工程缺口
@@ -43,11 +43,11 @@ ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的
 
 ## 仍需真实环境完成的发布门槛
 
-1. 由仓库所有者创建并推送首个 Git commit；当前不应由自动化擅自提交全部工作区。
-2. 建立独立 Eval fixture 仓库和 30 个真实 commit/隐藏测试，替换占位 SHA，并执行：
+1. 由仓库所有者人工审核并通过 Pull Request 合并当前阶段 2 的主仓库改动。
+2. 人工创建并上传独立的 Private Fixture 与 Grader 仓库，配置最小权限，再从远端干净 clone 执行：
 
    ```powershell
-   go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval
+   go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
    ```
 
 3. 用真实 Provider 分别运行 `single_agent`、`planner_developer`、`forgeflow`，采集完整 Token、成本、延迟和测试证据，导入 Eval API。
