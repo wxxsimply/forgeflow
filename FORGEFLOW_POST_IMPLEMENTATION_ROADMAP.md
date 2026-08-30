@@ -330,7 +330,7 @@ go run ./cmd/forgeflow eval `
 
 ## 7. 阶段 3：完成并运行真实三基线 Eval
 
-> 当前状态：未开始  
+> 当前状态：进行中
 > 进入条件：阶段 2 的 30 个 Fixture 全部验证通过。  
 > 本阶段目标：完成执行器，运行三种模式并生成不含虚构数据的真实对比报告。
 
@@ -910,7 +910,7 @@ Release 应包含：
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
-| 3 三基线 Eval | 未开始 | 待填写 |  |  |  |
+| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；等待人工提交后运行 90 次真实 Eval |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
@@ -918,4 +918,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 3：真实三基线 Eval 的准备入口**。阶段 0～2 已全部完成；阶段 2 使用 GitHub Free 可执行的 Private + Archived 只读控制替代 Private Ruleset，并通过只读 Deploy Key、Grader 拒绝访问、远端干净 clone 和写入拒绝验证。下一步开始配置真实 Provider 和三条执行链，但仍不得伪造 Token、成本、延迟或模型成绩。
+当前处于**阶段 3：真实三基线 Eval 进行中**。三条隔离执行链、工作区外 Grader、真实退出码、Token/成本/延迟采集、终态失败记录、脱敏和原子断点恢复入口已实现并通过本地测试。下一步必须由仓库所有者手动提交该精确版本；随后配置真实 Provider Key 与实时价格，完成 90 次执行并人工签署报告。当前没有真实三基线成绩，不得提前勾选阶段 3 退出门槛。

@@ -37,6 +37,7 @@ go run ./cmd/forgeflow eval --suite software/v1 --validate-only
 go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
 
 # 使用三条执行链采集的真实 evidence 生成对比报告
+go run ./cmd/forgeflow eval execute --suite software/v1 --fixture-repository D:\fixtures\forgeflow-eval-fixtures --grader-repository D:\fixtures\forgeflow-eval-grader --modes single_agent,planner_developer,forgeflow --input-usd-per-million <真实价格> --cached-input-usd-per-million <真实缓存价格> --output-usd-per-million <真实价格> --output .forgeflow/evals/evidence.json
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evidence.json --format json --output .forgeflow/evals/comparison.json
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evidence.json --format markdown --output .forgeflow/evals/comparison.md
 
@@ -44,4 +45,4 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evid
 go run ./cmd/forgeflow eval --promote-current .forgeflow/evals/current.json --promote-candidate .forgeflow/evals/candidate.json --approve
 ```
 
-Evidence 文件契约和历史报告保存规则见 `evals/README.md`。当前数据集的 30 个 `fixtureCommit` 已替换为本地独立 Fixture 仓库中的真实 commit，并通过正式 CLI 和私有 Grader 双向审计；仍需由仓库所有者人工上传两个 Private GitHub 仓库、配置最小权限并完成远端干净 clone 复验。完成这些操作后，还要提供真实模型配置及实际 Token、成本和延迟证据，才能运行三基线 Eval；不得把本地 Fixture 验证误称为真实 Baseline 成绩。
+Evidence 文件契约和历史报告保存规则见 `evals/README.md`。30 个 `fixtureCommit`、两个 Private + Archived 仓库、只读 Fixture Deploy Key、Grader 拒绝访问和远端干净 clone 已完成审计。三基线执行器现已实现；仍需先人工提交精确代码版本，再在配置真实 Provider Key 与实时 Token 价格的受控环境完成 90 次运行。不得把执行器测试或 Fixture 验证误称为真实 Baseline 成绩。

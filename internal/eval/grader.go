@@ -9,6 +9,9 @@ import (
 
 type Observation struct {
 	CaseID                   string          `json:"caseId"`
+	Outcome                  string          `json:"outcome"`
+	FailureCode              string          `json:"failureCode,omitempty"`
+	FailureMessage           string          `json:"failureMessage,omitempty"`
 	Decision                 Decision        `json:"decision"`
 	PatchApplicable          bool            `json:"patchApplicable"`
 	ChangedFiles             []string        `json:"changedFiles"`
@@ -21,6 +24,11 @@ type Observation struct {
 	DiffLines                int             `json:"diffLines"`
 	CostUSD                  *float64        `json:"costUsd,omitempty"`
 	DurationMS               *int64          `json:"durationMs,omitempty"`
+	ModelRequests            int             `json:"modelRequests"`
+	InputTokens              int             `json:"inputTokens"`
+	OutputTokens             int             `json:"outputTokens"`
+	CachedInputTokens        int             `json:"cachedInputTokens"`
+	ReasoningTokens          int             `json:"reasoningTokens"`
 	Regression               bool            `json:"regression"`
 	HumanIntervention        bool            `json:"humanIntervention"`
 	ModelScore               *float64        `json:"modelScore,omitempty"`
@@ -111,7 +119,7 @@ func ValidateObservations(dataset Dataset, observations []Observation) error {
 			return fmt.Errorf("duplicate observation for %q", observation.CaseID)
 		}
 		seen[observation.CaseID] = struct{}{}
-		if observation.Iterations < 0 || observation.DiffLines < 0 || (observation.CostUSD != nil && *observation.CostUSD < 0) || (observation.DurationMS != nil && *observation.DurationMS < 0) {
+		if observation.Iterations < 0 || observation.DiffLines < 0 || observation.ModelRequests < 0 || observation.InputTokens < 0 || observation.OutputTokens < 0 || observation.CachedInputTokens < 0 || observation.ReasoningTokens < 0 || (observation.CostUSD != nil && *observation.CostUSD < 0) || (observation.DurationMS != nil && *observation.DurationMS < 0) {
 			return fmt.Errorf("observation %q contains a negative measurement", observation.CaseID)
 		}
 	}
