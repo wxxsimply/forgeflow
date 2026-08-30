@@ -117,7 +117,7 @@ git status --ignored --short
 
 ## 5. 阶段 1：手动建立 Git 和 GitHub 基线
 
-> 当前状态：进行中（2026-08-19 Go 1.26.6 修复已人工上传，Linux CI 的 Go、Web、PostgreSQL 三个 Job 全部通过；等待人工运行 `deployment-assets`、启用 Dependabot 并配置 `main` Ruleset）
+> 当前状态：进行中（2026-08-19 Linux CI 已通过，Dependabot alerts/security updates、Secret scanning 和 Push protection 已启用；`deployment-assets` 暴露出 OpenTelemetry Collector 0.157.0 配置迁移问题，本地正在修复；`main` Ruleset 仍待配置）
 > 进入条件：已满足（阶段 0 于 2026-08-19 完成）。
 > 人工操作：本阶段所有提交、建仓、上传和 GitHub Settings 操作都必须手动完成。
 
@@ -178,7 +178,7 @@ git push -u origin main
 
 上传完成后，在 GitHub 网页人工确认：
 
-- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`6b67b095b9482cefb31614196e6adba7e2f70fdc`）。
+- [x] 最新已上传 commit SHA 与本地 `HEAD` 一致（`a0751a5fcae9669c4b3ca26accf61022805fef67`；当前另有 OTel 配置修复待提交）。
 - [x] `.env`、`.forgeflow`、Secret 文件和构建产物没有出现在已上传提交中。
 - [x] Actions 已识别 `ci.yml`、`deployment.yml` 和 `eval.yml`。
 - [x] README 和文档可以正常浏览。
@@ -232,14 +232,15 @@ git push -u origin main
 
 ### 5.7 阶段 1 退出门槛
 
-- [x] 本地存在可解析的 `HEAD`（`6b67b09`）。
+- [x] 本地存在可解析的 `HEAD`（`a0751a5`）。
 - [x] 代码已由仓库所有者手动上传到 GitHub。
 - [x] 最新已上传 commit 的远端 SHA 与本地 `HEAD` 一致。
 - [x] GitHub 上不存在 Secret、运行数据、二进制和私有 Evidence。
 - [ ] `main` 禁止直接推送并要求 Pull Request。
-- [x] `ci` 在 GitHub Linux Runner 上全部通过，包括 Race Detector、浏览器 E2E 和 PostgreSQL Integration（Run `32161234214`）。
-- [ ] `deployment-assets` Workflow 修复已人工上传，且手动运行通过。
-- [ ] 分支保护、Secret scanning 和依赖安全功能已人工确认。
+- [x] 最新 `ci` 在 GitHub Linux Runner 上全部通过，包括 Race Detector、浏览器 E2E 和 PostgreSQL Integration（Run `32163866073`）。
+- [x] `deployment-assets` 已对所有指向 `main` 的 Pull Request 运行（`a0751a5`）。
+- [ ] OpenTelemetry 配置修复已人工上传，且 `deployment-assets` 手动重跑通过。
+- [x] Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已确认启用。
 
 ---
 

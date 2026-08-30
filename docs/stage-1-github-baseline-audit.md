@@ -46,8 +46,8 @@ Go 1.26.6 修复及验证：
 - 仓库 Ruleset 列表为空。
 - Secret scanning：已启用。
 - Push protection：已启用。
-- Dependabot alerts：未启用。
-- Dependabot security updates：未启用。
+- Dependabot alerts：已启用，REST API 返回 HTTP 204。
+- Dependabot security updates：已启用。
 - Code scanning：尚待仓库所有者确认或配置。
 
 在 Ruleset 生效前不要开始阶段 2。建议 Ruleset 至少要求：
@@ -58,7 +58,7 @@ Go 1.26.6 修复及验证：
 - 要求线性历史。
 - 将 `Go verification`、`Web verification`、`PostgreSQL integration` 和 `deployment-assets / validate` 设为必需检查；检查名称以 GitHub 页面实际显示为准。
 
-为避免路径过滤导致某些 Pull Request 永远等不到必需检查，`deployment-assets` 已在本地改为对所有指向 `main` 的 Pull Request 运行。该 Workflow 修复需先人工提交和上传，再将 `deployment-assets / validate` 加入 Ruleset。
+为避免路径过滤导致某些 Pull Request 永远等不到必需检查，`deployment-assets` 已改为对所有指向 `main` 的 Pull Request 运行。仓库所有者已人工上传提交 `a0751a5`，其 `ci` Run `32163866073` 通过。
 
 本地使用 actionlint 1.7.7 检查更新后的 `deployment.yml`，结果通过。
 
@@ -78,23 +78,27 @@ gh workflow run deployment.yml --repo wxxsimply/forgeflow --ref main
 
 等待运行结束，确认 Compose、Caddy、Prometheus、Alertmanager、OpenTelemetry Collector 和五类镜像构建全部通过。
 
-在启用 Ruleset 前，还需要人工提交本轮 Workflow 和审计文档更新：
+首次手动运行 `32163878250` 已结束但失败。失败发生在 OpenTelemetry Collector 配置校验：0.157.0 不再接受旧的 `service.telemetry.metrics.address`。本地已依据该版本官方示例迁移为 `metrics.readers.pull.exporter.prometheus`，继续暴露 `0.0.0.0:8888` 给 Prometheus。由于本机 Docker Desktop 未运行，最终验证必须在修复上传后通过同一 GitHub Workflow 重跑完成。
+
+人工提交该修复：
 
 ```powershell
 git status --short
 git diff --check
 git diff
-git add .github/workflows/deployment.yml FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md docs/stage-1-github-baseline-audit.md
+git add deploy/staging/otel-collector.yaml FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md docs/stage-1-github-baseline-audit.md
 git diff --cached --check
-git commit -m "ci: require deployment validation on every pull request"
+git commit -m "fix: migrate collector telemetry metrics config"
 git push origin main
 ```
 
-这是启用分支保护前最后一次直接更新 `main`。上传并验证后再配置 Ruleset，后续修改全部通过分支和 Pull Request。
+随后再次执行 `gh workflow run deployment.yml --repo wxxsimply/forgeflow --ref main`。
+
+Workflow 修复已经上传。当前 OpenTelemetry 配置修复应作为启用分支保护前最后一次直接更新 `main`；上传并验证后再配置 Ruleset，后续修改全部通过分支和 Pull Request。
 
 ### 4.3 配置仓库治理
 
-在 GitHub `Settings` 中手动创建 `main` Ruleset/Branch Protection。Secret scanning 和 Push protection 已启用；仍需启用 Dependabot alerts、Dependabot security updates，并确认或配置 Code scanning。
+在 GitHub `Settings` 中手动创建 `main` Ruleset/Branch Protection。Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已启用；仍需确认或配置 Code scanning。
 
 如果要求至少 1 名非作者批准，个人仓库需要先邀请一名可信协作者，否则仓库所有者自己的 Pull Request 将无法满足审批门槛。
 
@@ -105,8 +109,8 @@ git push origin main
 - [x] 已上传提交的远端 SHA 与本地 `HEAD` 一致。
 - [x] README 与三个工作流可在 GitHub 访问。
 - [x] Go 1.26.6 修复已人工提交并上传（`6b67b09`）。
-- [x] 新提交的必需 CI 全部通过（Run `32161234214`）。
+- [x] 最新提交的必需 CI 全部通过（Run `32163866073`）。
 - [ ] `deployment-assets` 手动运行通过。
-- [ ] `deployment-assets` 已对所有指向 `main` 的 Pull Request 运行，避免必需检查因路径过滤缺失。
+- [x] `deployment-assets` 已对所有指向 `main` 的 Pull Request 运行，避免必需检查因路径过滤缺失（`a0751a5`）。
 - [ ] `main` 已禁止直接推送并要求 Pull Request。
-- [ ] 分支保护和依赖/Secret 安全功能已人工确认。
+- [x] Dependabot alerts、Dependabot security updates、Secret scanning 和 Push protection 已确认启用。
