@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +21,7 @@ import (
 	"forgeflow/internal/config"
 	"forgeflow/internal/domain"
 	fulleval "forgeflow/internal/eval"
+	"forgeflow/internal/evalexec"
 	"forgeflow/internal/model"
 	"forgeflow/internal/observability"
 	"forgeflow/internal/planner"
@@ -56,7 +60,7 @@ func run(ctx context.Context, args []string, configuration config.Config) error 
 	case "inspect":
 		return runInspect(ctx, args[1:])
 	case "eval":
-		return runEval(ctx, args[1:])
+		return runEval(ctx, args[1:], configuration)
 	case "plan":
 		return runPlan(ctx, args[1:], configuration)
 	case "show":
@@ -146,7 +150,10 @@ func runDatabase(ctx context.Context, args []string, configuration config.Config
 	return printJSON(map[string]any{"schemaVersion": version, "status": "ready"})
 }
 
-func runEval(ctx context.Context, args []string) error {
+func runEval(ctx context.Context, args []string, configuration config.Config) error {
+	if len(args) > 0 && args[0] == "execute" {
+		return runEvalExecute(ctx, args[1:], configuration)
+	}
 	set := flag.NewFlagSet("eval", flag.ContinueOnError)
 	suite := set.String("suite", "planner/v1", "eval suite")
 	evidencePath := set.String("evidence", "", "software/v1 evidence JSON")
@@ -233,6 +240,172 @@ func runEval(ctx context.Context, args []string) error {
 		return apperror.New(apperror.CodeModelOutput, "planner eval suite has failures")
 	}
 	return nil
+}
+
+func runEvalExecute(ctx context.Context, args []string, configuration config.Config) error {
+	set := flag.NewFlagSet("eval execute", flag.ContinueOnError)
+	suite := set.String("suite", fulleval.SoftwareV1, "fixed eval suite")
+	fixtureRepository := set.String("fixture-repository", "", "local immutable fixture repository")
+	graderRepository := set.String("grader-repository", "", "local private grader repository")
+	modesValue := set.String("modes", "single_agent,planner_developer,forgeflow", "comma-separated baseline modes")
+	output := set.String("output", filepath.Join(".forgeflow", "evals", "evidence.json"), "private evidence output")
+	workspaceRoot := set.String("workspace-root", filepath.Join(".forgeflow", "evals", "workspaces"), "temporary eval worktree root")
+	modelName := set.String("model", configuration.DeveloperModel, "same model used by all baselines")
+	reasoningEffort := set.String("reasoning-effort", configuration.DeveloperReasoningEffort, "same reasoning effort used by all baselines")
+	maxOutputTokens := set.Int("max-output-tokens", configuration.DeveloperMaxOutputTokens, "maximum output tokens per model request")
+	callTimeout := set.Duration("call-timeout", configuration.DeveloperTimeout, "timeout per model request")
+	commandTimeout := set.Duration("command-timeout", 10*time.Minute, "timeout per explicit or hidden test command")
+	contextMaxBytes := set.Int("context-max-bytes", configuration.DeveloperContextMaxBytes, "maximum repository snapshot bytes")
+	inputPrice := set.Float64("input-usd-per-million", configuration.PlannerInputUSDPerMTok, "real input token price in USD per million")
+	cachedInputPrice := set.Float64("cached-input-usd-per-million", 0, "real cached-input token price in USD per million")
+	outputPrice := set.Float64("output-usd-per-million", configuration.PlannerOutputUSDPerMTok, "real output token price in USD per million")
+	limit := set.Int("limit", 0, "maximum newly executed cases across all modes; 0 runs all remaining")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	if *suite != fulleval.SoftwareV1 {
+		return apperror.New(apperror.CodeValidation, "eval execute currently supports only software/v1")
+	}
+	if strings.TrimSpace(*fixtureRepository) == "" || strings.TrimSpace(*graderRepository) == "" {
+		return apperror.New(apperror.CodeValidation, "--fixture-repository and --grader-repository are required")
+	}
+	if strings.TrimSpace(configuration.OpenAIAPIKey) == "" {
+		return apperror.New(apperror.CodeUnauthorized, "OPENAI_API_KEY is required for real eval execution")
+	}
+	if *inputPrice <= 0 || *cachedInputPrice <= 0 || *outputPrice <= 0 {
+		return apperror.New(apperror.CodeValidation, "real positive input, cached-input, and output token prices are required")
+	}
+	if *limit < 0 {
+		return apperror.New(apperror.CodeValidation, "--limit cannot be negative")
+	}
+	dataset, err := fulleval.Load(*suite)
+	if err != nil {
+		return err
+	}
+	if err := fulleval.VerifyFixtureCommits(ctx, dataset, *fixtureRepository); err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.fixtures", "fixture repository failed preflight")
+	}
+	rootCommit, err := cleanGitCommit(ctx, ".")
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeConflict, "eval.execute.source", "commit the exact eval implementation before running paid baselines")
+	}
+	fixtureHead, err := gitCommit(ctx, *fixtureRepository)
+	if err != nil {
+		return err
+	}
+	graderCommit, err := cleanGitCommit(ctx, *graderRepository)
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeConflict, "eval.execute.grader", "private grader must be a clean exact commit")
+	}
+	modes, err := parseEvalModes(*modesValue)
+	if err != nil {
+		return err
+	}
+	provider, err := model.NewOpenAIProvider(model.OpenAIConfig{
+		APIKey: configuration.OpenAIAPIKey, BaseURL: configuration.OpenAIBaseURL,
+		Organization: configuration.OpenAIOrganization, Project: configuration.OpenAIProject,
+		MaxRetries: configuration.OpenAIMaxRetries,
+	})
+	if err != nil {
+		return err
+	}
+	absoluteFixture, _ := filepath.Abs(*fixtureRepository)
+	absoluteGrader, _ := filepath.Abs(*graderRepository)
+	absoluteWorkspaces, _ := filepath.Abs(*workspaceRoot)
+	absoluteOutput, _ := filepath.Abs(*output)
+	executor, err := evalexec.NewMux(evalexec.Options{
+		Provider: provider, Pricing: model.Pricing{InputUSDPerMillionTokens: *inputPrice, OutputUSDPerMillionTokens: *outputPrice}, CachedInputPrice: *cachedInputPrice,
+		FixtureRepository: absoluteFixture, GraderRepository: absoluteGrader, WorkspaceRoot: absoluteWorkspaces,
+		Model: *modelName, ReasoningEffort: *reasoningEffort, MaxOutputTokens: *maxOutputTokens,
+		CallTimeout: *callTimeout, CommandTimeout: *commandTimeout, ContextMaxBytes: *contextMaxBytes,
+	})
+	if err != nil {
+		return err
+	}
+	configurations := make([]fulleval.Configuration, 0, len(modes))
+	for _, mode := range modes {
+		configurations = append(configurations, evalConfiguration(mode, *modelName, rootCommit, fixtureHead, graderCommit, *inputPrice, *cachedInputPrice, *outputPrice))
+	}
+	file, err := fulleval.RunResumable(ctx, fulleval.ResumableOptions{
+		Dataset: dataset, Configurations: configurations, Executor: executor,
+		Recorder: fulleval.FileRecorder{Path: absoluteOutput}, MaxNewCases: *limit,
+		OnCompleted: func(mode fulleval.Mode, caseID string, completed, total int) {
+			fmt.Fprintf(os.Stderr, "eval %s %s recorded (%d/%d)\n", mode, caseID, completed, total)
+		},
+	})
+	if err != nil {
+		return err
+	}
+	complete := len(file.Runs) == len(modes)
+	observations := 0
+	for _, run := range file.Runs {
+		observations += len(run.Observations)
+		if len(run.Observations) != len(dataset.Cases) {
+			complete = false
+		}
+	}
+	return printJSON(map[string]any{"dataset": dataset.Name, "modes": modes, "observations": observations, "complete": complete, "evidence": absoluteOutput})
+}
+
+func parseEvalModes(value string) ([]fulleval.Mode, error) {
+	result := []fulleval.Mode{}
+	seen := map[fulleval.Mode]bool{}
+	for _, item := range strings.Split(value, ",") {
+		mode := fulleval.Mode(strings.TrimSpace(item))
+		if !slices.Contains([]fulleval.Mode{fulleval.ModeSingleAgent, fulleval.ModePlannerDeveloper, fulleval.ModeForgeFlow}, mode) {
+			return nil, apperror.New(apperror.CodeValidation, fmt.Sprintf("invalid eval mode %q", mode))
+		}
+		if seen[mode] {
+			return nil, apperror.New(apperror.CodeValidation, fmt.Sprintf("duplicate eval mode %q", mode))
+		}
+		seen[mode] = true
+		result = append(result, mode)
+	}
+	return result, nil
+}
+
+func evalConfiguration(mode fulleval.Mode, modelName, gitSHA, fixtureSHA, graderSHA string, inputPrice, cachedInputPrice, outputPrice float64) fulleval.Configuration {
+	agents := []string{"single_agent"}
+	prompts := map[string]string{"single_agent": "eval/single-agent/v1"}
+	if mode == fulleval.ModePlannerDeveloper {
+		agents = []string{"planner", "developer"}
+		prompts = map[string]string{"planner": "eval/planner/v1", "developer": "eval/developer/v1"}
+	} else if mode == fulleval.ModeForgeFlow {
+		agents = []string{"planner", "developer", "reviewer", "security"}
+		prompts = map[string]string{"planner": "eval/planner/v1", "developer": "eval/developer/v1", "reviewer": "eval/reviewer/v1", "security": "eval/security/v1", "judge": "eval/judge/v1"}
+	}
+	models := map[string]string{}
+	for _, agent := range agents {
+		models[agent] = modelName
+	}
+	return fulleval.Configuration{
+		Mode: mode, ModelVersions: models, PromptVersions: prompts,
+		PolicyVersion: evalexec.PolicyVersion, ToolVersions: map[string]string{"worktree": evalexec.ToolVersion, "apply_patch": evalexec.ToolVersion, "run_test": evalexec.ToolVersion, "hidden_grader": evalexec.ToolVersion},
+		GitCommit: gitSHA, FixtureRepositoryCommit: fixtureSHA, GraderCommit: graderSHA,
+		ExecutionEnvironment: runtime.GOOS + "/" + runtime.GOARCH + " " + runtime.Version(),
+		PricingUSDPerMTok:    map[string]float64{"input": inputPrice, "cachedInput": cachedInputPrice, "output": outputPrice},
+	}
+}
+
+func cleanGitCommit(ctx context.Context, directory string) (string, error) {
+	command := exec.CommandContext(ctx, "git", "-C", directory, "status", "--porcelain")
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(string(output)) != "" {
+		return "", fmt.Errorf("git worktree is not clean")
+	}
+	return gitCommit(ctx, directory)
+}
+
+func gitCommit(ctx context.Context, directory string) (string, error) {
+	command := exec.CommandContext(ctx, "git", "-C", directory, "rev-parse", "HEAD")
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve Git commit for %s: %w", directory, err)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 func runPromotion(currentPath, candidatePath string, humanApproved bool) error {
@@ -453,6 +626,7 @@ Commands:
   inspect [--repository <path>] [--base <ref>]
   eval    [--suite planner/v1]
   eval    --suite software/v1 --validate-only [--limit 6] [--fixture-repository <path>]
+  eval    execute --suite software/v1 --fixture-repository <path> --grader-repository <private-path> --modes single_agent,planner_developer,forgeflow --output <private-evidence.json>
   eval    --suite software/v1 --evidence <file> [--format json|markdown] [--output <file>]
   eval    --promote-current <report.json> --promote-candidate <report.json> --approve
   plan    --task <text> [--repository <path>] [--base <ref>] [--mode mock]

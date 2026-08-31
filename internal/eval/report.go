@@ -18,12 +18,16 @@ const (
 )
 
 type Configuration struct {
-	Mode           Mode              `json:"mode"`
-	ModelVersions  map[string]string `json:"modelVersions"`
-	PromptVersions map[string]string `json:"promptVersions"`
-	PolicyVersion  string            `json:"policyVersion"`
-	ToolVersions   map[string]string `json:"toolVersions"`
-	GitCommit      string            `json:"gitCommit"`
+	Mode                    Mode               `json:"mode"`
+	ModelVersions           map[string]string  `json:"modelVersions"`
+	PromptVersions          map[string]string  `json:"promptVersions"`
+	PolicyVersion           string             `json:"policyVersion"`
+	ToolVersions            map[string]string  `json:"toolVersions"`
+	GitCommit               string             `json:"gitCommit"`
+	FixtureRepositoryCommit string             `json:"fixtureRepositoryCommit,omitempty"`
+	GraderCommit            string             `json:"graderCommit,omitempty"`
+	ExecutionEnvironment    string             `json:"executionEnvironment,omitempty"`
+	PricingUSDPerMTok       map[string]float64 `json:"pricingUsdPerMTok,omitempty"`
 }
 
 type Evidence struct {

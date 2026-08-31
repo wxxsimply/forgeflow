@@ -71,7 +71,7 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
 - OpenAPI 自动类型生成、前端状态测试、Chromium E2E 和 Axe 无障碍门禁
 - OpenTelemetry HTTP/Run/Node/Model/Tool span、W3C Trace Context 与无 Collector 安全降级
 - Prometheus 低基数指标：Run、节点、模型成本、工具、审批、Queue、认证和 429
-- 固定 30 Case 软件 Eval、确定性 Grader、三基线 JSON/Markdown 报告和 Prompt/模型 Promotion 门禁
+- 固定 30 Case 软件 Eval、隔离的三基线执行器、工作区外私有 Grader、原子断点恢复证据、JSON/Markdown 报告和 Prompt/模型 Promotion 门禁
 - Go 1.26.6 多阶段 API/Worker/CLI 镜像、受 CSP/HSTS 保护的静态 Web 镜像
 - Caddy 自动 HTTPS、内部 Compose 网络、Docker Secret `_FILE` 注入和 API/Worker 权限隔离
 - Prometheus/Alertmanager/OTel Collector、备份校验、隔离恢复演练和 Schema 安全回滚
@@ -157,6 +157,22 @@ go run ./cmd/forgeflow eval --suite planner/v1
 ```
 
 阶段 10 的完整 30 Case、真实 evidence 报告和 Promotion 命令见 [Observability 与 Eval 说明](./docs/phase-10-observability-eval.md)。
+
+三基线真实执行入口会拒绝脏工作区、缺失 Key、零价格和不干净 Grader，防止无法追溯或虚构成本的运行。原始 Evidence 默认写入已被 Git 忽略的 `.forgeflow/evals`：
+
+```powershell
+$env:OPENAI_API_KEY="从安全密钥存储注入"
+go run ./cmd/forgeflow eval execute --suite software/v1 `
+  --fixture-repository D:\fixtures\forgeflow-eval-fixtures `
+  --grader-repository D:\fixtures\forgeflow-eval-grader `
+  --modes single_agent,planner_developer,forgeflow `
+  --input-usd-per-million <当前真实输入价格> `
+  --cached-input-usd-per-million <当前真实缓存输入价格> `
+  --output-usd-per-million <当前真实输出价格> `
+  --output .forgeflow\evals\evidence.json
+```
+
+命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
 Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 
