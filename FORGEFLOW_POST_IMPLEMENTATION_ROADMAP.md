@@ -363,7 +363,7 @@ type EvidenceRecorder interface {
 - 不复用上一种模式生成的文件和上下文。
 - 测试结果来自实际退出码。
 - 隐藏测试在 Agent 完成后由受信任 Grader 执行。
-- 记录模型、Prompt、Policy、Tool、Git SHA、Token、成本和延迟。
+- 记录模型、Reasoning、Prompt、Policy、Tool、Git SHA、Token、成本和延迟。
 - 超时、崩溃、拒绝和人工介入都必须形成 Observation，不能丢弃失败样本。
 - Evidence 原子写入，断点恢复不会重复计费或重复统计。
 - Evidence 中的路径、任务正文和模型输出在上传前按数据策略脱敏。
@@ -395,7 +395,7 @@ go run ./cmd/forgeflow eval `
 - [ ] 三种模式各完成 30 个 Case，共 90 次受控执行。
 - [ ] 没有缺失成本和 P95 延迟数据。
 - [ ] 报告包含完成率、隐藏测试通过率、回归率、人工介入率、成本和延迟。
-- [ ] 报告能追溯到精确 Git、模型、Prompt、Policy 和 Tool 版本。
+- [ ] 报告能追溯到精确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
 - [ ] 不把结构验证结果伪装成模型成绩。
 - [ ] 由人工审核报告并签署 Promotion 结论。
 
@@ -415,7 +415,7 @@ go run ./cmd/forgeflow eval `
 - [ ] 失败、拒绝、超时和人工介入没有被排除在统计外。
 - [ ] 成本和延迟指标完整，没有用估算值冒充真实值。
 - [ ] Grader 在 Agent 工作区外运行隐藏测试。
-- [ ] 报告可追溯至准确 Git、模型、Prompt、Policy 和 Tool 版本。
+- [ ] 报告可追溯至准确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
 - [ ] 脱敏汇总报告已人工批准；原始 Evidence 未上传 GitHub。
 
 ---
@@ -910,7 +910,7 @@ Release 应包含：
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
-| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；PR #6 已合并，30/30 Fixture 与私有 Grader 非付费预检通过；等待预检审计人工提交、轮换后的本地 Key 和付费 smoke 授权 |
+| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；非付费预检、1 个 DeepSeek smoke 和 2 次限额诊断已完成；`low` 档在 `feature-01` 通过，Reasoning 配置追踪修复等待人工提交；其余 Observation 未授权、未执行 |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
@@ -918,4 +918,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 3：真实三基线 Eval 进行中**。三条隔离执行链、工作区外 Grader、真实退出码、OpenAI/DeepSeek Provider 身份、双计费语义、价格有效期门禁、Token/成本/延迟采集、终态失败记录、脱敏和原子断点恢复入口已实现并通过本地测试；30/30 Fixture commit、Fixture/Grader 洁净性和私有 Grader 测试也已通过非付费预检。下一步必须由仓库所有者手动提交本次预检审计；随后撤销任何曾暴露的旧 Key，只从本地安全注入轮换后的 Key，并在明确付费授权和单一价格窗口内先完成 1 个 smoke Case。当前没有真实三基线成绩，不得提前勾选阶段 3 退出门槛或进入阶段 4。
+当前处于**阶段 3：真实三基线 Eval 进行中**。执行器、隔离 Grader、双 Provider 计费、价格窗口、失败终态和原子 Evidence 已通过非付费预检。`single_agent/feature-01` 的首次 `medium` smoke 正确保留空最终输出失败；随后在额外 `$0.01` 限额内执行两次诊断：`none` 产生损坏补丁，`low` 完成补丁、构建、显式测试和隐藏测试，总额外成本 `$0.001719588`，未执行第 3 次授权调用。当前分支已补充 Reasoning 配置追踪和断点续跑漂移测试，下一步必须由仓库所有者手动审核、提交并合并本轮代码与脱敏审计；正式基线须使用新 commit 和新 Evidence 路径。其余 Observation 未获数据出站和费用授权，当前没有完整三基线成绩，不得勾选阶段 3 退出门槛或进入阶段 4。
