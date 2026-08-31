@@ -341,7 +341,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	}
 	configurations := make([]fulleval.Configuration, 0, len(modes))
 	for _, mode := range modes {
-		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, rootCommit, fixtureHead, graderCommit, pricing))
+		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, strings.TrimSpace(*reasoningEffort), rootCommit, fixtureHead, graderCommit, pricing))
 	}
 	file, err := fulleval.RunResumable(ctx, fulleval.ResumableOptions{
 		Dataset: dataset, Configurations: configurations, Executor: executor,
@@ -381,7 +381,7 @@ func parseEvalModes(value string) ([]fulleval.Mode, error) {
 	return result, nil
 }
 
-func evalConfiguration(mode fulleval.Mode, providerName, modelName, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing) fulleval.Configuration {
+func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEffort, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing) fulleval.Configuration {
 	agents := []string{"single_agent"}
 	prompts := map[string]string{"single_agent": "eval/single-agent/v1"}
 	if mode == fulleval.ModePlannerDeveloper {
@@ -400,7 +400,7 @@ func evalConfiguration(mode fulleval.Mode, providerName, modelName, gitSHA, fixt
 		prices["cacheWriteInput"] = pricing.CacheWriteUSDPerMillion
 	}
 	return fulleval.Configuration{
-		Mode: mode, ModelVersions: models, PromptVersions: prompts,
+		Mode: mode, ReasoningEffort: reasoningEffort, ModelVersions: models, PromptVersions: prompts,
 		PolicyVersion: evalexec.PolicyVersion, ToolVersions: map[string]string{"worktree": evalexec.ToolVersion, "apply_patch": evalexec.ToolVersion, "run_test": evalexec.ToolVersion, "hidden_grader": evalexec.ToolVersion},
 		GitCommit: gitSHA, FixtureRepositoryCommit: fixtureSHA, GraderCommit: graderSHA,
 		ExecutionEnvironment: runtime.GOOS + "/" + runtime.GOARCH + " " + runtime.Version(),

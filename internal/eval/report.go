@@ -19,6 +19,7 @@ const (
 
 type Configuration struct {
 	Mode                    Mode               `json:"mode"`
+	ReasoningEffort         string             `json:"reasoningEffort,omitempty"`
 	ModelVersions           map[string]string  `json:"modelVersions"`
 	PromptVersions          map[string]string  `json:"promptVersions"`
 	PolicyVersion           string             `json:"policyVersion"`

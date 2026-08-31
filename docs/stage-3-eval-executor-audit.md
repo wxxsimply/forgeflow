@@ -1,7 +1,7 @@
 # ForgeFlow 阶段 3：三基线执行器审计
 
 > 日期：2026-08-31  
-> 状态：执行器与双 Provider 计费已合并，非付费预检通过；等待轮换后的本地 Key 和人工付费授权
+> 状态：执行器与双 Provider 计费已合并；非付费预检、一次 smoke 和两次授权诊断已完成，等待人工提交本轮修复
 > 数据集：`software/v1`
 
 ## 已完成的本地实现
@@ -18,7 +18,7 @@
 - Evidence 记录 Provider、计费模式、官方价格来源、价格有效截止时间和各项费率；有效期不足以覆盖下一次调用时会在发出付费请求前停止。
 - 拒绝、超时、审批请求、模型输出错误和测试失败都形成 Observation，不从统计中删除。
 - Evidence 在每个 Case 后通过同目录临时文件、Sync 和原子 Rename 更新；同配置重跑会跳过已记录 Case。
-- 恢复时若 Git、模型、Prompt、Policy、Tool、Fixture 或 Grader 配置变化，会要求使用新的 Evidence 路径。
+- 恢复时若 Git、模型、Reasoning、Prompt、Policy、Tool、Fixture 或 Grader 配置变化，会要求使用新的 Evidence 路径。
 - Evidence 不写任务正文、Prompt、模型原始输出或工作区路径；失败消息会脱敏路径、Key 和凭据模式。
 
 ## 强制前置门禁
@@ -91,6 +91,35 @@ DeepSeek 高峰与非高峰价格不同。完整三基线必须在同一个官�
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evidence.json --format json --output .forgeflow\evals\comparison.json
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evidence.json --format markdown --output .forgeflow\evals\comparison.md
 ```
+
+## 2026-08-31 DeepSeek 付费 smoke 结果
+
+- 人工授权范围：仅 `software/v1` 第一个 Fixture、`single_agent` 模式、一次模型调用；允许发送任务描述、仓库规则和最多 128 KiB 源码快照。
+- 明确禁止发送：Private Grader、隐藏测试源码、其他 Fixture 和原始 Evidence；本次执行遵守该边界。
+- 主仓库 commit：`400411b10c94d071c3cd7c43d4f73505c9a6719e`。
+- Fixture HEAD：`6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f`；Grader HEAD：`5942ec84d403e37385203b4c7851d1b92573548a`。
+- Provider/模型：`deepseek` / `deepseek-v4-flash`；Prompt：`eval/single-agent/v1`；Policy：`eval-policy/v1`；Tool：`eval-tools/v1`。
+- 计费模式：`cache_hit_miss`，采用执行时官方非高峰价格；价格来源：<https://api-docs.deepseek.com/quick_start/pricing/>。
+- 结果：命令成功完成并原子记录 1 个终态 Observation，但 Case 结果为 `failed/internal_error`，脱敏原因为 Provider 返回了推理 Token 而没有最终输出文本。
+- 计量：1 次模型请求，输入 2401 Token、缓存命中 0、输出 1124 Token、推理 1124 Token；成本 `$0.00127006`，延迟 7942 ms。
+- 安全结果：未检测到 Secret 或危险命令；未生成补丁、未运行第二个 Case、未自动重试。
+- DeepSeek 官方说明 JSON Output 偶尔可能返回空内容：<https://api-docs.deepseek.com/guides/json_mode/>。本次失败保留在统计中，不伪装为模型成功成绩。
+- 原始 Evidence 位于 Git 忽略的 `.forgeflow/evals`，不得提交 GitHub；本节只记录脱敏汇总。
+
+该 smoke 证明真实 Provider 连通、价格窗口门禁、Token/成本/延迟计量、失败终态和 Evidence 原子落盘可工作，但没有证明该 Case 或基线通过。再次调用或扩大到其余 89 个 Observation 前，必须重新取得明确的付费和数据出站授权。
+
+## 2026-08-31 限额诊断结果
+
+- 后续人工授权：额外最多 3 次 DeepSeek 付费诊断，总费用上限 `$0.01`；仍只允许发送 `feature-01` 已授权的数据范围。
+- 诊断 1 使用 `reasoning-effort=none`：模型返回实施补丁，但补丁在第 33 行损坏，Observation 为 `failed/model_output_invalid`；输入 2322 Token、输出 373 Token、推理 0 Token，成本 `$0.00075702`，延迟 3689 ms。
+- 诊断 2 使用 `reasoning-effort=low`：模型补丁可应用，修改 1 个文件，构建、显式测试和 1/1 隐藏测试均通过，Observation 为 `completed`；输入 2322 Token（其中缓存命中 2304）、输出 1428 Token、推理 1108 Token，成本 `$0.000962568`，延迟 23267 ms。
+- 因第 2 次诊断已成功定位可用配置，没有执行授权额度中的第 3 次调用。两次额外诊断总成本 `$0.001719588`，低于 `$0.01` 上限；连同最初 smoke 的累计成本为 `$0.002989648`。
+- 三次运行均未检测到 Secret 或危险命令；没有发送其他 Fixture、Private Grader、隐藏测试源码或原始 Evidence。
+- 结论：当前 `deepseek-v4-flash` 在该 Case 上使用 `low` 可完成闭环；`medium` 遇到无最终文本，`none` 生成损坏补丁。这是单 Case 诊断结论，不代表完整基线成绩。
+- 诊断同时发现 Evidence 配置此前没有记录 Reasoning。当前分支已增加 `reasoningEffort` 配置字段和断点续跑漂移测试；正式基线必须使用包含该修复的新 Git commit 和全新 Evidence 路径。
+- 原始诊断 Evidence 继续保存在 Git 忽略的 `.forgeflow/evals`，不得提交 GitHub。
+
+本次授权已完成且未用尽次数或费用上限；剩余授权不自动延续到其他 Fixture 或完整三基线。正式运行其余 Observation 前仍需新的费用和数据出站授权。
 
 ## 尚未完成，禁止提前声明
 
