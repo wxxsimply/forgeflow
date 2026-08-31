@@ -23,6 +23,7 @@ const (
 type OpenAIConfig struct {
 	APIKey           string
 	BaseURL          string
+	ProviderName     string
 	Organization     string
 	Project          string
 	HTTPClient       *http.Client
@@ -34,6 +35,7 @@ type OpenAIConfig struct {
 type OpenAIProvider struct {
 	apiKey           string
 	endpoint         string
+	name             string
 	organization     string
 	project          string
 	client           *http.Client
@@ -44,7 +46,14 @@ type OpenAIProvider struct {
 
 func NewOpenAIProvider(configuration OpenAIConfig) (*OpenAIProvider, error) {
 	if strings.TrimSpace(configuration.APIKey) == "" {
-		return nil, &Error{Kind: ErrorAuthentication, Message: "OPENAI_API_KEY is required for the OpenAI planner"}
+		return nil, &Error{Kind: ErrorAuthentication, Message: "OPENAI_API_KEY is required for the OpenAI-compatible provider"}
+	}
+	providerName := strings.TrimSpace(configuration.ProviderName)
+	if providerName == "" {
+		providerName = "openai"
+	}
+	if providerName != "openai" && providerName != "deepseek" {
+		return nil, &Error{Kind: ErrorInvalidRequest, Message: "provider name must be openai or deepseek"}
 	}
 	baseURL := strings.TrimSpace(configuration.BaseURL)
 	if baseURL == "" {
@@ -78,26 +87,36 @@ func NewOpenAIProvider(configuration OpenAIConfig) (*OpenAIProvider, error) {
 	}
 	return &OpenAIProvider{
 		apiKey: strings.TrimSpace(configuration.APIKey), endpoint: strings.TrimRight(baseURL, "/") + "/responses",
+		name:         providerName,
 		organization: configuration.Organization, project: configuration.Project, client: &clientCopy,
 		maxRetries: configuration.MaxRetries, retryBaseDelay: retryDelay, maxResponseBytes: maxResponseBytes,
 	}, nil
 }
 
-func (p *OpenAIProvider) Name() string { return "openai" }
+func (p *OpenAIProvider) Name() string { return p.name }
 
 func (p *OpenAIProvider) Generate(ctx context.Context, request Request) (Response, error) {
 	if err := validateRequest(request); err != nil {
 		return Response{}, err
 	}
-	body, err := json.Marshal(openAIRequest{
+	requestBody := openAIRequest{
 		Model: request.Model, Instructions: request.Instructions, Input: request.Input,
-		MaxOutputTokens: request.MaxOutputTokens, Store: false,
-		Reasoning: openAIReasoning{Effort: request.ReasoningEffort},
+		MaxOutputTokens: request.MaxOutputTokens,
+		Reasoning:       openAIReasoning{Effort: request.ReasoningEffort},
 		Text: openAIText{Format: openAITextFormat{
 			Type: "json_schema", Name: request.ResponseFormat.Name, Description: request.ResponseFormat.Description,
-			Schema: request.ResponseFormat.Schema, Strict: request.ResponseFormat.Strict,
+			Schema: request.ResponseFormat.Schema,
 		}},
-	})
+	}
+	if p.name == "openai" {
+		store := false
+		strict := request.ResponseFormat.Strict
+		requestBody.Store = &store
+		requestBody.Text.Format.Strict = &strict
+	} else {
+		requestBody.Text.Format.Description = ""
+	}
+	body, err := json.Marshal(requestBody)
 	if err != nil {
 		return Response{}, &Error{Kind: ErrorInvalidRequest, Message: "OpenAI request could not be encoded", Err: err}
 	}
@@ -121,7 +140,8 @@ func (p *OpenAIProvider) Generate(ctx context.Context, request Request) (Respons
 		Usage: Usage{
 			InputTokens: decoded.Usage.InputTokens, OutputTokens: decoded.Usage.OutputTokens,
 			TotalTokens: decoded.Usage.TotalTokens, CachedInputTokens: decoded.Usage.InputTokensDetails.CachedTokens,
-			ReasoningTokens: decoded.Usage.OutputTokensDetails.ReasoningTokens,
+			CacheWriteInputTokens: decoded.Usage.InputTokensDetails.CacheWriteTokens,
+			ReasoningTokens:       decoded.Usage.OutputTokensDetails.ReasoningTokens,
 		},
 	}
 	var output strings.Builder
@@ -200,7 +220,7 @@ type openAIRequest struct {
 	Instructions    string          `json:"instructions"`
 	Input           string          `json:"input"`
 	MaxOutputTokens int             `json:"max_output_tokens"`
-	Store           bool            `json:"store"`
+	Store           *bool           `json:"store,omitempty"`
 	Reasoning       openAIReasoning `json:"reasoning,omitempty"`
 	Text            openAIText      `json:"text"`
 }
@@ -218,7 +238,7 @@ type openAITextFormat struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Schema      json.RawMessage `json:"schema"`
-	Strict      bool            `json:"strict"`
+	Strict      *bool           `json:"strict,omitempty"`
 }
 
 type openAIResponse struct {
@@ -241,7 +261,8 @@ type openAIResponse struct {
 		OutputTokens       int `json:"output_tokens"`
 		TotalTokens        int `json:"total_tokens"`
 		InputTokensDetails struct {
-			CachedTokens int `json:"cached_tokens"`
+			CachedTokens     int `json:"cached_tokens"`
+			CacheWriteTokens int `json:"cache_write_tokens"`
 		} `json:"input_tokens_details"`
 		OutputTokensDetails struct {
 			ReasoningTokens int `json:"reasoning_tokens"`
@@ -340,5 +361,5 @@ func isLoopbackHost(host string) bool {
 var _ Provider = (*OpenAIProvider)(nil)
 
 func (p *OpenAIProvider) String() string {
-	return fmt.Sprintf("OpenAIProvider(endpoint=%s)", p.endpoint)
+	return fmt.Sprintf("OpenAIProvider(name=%s, endpoint=%s)", p.name, p.endpoint)
 }

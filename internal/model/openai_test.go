@@ -36,7 +36,7 @@ func TestOpenAIProviderSendsResponsesStructuredOutputRequest(t *testing.T) {
 		_, _ = writer.Write([]byte(`{
           "id":"resp_123","model":"gpt-test","status":"completed",
           "output":[{"type":"message","content":[{"type":"output_text","text":"{\"summary\":\"ok\"}"}]}],
-          "usage":{"input_tokens":120,"output_tokens":30,"total_tokens":150,"input_tokens_details":{"cached_tokens":20},"output_tokens_details":{"reasoning_tokens":10}}
+		  "usage":{"input_tokens":120,"output_tokens":30,"total_tokens":150,"input_tokens_details":{"cached_tokens":20,"cache_write_tokens":40},"output_tokens_details":{"reasoning_tokens":10}}
         }`))
 	}))
 	defer server.Close()
@@ -49,7 +49,7 @@ func TestOpenAIProviderSendsResponsesStructuredOutputRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
-	if response.ID != "resp_123" || response.OutputText != `{"summary":"ok"}` || response.Usage.CachedInputTokens != 20 || response.Usage.ReasoningTokens != 10 {
+	if response.ID != "resp_123" || response.OutputText != `{"summary":"ok"}` || response.Usage.CachedInputTokens != 20 || response.Usage.CacheWriteInputTokens != 40 || response.Usage.ReasoningTokens != 10 {
 		t.Fatalf("response = %+v", response)
 	}
 	if captured["store"] != false || captured["model"] != "gpt-test" {
@@ -62,6 +62,38 @@ func TestOpenAIProviderSendsResponsesStructuredOutputRequest(t *testing.T) {
 	format, ok := text["format"].(map[string]any)
 	if !ok || format["type"] != "json_schema" || format["strict"] != true {
 		t.Fatalf("format = %#v", text["format"])
+	}
+}
+
+func TestDeepSeekProviderOmitsUnsupportedStructuredOutputFields(t *testing.T) {
+	var captured map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if err := json.NewDecoder(request.Body).Decode(&captured); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		_, _ = writer.Write([]byte(`{"id":"ok","model":"deepseek-test","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"{}"}]}],"usage":{}}`))
+	}))
+	defer server.Close()
+	provider, err := NewOpenAIProvider(OpenAIConfig{APIKey: "test", BaseURL: server.URL, ProviderName: "deepseek", HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.Generate(context.Background(), validModelRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if provider.Name() != "deepseek" {
+		t.Fatalf("provider name = %q", provider.Name())
+	}
+	if _, exists := captured["store"]; exists {
+		t.Fatal("DeepSeek request included unsupported store field")
+	}
+	text := captured["text"].(map[string]any)
+	format := text["format"].(map[string]any)
+	if _, exists := format["strict"]; exists {
+		t.Fatal("DeepSeek request included undocumented strict field")
+	}
+	if _, exists := format["description"]; exists {
+		t.Fatal("DeepSeek request included undocumented description field")
 	}
 }
 

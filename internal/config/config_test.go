@@ -14,6 +14,7 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_DATA_DIR",
 		"FORGEFLOW_WORKFLOW_MODE",
 		"FORGEFLOW_PLANNER_MODE",
+		"FORGEFLOW_MODEL_PROVIDER",
 		"FORGEFLOW_OPENAI_MAX_RETRIES",
 		"FORGEFLOW_PLANNER_MODEL",
 		"FORGEFLOW_PLANNER_PROMPT_VERSION",
@@ -78,6 +79,9 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	}
 	if configuration.PlannerMode != "mock" {
 		t.Fatalf("PlannerMode = %q", configuration.PlannerMode)
+	}
+	if configuration.ModelProvider != "openai" {
+		t.Fatalf("ModelProvider = %q", configuration.ModelProvider)
 	}
 	if configuration.WorkflowMode != "planning" {
 		t.Fatalf("WorkflowMode = %q", configuration.WorkflowMode)
@@ -189,6 +193,13 @@ func TestLoadRejectsInvalidPlannerConfiguration(t *testing.T) {
 	t.Setenv("FORGEFLOW_PLANNER_TIMEOUT", "forever")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() accepted an invalid planner timeout")
+	}
+}
+
+func TestLoadRejectsUnknownModelProvider(t *testing.T) {
+	t.Setenv("FORGEFLOW_MODEL_PROVIDER", "unknown")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted an unknown model provider")
 	}
 }
 

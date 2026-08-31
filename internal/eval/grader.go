@@ -28,6 +28,7 @@ type Observation struct {
 	InputTokens              int             `json:"inputTokens"`
 	OutputTokens             int             `json:"outputTokens"`
 	CachedInputTokens        int             `json:"cachedInputTokens"`
+	CacheWriteInputTokens    int             `json:"cacheWriteInputTokens"`
 	ReasoningTokens          int             `json:"reasoningTokens"`
 	Regression               bool            `json:"regression"`
 	HumanIntervention        bool            `json:"humanIntervention"`
@@ -119,7 +120,7 @@ func ValidateObservations(dataset Dataset, observations []Observation) error {
 			return fmt.Errorf("duplicate observation for %q", observation.CaseID)
 		}
 		seen[observation.CaseID] = struct{}{}
-		if observation.Iterations < 0 || observation.DiffLines < 0 || observation.ModelRequests < 0 || observation.InputTokens < 0 || observation.OutputTokens < 0 || observation.CachedInputTokens < 0 || observation.ReasoningTokens < 0 || (observation.CostUSD != nil && *observation.CostUSD < 0) || (observation.DurationMS != nil && *observation.DurationMS < 0) {
+		if observation.Iterations < 0 || observation.DiffLines < 0 || observation.ModelRequests < 0 || observation.InputTokens < 0 || observation.OutputTokens < 0 || observation.CachedInputTokens < 0 || observation.CacheWriteInputTokens < 0 || observation.ReasoningTokens < 0 || (observation.CostUSD != nil && *observation.CostUSD < 0) || (observation.DurationMS != nil && *observation.DurationMS < 0) {
 			return fmt.Errorf("observation %q contains a negative measurement", observation.CaseID)
 		}
 	}

@@ -2,6 +2,7 @@ package evalexec
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -20,15 +21,44 @@ func TestValidateChangeSetRejectsForbiddenAndBudgetOverflow(t *testing.T) {
 	}
 }
 
-func TestMeterUsesSeparateCachedInputPrice(t *testing.T) {
+func TestMeterUsesCacheReadWritePrices(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", Usage: model.Usage{InputTokens: 100, CachedInputTokens: 30, CacheWriteInputTokens: 20, OutputTokens: 20}}}}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheReadWrite, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, CacheWriteUSDPerMillion: 12.5, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
+	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Second); err != nil {
+		t.Fatal(err)
+	}
+	want := (50.0*10 + 30.0*2 + 20.0*12.5 + 20.0*30) / 1_000_000
+	if math.Abs(meter.cost-want) > 1e-12 {
+		t.Fatalf("cost=%f want=%f", meter.cost, want)
+	}
+	if meter.usage.CacheWriteInputTokens != 20 {
+		t.Fatalf("cache write tokens=%d want=20", meter.usage.CacheWriteInputTokens)
+	}
+}
+
+func TestMeterUsesCacheHitMissPrices(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
 	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", Usage: model.Usage{InputTokens: 100, CachedInputTokens: 40, OutputTokens: 20}}}}
-	meter := &meter{provider: provider, pricing: model.Pricing{InputUSDPerMillionTokens: 10, OutputUSDPerMillionTokens: 30}, cachedInputPrice: 2}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
 	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Second); err != nil {
 		t.Fatal(err)
 	}
 	want := (60.0*10 + 40.0*2 + 20.0*30) / 1_000_000
-	if meter.cost != want {
+	if math.Abs(meter.cost-want) > 1e-12 {
 		t.Fatalf("cost=%f want=%f", meter.cost, want)
+	}
+}
+
+func TestMeterRefusesCallOutsidePricingWindow(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed"}}}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Second)}, now: func() time.Time { return now }}
+	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Minute); err == nil {
+		t.Fatal("expected pricing-window rejection")
+	}
+	if provider.CallCount() != 0 {
+		t.Fatal("provider was called after the pricing window became unsafe")
 	}
 }
 

@@ -14,7 +14,8 @@
 - Agent 只能输出结构化决策或统一 Diff；补丁应用前检查禁止路径、文件数和 Diff 行数预算。
 - 显式测试只允许数据集固定的 `go`/`npm` 命令，结论取实际进程退出码；测试环境不继承 `OPENAI_API_KEY`。
 - 隐藏测试由 Agent 工作区外的 Private Grader 执行，Agent 不读取 Grader 源码或隐藏测试结果。
-- Observation 记录终态、失败分类、Token、模型请求数、成本、延迟、变更、测试和人工介入。
+- Observation 支持 `cache_hit_miss`（DeepSeek）和 `cache_read_write`（OpenAI）两种官方计费语义，分开记录普通输入、缓存读取、可选缓存写入、输出和推理 Token，并按各自费率计算真实成本。
+- Evidence 记录 Provider、计费模式、官方价格来源、价格有效截止时间和各项费率；有效期不足以覆盖下一次调用时会在发出付费请求前停止。
 - 拒绝、超时、审批请求、模型输出错误和测试失败都形成 Observation，不从统计中删除。
 - Evidence 在每个 Case 后通过同目录临时文件、Sync 和原子 Rename 更新；同配置重跑会跳过已记录 Case。
 - 恢复时若 Git、模型、Prompt、Policy、Tool、Fixture 或 Grader 配置变化，会要求使用新的 Evidence 路径。
@@ -27,9 +28,10 @@
 1. 主仓库工作区干净，并记录精确 40 位 Git SHA。
 2. Private Grader 工作区干净，并记录精确 Git SHA。
 3. 30 个 Fixture SHA 全部可解析，并记录 Fixture HEAD。
-4. `OPENAI_API_KEY` 只从当前进程环境注入。
-5. 输入、缓存输入和输出 Token 的当前真实价格均为正数，不用零值冒充成本。
-6. 三种模式和输出路径合法；原始 Evidence 位于 Git 忽略的 `.forgeflow/evals`。
+4. OpenAI-compatible Provider Key 只通过兼容变量 `OPENAI_API_KEY` 从当前进程环境注入；变量名不代表必须使用 OpenAI。
+5. 显式选择 Provider 和计费模式，并提供当前真实价格、官方 HTTPS 来源及 RFC3339 有效截止时间。
+6. `cache_hit_miss` 只接受普通输入、缓存命中和输出价格；`cache_read_write` 还必须提供缓存写入价格。
+7. 三种模式和输出路径合法；原始 Evidence 位于 Git 忽略的 `.forgeflow/evals`。
 
 ## 已通过的本地验证
 
@@ -46,24 +48,32 @@
 
 ## 提交后的真实执行
 
-从安全密钥存储注入 Key，并从官方价格页核对当前所选模型的真实价格：
+下面是 DeepSeek Responses API 的执行模板。先撤销任何曾出现在聊天、日志或命令历史中的 Key，再把新 Key 仅注入当前 PowerShell 进程；不要写入仓库中的 `.env`：
 
 ```powershell
-$env:OPENAI_API_KEY="<仅当前终端使用>"
+$secureKey = Read-Host "DeepSeek API Key" -AsSecureString
+$keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+try { $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer) }
+$env:FORGEFLOW_OPENAI_BASE_URL = "https://api.deepseek.com"
 
 go run ./cmd/forgeflow eval execute `
   --suite software/v1 `
   --fixture-repository D:\fixtures\forgeflow-eval-fixtures `
   --grader-repository D:\fixtures\forgeflow-eval-grader `
   --modes single_agent,planner_developer,forgeflow `
-  --model <固定模型> `
-  --input-usd-per-million <当前真实输入价格> `
-  --cached-input-usd-per-million <当前真实缓存输入价格> `
-  --output-usd-per-million <当前真实输出价格> `
+  --provider deepseek `
+  --model deepseek-v4-flash `
+  --pricing-mode cache_hit_miss `
+  --pricing-source https://api-docs.deepseek.com/quick_start/pricing/ `
+  --pricing-valid-until <当前峰谷价格窗口结束时间，RFC3339> `
+  --input-usd-per-million <当前缓存未命中价格> `
+  --cached-input-usd-per-million <当前缓存命中价格> `
+  --output-usd-per-million <当前输出价格> `
   --output .forgeflow\evals\evidence.json
 ```
 
-可先增加 `--limit 1` 做一次付费 smoke；确认 Observation 正确后去掉该参数，原命令会从下一个 Case 继续。
+DeepSeek 高峰与非高峰价格不同。完整三基线必须在同一个官方价格窗口内运行；优先选择周末或足够长的非高峰窗口。可先增加 `--limit 1` 做一次付费 smoke，确认结构化输出、Token 和成本正确后去掉该参数，原命令会从下一个 Case 继续。如果价格窗口到期，必须停止并使用新的 Evidence 路径，不能用新价格续写旧配置。
 
 完成 90 个 Observation 后生成私有 JSON 与 Markdown 对比报告：
 

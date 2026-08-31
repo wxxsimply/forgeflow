@@ -29,6 +29,7 @@ type Config struct {
 	DataDir                  string
 	WorkflowMode             string
 	PlannerMode              string
+	ModelProvider            string
 	OpenAIAPIKey             string
 	OpenAIBaseURL            string
 	OpenAIOrganization       string
@@ -241,7 +242,8 @@ func Load() (Config, error) {
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL")),
 		BootstrapAdminPassword: bootstrapAdminPassword,
 		DataDir:                dataDirectory, WorkflowMode: envOrDefault("FORGEFLOW_WORKFLOW_MODE", "planning"), PlannerMode: envOrDefault("FORGEFLOW_PLANNER_MODE", "mock"),
-		OpenAIAPIKey: strings.TrimSpace(openAIAPIKey), OpenAIBaseURL: envOrDefault("FORGEFLOW_OPENAI_BASE_URL", "https://api.openai.com/v1"),
+		ModelProvider: envOrDefault("FORGEFLOW_MODEL_PROVIDER", "openai"),
+		OpenAIAPIKey:  strings.TrimSpace(openAIAPIKey), OpenAIBaseURL: envOrDefault("FORGEFLOW_OPENAI_BASE_URL", "https://api.openai.com/v1"),
 		OpenAIOrganization: strings.TrimSpace(os.Getenv("OPENAI_ORGANIZATION")), OpenAIProject: strings.TrimSpace(os.Getenv("OPENAI_PROJECT")),
 		OpenAIMaxRetries: maxRetries, PlannerModel: envOrDefault("FORGEFLOW_PLANNER_MODEL", "gpt-5.6"),
 		PlannerPromptVersion:   envOrDefault("FORGEFLOW_PLANNER_PROMPT_VERSION", "planner/v1"),
@@ -318,6 +320,9 @@ func (c Config) Validate() error {
 	}
 	if !oneOf(c.PlannerMode, "mock", "openai") {
 		return fmt.Errorf("FORGEFLOW_PLANNER_MODE must be mock or openai")
+	}
+	if !oneOf(c.ModelProvider, "openai", "deepseek") {
+		return fmt.Errorf("FORGEFLOW_MODEL_PROVIDER must be openai or deepseek")
 	}
 	if strings.TrimSpace(c.OpenAIBaseURL) == "" {
 		return fmt.Errorf("FORGEFLOW_OPENAI_BASE_URL cannot be empty")

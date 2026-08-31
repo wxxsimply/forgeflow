@@ -250,6 +250,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	modesValue := set.String("modes", "single_agent,planner_developer,forgeflow", "comma-separated baseline modes")
 	output := set.String("output", filepath.Join(".forgeflow", "evals", "evidence.json"), "private evidence output")
 	workspaceRoot := set.String("workspace-root", filepath.Join(".forgeflow", "evals", "workspaces"), "temporary eval worktree root")
+	providerName := set.String("provider", "", "model provider identity: openai or deepseek")
 	modelName := set.String("model", configuration.DeveloperModel, "same model used by all baselines")
 	reasoningEffort := set.String("reasoning-effort", configuration.DeveloperReasoningEffort, "same reasoning effort used by all baselines")
 	maxOutputTokens := set.Int("max-output-tokens", configuration.DeveloperMaxOutputTokens, "maximum output tokens per model request")
@@ -258,7 +259,11 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	contextMaxBytes := set.Int("context-max-bytes", configuration.DeveloperContextMaxBytes, "maximum repository snapshot bytes")
 	inputPrice := set.Float64("input-usd-per-million", configuration.PlannerInputUSDPerMTok, "real input token price in USD per million")
 	cachedInputPrice := set.Float64("cached-input-usd-per-million", 0, "real cached-input token price in USD per million")
+	cacheWritePrice := set.Float64("cache-write-input-usd-per-million", 0, "real cache-write input token price in USD per million")
 	outputPrice := set.Float64("output-usd-per-million", configuration.PlannerOutputUSDPerMTok, "real output token price in USD per million")
+	pricingMode := set.String("pricing-mode", "", "required pricing mode: cache_hit_miss or cache_read_write")
+	pricingSource := set.String("pricing-source", "", "HTTPS pricing source recorded in evidence")
+	pricingValidUntil := set.String("pricing-valid-until", "", "RFC3339 deadline before the selected prices change")
 	limit := set.Int("limit", 0, "maximum newly executed cases across all modes; 0 runs all remaining")
 	if err := set.Parse(args); err != nil {
 		return err
@@ -270,10 +275,22 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 		return apperror.New(apperror.CodeValidation, "--fixture-repository and --grader-repository are required")
 	}
 	if strings.TrimSpace(configuration.OpenAIAPIKey) == "" {
-		return apperror.New(apperror.CodeUnauthorized, "OPENAI_API_KEY is required for real eval execution")
+		return apperror.New(apperror.CodeUnauthorized, "OPENAI_API_KEY is required for the OpenAI-compatible model endpoint")
 	}
-	if *inputPrice <= 0 || *cachedInputPrice <= 0 || *outputPrice <= 0 {
-		return apperror.New(apperror.CodeValidation, "real positive input, cached-input, and output token prices are required")
+	if !slices.Contains([]string{"openai", "deepseek"}, strings.TrimSpace(*providerName)) {
+		return apperror.New(apperror.CodeValidation, "--provider must be openai or deepseek")
+	}
+	validUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(*pricingValidUntil))
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.pricing_deadline", "--pricing-valid-until must be an RFC3339 timestamp")
+	}
+	pricing := evalexec.UsagePricing{
+		Mode: evalexec.PricingMode(strings.TrimSpace(*pricingMode)), InputUSDPerMillionTokens: *inputPrice,
+		CachedUSDPerMillionTokens: *cachedInputPrice, CacheWriteUSDPerMillion: *cacheWritePrice,
+		OutputUSDPerMillionTokens: *outputPrice, Source: strings.TrimSpace(*pricingSource), ValidUntil: validUntil.UTC(),
+	}
+	if err := pricing.Validate(time.Now().UTC()); err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.pricing", "eval pricing configuration is invalid")
 	}
 	if *limit < 0 {
 		return apperror.New(apperror.CodeValidation, "--limit cannot be negative")
@@ -304,7 +321,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	provider, err := model.NewOpenAIProvider(model.OpenAIConfig{
 		APIKey: configuration.OpenAIAPIKey, BaseURL: configuration.OpenAIBaseURL,
 		Organization: configuration.OpenAIOrganization, Project: configuration.OpenAIProject,
-		MaxRetries: configuration.OpenAIMaxRetries,
+		MaxRetries: configuration.OpenAIMaxRetries, ProviderName: strings.TrimSpace(*providerName),
 	})
 	if err != nil {
 		return err
@@ -314,7 +331,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	absoluteWorkspaces, _ := filepath.Abs(*workspaceRoot)
 	absoluteOutput, _ := filepath.Abs(*output)
 	executor, err := evalexec.NewMux(evalexec.Options{
-		Provider: provider, Pricing: model.Pricing{InputUSDPerMillionTokens: *inputPrice, OutputUSDPerMillionTokens: *outputPrice}, CachedInputPrice: *cachedInputPrice,
+		Provider: provider, Pricing: pricing,
 		FixtureRepository: absoluteFixture, GraderRepository: absoluteGrader, WorkspaceRoot: absoluteWorkspaces,
 		Model: *modelName, ReasoningEffort: *reasoningEffort, MaxOutputTokens: *maxOutputTokens,
 		CallTimeout: *callTimeout, CommandTimeout: *commandTimeout, ContextMaxBytes: *contextMaxBytes,
@@ -324,7 +341,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	}
 	configurations := make([]fulleval.Configuration, 0, len(modes))
 	for _, mode := range modes {
-		configurations = append(configurations, evalConfiguration(mode, *modelName, rootCommit, fixtureHead, graderCommit, *inputPrice, *cachedInputPrice, *outputPrice))
+		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, rootCommit, fixtureHead, graderCommit, pricing))
 	}
 	file, err := fulleval.RunResumable(ctx, fulleval.ResumableOptions{
 		Dataset: dataset, Configurations: configurations, Executor: executor,
@@ -364,7 +381,7 @@ func parseEvalModes(value string) ([]fulleval.Mode, error) {
 	return result, nil
 }
 
-func evalConfiguration(mode fulleval.Mode, modelName, gitSHA, fixtureSHA, graderSHA string, inputPrice, cachedInputPrice, outputPrice float64) fulleval.Configuration {
+func evalConfiguration(mode fulleval.Mode, providerName, modelName, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing) fulleval.Configuration {
 	agents := []string{"single_agent"}
 	prompts := map[string]string{"single_agent": "eval/single-agent/v1"}
 	if mode == fulleval.ModePlannerDeveloper {
@@ -378,12 +395,17 @@ func evalConfiguration(mode fulleval.Mode, modelName, gitSHA, fixtureSHA, grader
 	for _, agent := range agents {
 		models[agent] = modelName
 	}
+	prices := map[string]float64{"input": pricing.InputUSDPerMillionTokens, "cachedInput": pricing.CachedUSDPerMillionTokens, "output": pricing.OutputUSDPerMillionTokens}
+	if pricing.CacheWriteUSDPerMillion > 0 {
+		prices["cacheWriteInput"] = pricing.CacheWriteUSDPerMillion
+	}
 	return fulleval.Configuration{
 		Mode: mode, ModelVersions: models, PromptVersions: prompts,
 		PolicyVersion: evalexec.PolicyVersion, ToolVersions: map[string]string{"worktree": evalexec.ToolVersion, "apply_patch": evalexec.ToolVersion, "run_test": evalexec.ToolVersion, "hidden_grader": evalexec.ToolVersion},
 		GitCommit: gitSHA, FixtureRepositoryCommit: fixtureSHA, GraderCommit: graderSHA,
 		ExecutionEnvironment: runtime.GOOS + "/" + runtime.GOARCH + " " + runtime.Version(),
-		PricingUSDPerMTok:    map[string]float64{"input": inputPrice, "cachedInput": cachedInputPrice, "output": outputPrice},
+		ModelProvider:        providerName, PricingMode: string(pricing.Mode), PricingSource: pricing.Source,
+		PricingValidUntil: pricing.ValidUntil.UTC().Format(time.RFC3339), PricingUSDPerMTok: prices,
 	}
 }
 
@@ -576,6 +598,7 @@ func newService(mode string, configuration config.Config) (*application.Service,
 	planAgent, err := planner.New(mode, planner.Options{
 		Inspector: repoharness.NewGitInspector(repoharness.DefaultLimits()),
 		APIKey:    configuration.OpenAIAPIKey, OpenAIBaseURL: configuration.OpenAIBaseURL,
+		ModelProvider:      configuration.ModelProvider,
 		OpenAIOrganization: configuration.OpenAIOrganization, OpenAIProject: configuration.OpenAIProject,
 		OpenAIMaxRetries: configuration.OpenAIMaxRetries, Model: configuration.PlannerModel,
 		PromptVersion: configuration.PlannerPromptVersion, ReasoningEffort: configuration.PlannerReasoningEffort,
