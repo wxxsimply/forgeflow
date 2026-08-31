@@ -62,7 +62,8 @@ describe('governed workflow pages', () => {
     vi.mocked(api.decideApproval).mockRejectedValue(new APIError(409, { code: 'conflict', message: 'stale approval' }));
     const user = userEvent.setup();
     renderApp(`/approvals/${approval.request.approvalId}`);
-    expect(await screen.findByText('增加幂等键校验与冲突响应。')).toBeInTheDocument();
+    await waitFor(() => expect(api.getRun).toHaveBeenCalledWith(run.runId), { timeout: 5000 });
+    expect(await screen.findByText('增加幂等键校验与冲突响应。', {}, { timeout: 5000 })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '批准并继续' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('审批已被其他人更新');
     expect(api.decideApproval).toHaveBeenCalledWith(approval.request.approvalId, '"4"', 'approve', '');
