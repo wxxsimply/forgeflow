@@ -45,11 +45,12 @@ type ResponseFormat struct {
 }
 
 type Usage struct {
-	InputTokens       int `json:"inputTokens"`
-	OutputTokens      int `json:"outputTokens"`
-	TotalTokens       int `json:"totalTokens"`
-	CachedInputTokens int `json:"cachedInputTokens"`
-	ReasoningTokens   int `json:"reasoningTokens"`
+	InputTokens           int `json:"inputTokens"`
+	OutputTokens          int `json:"outputTokens"`
+	TotalTokens           int `json:"totalTokens"`
+	CachedInputTokens     int `json:"cachedInputTokens"`
+	CacheWriteInputTokens int `json:"cacheWriteInputTokens"`
+	ReasoningTokens       int `json:"reasoningTokens"`
 }
 
 type Response struct {

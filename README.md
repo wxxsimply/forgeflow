@@ -99,7 +99,8 @@ Linux/macOS 也可以执行 `make verify`。两者都会检查格式、运行测
 | `FORGEFLOW_DATA_DIR` | `.forgeflow` | Checkpoint 和本地运行数据目录 |
 | `FORGEFLOW_WORKFLOW_MODE` | `planning` | `planning` 仅运行计划审批；`development` 仅允许在 Worker 中启用完整开发图 |
 | `FORGEFLOW_PLANNER_MODE` | `mock` | `mock` 或 `openai` |
-| `FORGEFLOW_PLANNER_MODEL` | `gpt-5.6` | OpenAI Planner 模型 |
+| `FORGEFLOW_MODEL_PROVIDER` | `openai` | OpenAI-compatible 端点身份：`openai` 或 `deepseek` |
+| `FORGEFLOW_PLANNER_MODEL` | `gpt-5.6` | OpenAI-compatible Planner 模型 |
 | `FORGEFLOW_PLANNER_PROMPT_VERSION` | `planner/v1` | 版本化 Prompt |
 | `FORGEFLOW_PLANNER_TIMEOUT` | `120s` | 单次 Planner 调用超时 |
 | `FORGEFLOW_DEVELOPER_MODEL` | `gpt-5.6` | Developer 使用的模型 |
@@ -117,7 +118,7 @@ Linux/macOS 也可以执行 `make verify`。两者都会检查格式、运行测
 | `FORGEFLOW_ARTIFACT_ROOT` | `.forgeflow/artifacts` | Artifact 大对象目录 |
 | `FORGEFLOW_WORKER_LEASE_TTL` | `30s` | Worker Job 租约时长 |
 | `FORGEFLOW_WORKER_METRICS_ADDRESS` | `127.0.0.1:9091` | Worker 内部健康与 Metrics 地址 |
-| `OPENAI_API_KEY` | 无 | 仅 `openai` 模式需要；禁止写入仓库 |
+| `OPENAI_API_KEY` | 无 | OpenAI-compatible Provider 凭据；兼容变量名，禁止写入仓库 |
 | `FORGEFLOW_DOCKER_ENABLED` | `false` | 是否允许真实 Docker 沙箱执行 |
 | `FORGEFLOW_SANDBOX_IMAGE` | 无 | 启用 Docker 时必须是固定 sha256 digest 的镜像 |
 | `FORGEFLOW_SANDBOX_WORKSPACE_ROOT` | `.forgeflow/workspaces` | Docker 唯一允许挂载的受管工作区根目录 |
@@ -166,13 +167,19 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
   --fixture-repository D:\fixtures\forgeflow-eval-fixtures `
   --grader-repository D:\fixtures\forgeflow-eval-grader `
   --modes single_agent,planner_developer,forgeflow `
+  --provider <openai-or-deepseek> `
+  --model <固定模型> `
+  --pricing-mode <cache_hit_miss-or-cache_read_write> `
+  --pricing-source <官方HTTPS价格页> `
+  --pricing-valid-until <RFC3339价格有效截止时间> `
   --input-usd-per-million <当前真实输入价格> `
   --cached-input-usd-per-million <当前真实缓存输入价格> `
+  --cache-write-input-usd-per-million <仅cache_read_write模式需要> `
   --output-usd-per-million <当前真实输出价格> `
   --output .forgeflow\evals\evidence.json
 ```
 
-命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
+命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项；价格有效期不足以覆盖下一次模型调用时会在付费请求前停止。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
 Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 

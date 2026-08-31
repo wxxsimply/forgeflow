@@ -37,6 +37,7 @@ type Options struct {
 	Inspector                 repository.RepositoryInspector
 	PromptLoader              *PromptLoader
 	APIKey                    string
+	ModelProvider             string
 	OpenAIBaseURL             string
 	OpenAIOrganization        string
 	OpenAIProject             string
@@ -78,6 +79,7 @@ func New(mode string, optional ...Options) (Planner, error) {
 		if options.Provider == nil {
 			provider, err := model.NewOpenAIProvider(model.OpenAIConfig{
 				APIKey: options.APIKey, BaseURL: options.OpenAIBaseURL,
+				ProviderName: options.ModelProvider,
 				Organization: options.OpenAIOrganization, Project: options.OpenAIProject,
 				MaxRetries: options.OpenAIMaxRetries,
 			})

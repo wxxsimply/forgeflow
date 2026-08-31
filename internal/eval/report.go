@@ -27,6 +27,10 @@ type Configuration struct {
 	FixtureRepositoryCommit string             `json:"fixtureRepositoryCommit,omitempty"`
 	GraderCommit            string             `json:"graderCommit,omitempty"`
 	ExecutionEnvironment    string             `json:"executionEnvironment,omitempty"`
+	ModelProvider           string             `json:"modelProvider,omitempty"`
+	PricingMode             string             `json:"pricingMode,omitempty"`
+	PricingSource           string             `json:"pricingSource,omitempty"`
+	PricingValidUntil       string             `json:"pricingValidUntil,omitempty"`
 	PricingUSDPerMTok       map[string]float64 `json:"pricingUsdPerMTok,omitempty"`
 }
 

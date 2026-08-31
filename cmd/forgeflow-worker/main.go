@@ -80,6 +80,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	planAgent, err := planner.New(configuration.PlannerMode, planner.Options{
 		Provider:  provider,
 		Inspector: repository.NewGitInspector(repository.DefaultLimits()), APIKey: configuration.OpenAIAPIKey,
+		ModelProvider: configuration.ModelProvider,
 		OpenAIBaseURL: configuration.OpenAIBaseURL, OpenAIOrganization: configuration.OpenAIOrganization,
 		OpenAIProject: configuration.OpenAIProject, OpenAIMaxRetries: configuration.OpenAIMaxRetries,
 		Model: configuration.PlannerModel, PromptVersion: configuration.PlannerPromptVersion,
@@ -173,6 +174,7 @@ func workerModelProvider(configuration config.Config) (model.Provider, error) {
 	}
 	return model.NewOpenAIProvider(model.OpenAIConfig{
 		APIKey: configuration.OpenAIAPIKey, BaseURL: configuration.OpenAIBaseURL,
+		ProviderName: configuration.ModelProvider,
 		Organization: configuration.OpenAIOrganization, Project: configuration.OpenAIProject,
 		MaxRetries: configuration.OpenAIMaxRetries,
 	})

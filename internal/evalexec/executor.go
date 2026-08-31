@@ -20,8 +20,7 @@ const (
 
 type Options struct {
 	Provider          model.Provider
-	Pricing           model.Pricing
-	CachedInputPrice  float64
+	Pricing           UsagePricing
 	FixtureRepository string
 	GraderRepository  string
 	WorkspaceRoot     string
@@ -47,8 +46,8 @@ func newCore(options Options) (*core, error) {
 			return nil, fmt.Errorf("%s is required", name)
 		}
 	}
-	if options.Pricing.InputUSDPerMillionTokens <= 0 || options.Pricing.OutputUSDPerMillionTokens <= 0 || options.CachedInputPrice <= 0 {
-		return nil, fmt.Errorf("real input, cached-input, and output token pricing is required for eval cost evidence")
+	if err := options.Pricing.Validate(time.Now().UTC()); err != nil {
+		return nil, fmt.Errorf("eval pricing is invalid: %w", err)
 	}
 	if options.MaxOutputTokens <= 0 {
 		options.MaxOutputTokens = 16_000
@@ -135,29 +134,41 @@ func (m *Mux) Execute(ctx context.Context, evalCase fulleval.Case, mode fulleval
 }
 
 type meter struct {
-	provider         model.Provider
-	pricing          model.Pricing
-	cachedInputPrice float64
-	usage            model.Usage
-	requests         int
-	cost             float64
+	provider model.Provider
+	pricing  UsagePricing
+	usage    model.Usage
+	requests int
+	cost     float64
+	now      func() time.Time
 }
 
 func (m *meter) call(ctx context.Context, request model.Request, agent string, timeout time.Duration) (model.Response, error) {
+	now := m.now
+	if now == nil {
+		now = func() time.Time { return time.Now().UTC() }
+	}
+	if err := m.pricing.CanStart(now(), timeout); err != nil {
+		return model.Response{}, err
+	}
 	callContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	response, err := model.GenerateObserved(callContext, m.provider, request, agent, "eval", m.pricing)
+	observabilityPricing := model.Pricing{InputUSDPerMillionTokens: m.pricing.InputUSDPerMillionTokens, OutputUSDPerMillionTokens: m.pricing.OutputUSDPerMillionTokens}
+	response, err := model.GenerateObserved(callContext, m.provider, request, agent, "eval", observabilityPricing)
 	m.requests++
 	m.usage.InputTokens += response.Usage.InputTokens
 	m.usage.OutputTokens += response.Usage.OutputTokens
 	m.usage.TotalTokens += response.Usage.TotalTokens
 	m.usage.CachedInputTokens += response.Usage.CachedInputTokens
+	m.usage.CacheWriteInputTokens += response.Usage.CacheWriteInputTokens
 	m.usage.ReasoningTokens += response.Usage.ReasoningTokens
-	uncachedInput := response.Usage.InputTokens - response.Usage.CachedInputTokens
-	if uncachedInput < 0 {
-		uncachedInput = 0
+	cost, pricingErr := m.pricing.Estimate(response.Usage)
+	if pricingErr != nil {
+		if err != nil {
+			return response, errors.Join(err, pricingErr)
+		}
+		return response, pricingErr
 	}
-	m.cost += float64(uncachedInput)/1_000_000*m.pricing.InputUSDPerMillionTokens + float64(response.Usage.CachedInputTokens)/1_000_000*m.cachedInputPrice + float64(response.Usage.OutputTokens)/1_000_000*m.pricing.OutputUSDPerMillionTokens
+	m.cost += cost
 	return response, err
 }
 
@@ -193,7 +204,7 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 	for _, name := range evalCase.HiddenTests {
 		observation.HiddenTestResults[name] = false
 	}
-	usage := &meter{provider: c.options.Provider, pricing: c.options.Pricing, cachedInputPrice: c.options.CachedInputPrice}
+	usage := &meter{provider: c.options.Provider, pricing: c.options.Pricing}
 	defer func() {
 		duration := time.Since(started).Milliseconds()
 		cost := usage.cost
@@ -203,6 +214,7 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 		observation.InputTokens = usage.usage.InputTokens
 		observation.OutputTokens = usage.usage.OutputTokens
 		observation.CachedInputTokens = usage.usage.CachedInputTokens
+		observation.CacheWriteInputTokens = usage.usage.CacheWriteInputTokens
 		observation.ReasoningTokens = usage.usage.ReasoningTokens
 	}()
 
