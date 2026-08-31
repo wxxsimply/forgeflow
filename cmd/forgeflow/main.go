@@ -394,7 +394,7 @@ func cleanGitCommit(ctx context.Context, directory string) (string, error) {
 		return "", err
 	}
 	if strings.TrimSpace(string(output)) != "" {
-		return "", fmt.Errorf("Git worktree is not clean")
+		return "", fmt.Errorf("git worktree is not clean")
 	}
 	return gitCommit(ctx, directory)
 }
