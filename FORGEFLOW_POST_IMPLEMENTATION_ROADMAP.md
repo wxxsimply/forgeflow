@@ -407,7 +407,7 @@ go run ./cmd/forgeflow eval `
 - 可断点恢复的 Evidence 采集器。
 - 90 次执行的原始私有 Evidence。
 - JSON 和 Markdown 对比报告。
-- 人工签署的 Eval 审核结论。
+- `release-reports/stage-3-eval-review-template.md` 人工审核模板，以及完成后由仓库所有者签署的 Eval 审核结论。
 
 ### 7.6 阶段 3 退出门槛
 

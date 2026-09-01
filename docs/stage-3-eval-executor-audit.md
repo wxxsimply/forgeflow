@@ -41,6 +41,7 @@
 - 临时真实 Git 仓库中的 Patch apply 与 `go test` 退出码集成测试。
 - 本地 Private Grader 自身测试和 30 Case Fixture commit 预检。
 - 全仓库 Go 测试、格式、Vet 和项目验证脚本（最终结果以提交前命令输出为准）。
+- 专用 `release-reports` 脱敏发布边界和阶段 3 人工审核/Promotion 签署模板；模板保持 `DRAFT / NOT APPROVED`，不预填虚构成绩。
 
 ## 2026-08-31 非付费预检快照
 
