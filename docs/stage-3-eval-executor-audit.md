@@ -1,7 +1,7 @@
 # ForgeFlow 阶段 3：三基线执行器审计
 
-> 日期：2026-08-31  
-> 状态：执行器与双 Provider 计费已合并；非付费预检、一次 smoke 和两次授权诊断已完成，等待人工提交本轮修复
+> 日期：2026-08-31～2026-09-01
+> 状态：执行器与双 Provider 计费及 Reasoning 配置追踪已合并；45-Observation 试运行已完成，完整 90 次基线等待新的连续价格窗口
 > 数据集：`software/v1`
 
 ## 已完成的本地实现
@@ -119,7 +119,20 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evid
 - 诊断同时发现 Evidence 配置此前没有记录 Reasoning。当前分支已增加 `reasoningEffort` 配置字段和断点续跑漂移测试；正式基线必须使用包含该修复的新 Git commit 和全新 Evidence 路径。
 - 原始诊断 Evidence 继续保存在 Git 忽略的 `.forgeflow/evals`，不得提交 GitHub。
 
-本次授权已完成且未用尽次数或费用上限；剩余授权不自动延续到其他 Fixture 或完整三基线。正式运行其余 Observation 前仍需新的费用和数据出站授权。
+本次限额诊断授权已完成且未用尽次数或费用上限；剩余诊断额度没有自动延续。后续完整三基线已取得单独的费用和数据出站授权，范围见下一节。
+
+## 2026-09-01 三基线价格窗口试运行
+
+- 仓库所有者已明确授权将 `software/v1` 全部 30 个私有 Fixture 的任务描述、仓库规则和每个最多 128 KiB 源码快照发送给 DeepSeek，用于三基线正式 Eval；明确禁止发送 Private Grader、隐藏测试源码、原始 Evidence 或凭据。
+- 主仓库 commit：`6d989ea394a6c3961ee353e2eaba593f160b1df5`（PR #8 已合并）；Fixture HEAD：`6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f`；Grader HEAD：`5942ec84d403e37385203b4c7851d1b92573548a`。三个工作区在执行前均通过洁净性和 30 Case 预检。
+- 固定配置：`deepseek/deepseek-v4-flash`、`reasoning-effort=low`、`cache_hit_miss`、非高峰缓存命中 `$0.007/M`、未命中 `$0.22/M`、输出 `$0.66/M`；价格来源：<https://api-docs.deepseek.com/quick_start/pricing/>。
+- `single_agent` 完成 30/30：8 个无失败码的 `completed`，4 个 `completed/hidden_grader_failed`，1 个 `failed/explicit_tests_failed`，16 个 `failed/model_output_invalid`，1 个 `approval_required`；30 次模型请求，成本 `$0.084260068`，P95 延迟 64955 ms。
+- `planner_developer` 完成 15/30：4 个 `completed`，11 个 `failed/model_output_invalid`；30 次模型请求，成本 `$0.061973780`，当前样本 P95 延迟 89679 ms。
+- `forgeflow` 尚未开始。合计保存 45 个终态 Observation、60 次模型请求、输入 141387 Token（缓存命中 2304）、输出 175181 Token、推理 159805 Token；累计成本 `$0.146233848`，整体 P95 延迟 64955 ms。
+- 45 个 Observation 的 Secret 检测和危险命令执行计数均为 0；Private Grader 与隐藏测试始终在 Agent 工作区外运行，原始 Evidence 始终位于 Git 忽略的 `.forgeflow/evals`。
+- 用户主动暂停后付费进程已终止；恢复时原价格有效期已经结束。根据配置漂移门禁，本次 45-Observation Evidence 保留为私有试运行证据，不与后续价格窗口混写，也不计作完整三基线报告。
+
+完整 90 次正式基线必须在新的、足够长的连续官方价格窗口中使用全新 Evidence 路径从头执行。不得删除上述失败样本、把部分结果拼接成完整报告，或提前勾选阶段 3 退出门槛。
 
 ## 尚未完成，禁止提前声明
 
