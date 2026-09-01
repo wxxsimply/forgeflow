@@ -54,6 +54,7 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_WORKER_HEARTBEAT_INTERVAL",
 		"FORGEFLOW_WORKER_POLL_INTERVAL",
 		"FORGEFLOW_WORKER_METRICS_ADDRESS",
+		"FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES",
 		"FORGEFLOW_BOOTSTRAP_ADMIN_PASSWORD_FILE",
 		"OPENAI_API_KEY_FILE",
 		"FORGEFLOW_DOCKER_ENABLED",
@@ -100,6 +101,9 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	}
 	if configuration.PostgresEnabled || configuration.PostgresMaxOpenConns != 20 || configuration.WorkerLeaseTTL != 30*time.Second {
 		t.Fatalf("stage seven defaults = %+v", configuration)
+	}
+	if configuration.EnforceActiveReleases {
+		t.Fatal("active release governance must be opt-in outside controlled deployment")
 	}
 	if configuration.PlannerModel != "gpt-5.6" || configuration.PlannerPromptVersion != "planner/v1" || configuration.PlannerTimeout.String() != "2m0s" {
 		t.Fatalf("planner defaults = model %q prompt %q timeout %s", configuration.PlannerModel, configuration.PlannerPromptVersion, configuration.PlannerTimeout)

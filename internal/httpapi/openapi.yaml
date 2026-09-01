@@ -751,12 +751,13 @@ components:
       properties: {agent: {type: string}, version: {type: string}, sha256: {type: string}, configured: {type: boolean}}
     PromptRelease:
       type: object
-      required: [id, agent, version, promptSha256, evalRunId, promotedBy, comment, active, createdAt]
+      required: [id, agent, version, promptSha256, model, evalRunId, promotedBy, comment, active, createdAt]
       properties:
         id: {type: string, format: uuid}
         agent: {type: string}
         version: {type: string}
         promptSha256: {type: string}
+        model: {type: string}
         evalRunId: {type: string, format: uuid}
         promotedBy: {type: string, format: uuid}
         rollbackOf: {type: string, format: uuid}
@@ -772,12 +773,12 @@ components:
     PromptPromotionRequest:
       type: object
       additionalProperties: false
-      required: [evalRunId]
+      required: [evalRunId, comment]
       properties: {evalRunId: {type: string, format: uuid}, comment: {type: string, maxLength: 2000}}
     PromptRollbackRequest:
       type: object
       additionalProperties: false
-      required: [releaseId]
+      required: [releaseId, comment]
       properties: {releaseId: {type: string, format: uuid}, comment: {type: string, maxLength: 2000}}
     Error:
       type: object

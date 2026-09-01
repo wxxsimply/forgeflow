@@ -1,7 +1,7 @@
 # ForgeFlow 阶段 3：三基线执行器审计
 
 > 日期：2026-08-31～2026-09-01
-> 状态：正式三基线 90-Observation Evidence 与私有报告已完成技术审计；等待仓库所有者人工复核和 Promotion 签署
+> 状态：已完成；正式三基线 90-Observation Evidence 与私有报告已完成技术审计，仓库所有者已批准为后续候选版本的真实对照基线
 > 数据集：`software/v1`
 
 ## 已完成的本地实现
@@ -161,15 +161,15 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evid
 - 合计 90 个终态 Observation、159 次模型请求；输入 351092、缓存命中 179328、输出 477854、推理 438035 Token。正式 Evidence 成本 `$0.354427016`；加上同一授权下此前诊断 `$0.045562336` 后，授权周期总成本 `$0.399989352`，按 2026-09-01 中国外汇交易中心中间价 1 USD = 6.7809 CNY 换算约 `2.7123 CNY`，低于 10 元授权和 `$1.40` 代码硬上限。
 - 所有 90 个 Observation 均有成本和时长；Secret 检测 0，危险命令执行 0。失败样本原样保留：`model_output_invalid` 51、显式测试失败 4、隐藏测试失败 6、`internal_error` 3；9 个 Observation 记录人工介入，其中 3 个终态为 `approval_required`。没有删除失败后重跑成成功。
 - 原始 Evidence SHA-256：`9674C3A46E2226672BB8D29B97E23F181A0E899E7384E3A84673F7766DF8DDDC`；私有 JSON 报告 SHA-256：`F58D631F9E3D89A163921013C041B8C5445F8974D979EB837A8A5D30959E7FD3`；私有 Markdown 报告 SHA-256：`50224CC2F139ABC175C6E55002CA949A50439211EE96FB26641767101605494E`。三份文件都位于 `.forgeflow/evals` 并由 `.gitignore` 排除，只提交本节脱敏汇总。
-- 这些指标显示完整 ForgeFlow 当前并未优于简化基线，不能据此宣传性能提升；它们构成后续 Prompt/模型候选版本的真实初始对照。阶段 3 技术 Evidence 已完整，但进入阶段 4 仍需仓库所有者人工复核并签署 `release-reports/stage-3-eval-review-template.md`。
+- 这些指标显示完整 ForgeFlow 当前并未优于简化基线，不能据此宣传性能提升；它们构成后续 Prompt/模型候选版本的真实初始对照。仓库所有者 `wxxsimply` 已于 `2026-09-01T13:09:19Z` 人工复核，并以 PR #13 和明确确认签署 `APPROVED AS BASELINE`。
 
-## 尚未完成，禁止提前声明
+## 阶段 3 完成记录
 
 - [x] 三种模式各 30 个终态 Observation，共 90 次真实执行。
 - [x] 成本和 P95 延迟数据完整。
 - [x] JSON/Markdown 对比报告已生成并完成技术完整性检查。
-- [ ] JSON/Markdown 对比报告已由仓库所有者人工复核。
-- [ ] 脱敏汇总已由人工签署 Promotion 结论。
+- [x] JSON/Markdown 对比报告已由仓库所有者人工复核。
+- [x] 脱敏汇总已由人工签署 `APPROVED AS BASELINE` 结论。
 - [x] 原始 Evidence 已确认由 `.gitignore` 排除，未进入当前 Git 候选修改。
 
-这些项目完成前，阶段 3 保持“进行中”，不能进入阶段 4。
+阶段 3 已满足退出门槛，可以进入阶段 4；该签署不等同于候选 Prompt、模型或 Production 发布批准。

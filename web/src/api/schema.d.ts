@@ -911,6 +911,7 @@ export interface components {
             agent: string;
             version: string;
             promptSha256: string;
+            model: string;
             /** Format: uuid */
             evalRunId: string;
             /** Format: uuid */
@@ -929,12 +930,12 @@ export interface components {
         PromptPromotionRequest: {
             /** Format: uuid */
             evalRunId: string;
-            comment?: string;
+            comment: string;
         };
         PromptRollbackRequest: {
             /** Format: uuid */
             releaseId: string;
-            comment?: string;
+            comment: string;
         };
         Error: {
             code: string;

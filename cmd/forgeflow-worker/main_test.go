@@ -18,19 +18,28 @@ func TestWorkerStatusHandlerExposesHealthAndMetrics(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = telemetry.Shutdown(context.Background()) })
 
-	for path, expected := range map[string]string{"/healthz": "\"status\":\"ok\"", "/metrics": "text/plain"} {
+	for path, expected := range map[string]string{"/healthz": "\"status\":\"ok\"", "/readyz": "\"status\":\"ready\"", "/metrics": "text/plain"} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		response := httptest.NewRecorder()
 		workerStatusHandler().ServeHTTP(response, request)
 		if response.Code != http.StatusOK {
 			t.Fatalf("%s status=%d", path, response.Code)
 		}
-		if path == "/healthz" && !strings.Contains(response.Body.String(), expected) {
+		if path != "/metrics" && !strings.Contains(response.Body.String(), expected) {
 			t.Fatalf("health body=%s", response.Body.String())
 		}
 		if path == "/metrics" && !strings.Contains(response.Header().Get("Content-Type"), expected) {
 			t.Fatalf("metrics content type=%s", response.Header().Get("Content-Type"))
 		}
+	}
+}
+
+func TestWorkerReadinessFailsClosedOnReleaseMismatch(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	response := httptest.NewRecorder()
+	workerStatusHandler(func(context.Context) error { return context.Canceled }).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "active_release_mismatch") {
+		t.Fatalf("readiness status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

@@ -10,8 +10,11 @@ func TestEmbeddedMigrationsArePairedAndContainControlPlaneTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 4 || all[0].Version != 1 || all[1].Version != 2 || all[2].Version != 3 || all[3].Version != 4 || strings.TrimSpace(all[3].Down) == "" {
+	if len(all) != 5 || all[0].Version != 1 || all[1].Version != 2 || all[2].Version != 3 || all[3].Version != 4 || all[4].Version != 5 || strings.TrimSpace(all[4].Down) == "" {
 		t.Fatalf("migrations=%+v", all)
+	}
+	if !strings.Contains(all[4].Up, "ADD COLUMN model") {
+		t.Fatal("prompt release model migration is missing")
 	}
 	for _, table := range []string{"eval_runs", "prompt_releases"} {
 		if !strings.Contains(all[3].Up, "CREATE TABLE "+table) {

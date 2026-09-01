@@ -72,6 +72,7 @@ type Config struct {
 	WorkerHeartbeatInterval  time.Duration
 	WorkerPollInterval       time.Duration
 	WorkerMetricsAddress     string
+	EnforceActiveReleases    bool
 	DockerEnabled            bool
 	DockerBinary             string
 	SandboxWorkspaceRoot     string
@@ -217,6 +218,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	governanceEnforceActiveReleases, err := envBool("FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES", false)
+	if err != nil {
+		return Config{}, err
+	}
 	dataDirectory := envOrDefault("FORGEFLOW_DATA_DIR", ".forgeflow")
 	bootstrapAdminPassword, err := envOrFile("FORGEFLOW_BOOTSTRAP_ADMIN_PASSWORD")
 	if err != nil {
@@ -268,8 +273,9 @@ func Load() (Config, error) {
 		PostgresConnMaxLifetime: postgresLifetime, PostgresPingTimeout: postgresPingTimeout,
 		ArtifactRoot: envOrDefault("FORGEFLOW_ARTIFACT_ROOT", filepath.Join(dataDirectory, "artifacts")), ArtifactMaxBytes: artifactMaxBytes,
 		WorkerLeaseTTL: workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
-		WorkerMetricsAddress: envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
-		DockerEnabled:        dockerEnabled, DockerBinary: envOrDefault("FORGEFLOW_DOCKER_BINARY", "docker"),
+		WorkerMetricsAddress:  envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
+		EnforceActiveReleases: governanceEnforceActiveReleases,
+		DockerEnabled:         dockerEnabled, DockerBinary: envOrDefault("FORGEFLOW_DOCKER_BINARY", "docker"),
 		SandboxWorkspaceRoot: envOrDefault("FORGEFLOW_SANDBOX_WORKSPACE_ROOT", filepath.Join(dataDirectory, "workspaces")),
 		SandboxImage:         strings.TrimSpace(os.Getenv("FORGEFLOW_SANDBOX_IMAGE")),
 		SandboxCPUs:          envOrDefault("FORGEFLOW_SANDBOX_CPUS", "1.0"), SandboxMemory: envOrDefault("FORGEFLOW_SANDBOX_MEMORY", "512m"),

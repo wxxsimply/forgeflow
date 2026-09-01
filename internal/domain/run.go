@@ -163,6 +163,8 @@ type ResumeGuard struct {
 	BaseCommit       string    `json:"baseCommit,omitempty"`
 	PolicyVersions   []string  `json:"policyVersions"`
 	PromptBindings   []string  `json:"promptBindings"`
+	ModelBindings    []string  `json:"modelBindings"`
+	ToolBindings     []string  `json:"toolBindings"`
 	ApprovalID       string    `json:"approvalId,omitempty"`
 	ApprovalInputSHA string    `json:"approvalInputSha,omitempty"`
 	ApprovalPolicy   string    `json:"approvalPolicy,omitempty"`
