@@ -1,7 +1,7 @@
 # ForgeFlow 阶段 3：三基线执行器审计
 
 > 日期：2026-08-31～2026-09-01
-> 状态：执行器与双 Provider 计费及 Reasoning 配置追踪已合并；45-Observation 试运行和 5-Case ForgeFlow 全链路诊断已完成，完整 90 次基线等待新的连续价格窗口
+> 状态：正式三基线 90-Observation Evidence 与私有报告已完成技术审计；等待仓库所有者人工复核和 Promotion 签署
 > 数据集：`software/v1`
 
 ## 已完成的本地实现
@@ -150,12 +150,26 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evid
 
 北京时间 18:00 的一次性续跑已配置为使用足够长的非高峰窗口、新 Evidence 路径和费用检查。本次 `$0.045562336` 必须计入 10 元人民币总上限。正式运行必须基于包含代码级费用门禁的已合并 commit，传入固定的 `--max-total-cost-usd` 和 `--prior-cost-usd 0.045562336`；若该 commit 尚未合并，自动化必须停止且不得发起付费调用。
 
+## 2026-09-01 正式三基线结果
+
+- PR #12 已合并，正式执行固定在主仓库 commit `e18bfa9c5e73435634644c7c44c629d7cca07dab`；Fixture commit 为 `6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f`，Private Grader commit 为 `5942ec84d403e37385203b4c7851d1b92573548a`，三个工作区执行前均洁净且 30/30 Fixture 预检通过。
+- 固定配置为 `deepseek/deepseek-v4-flash`、`reasoning-effort=low`、`max-output-tokens=16000`、`cache_hit_miss`；连续非高峰费率为缓存命中 `$0.007/M`、未命中 `$0.22/M`、输出 `$0.66/M`，官方来源为 <https://api-docs.deepseek.com/quick_start/pricing/>，价格有效截止为 `2026-09-02T01:00:00Z`。
+- 三个模式分别从 `2026-09-01T10:03:37Z`、`2026-09-01T10:23:54Z`、`2026-09-01T10:49:24Z` 开始记录，报告在 `2026-09-01T11:33:30Z` 生成；全部位于同一个连续非高峰价格窗口。
+- `single_agent`：8/30 通过，Completion `26.67%`，Hidden Test `30.00%`，Regression `16.67%`，Human Intervention `10.00%`，平均成本 `$0.0022`，P95 `79816 ms`。30 次请求，输入 69649、缓存命中 69120、输出 100147、推理 90329 Token，正式运行成本 `$0.066697240`。
+- `planner_developer`：11/30 通过，Completion `36.67%`，Hidden Test `36.67%`，Regression `6.67%`，Human Intervention `10.00%`，平均成本 `$0.0046`，P95 `128361 ms`。55 次请求，输入 131636、缓存命中 36864、输出 177866、推理 164861 Token，正式运行成本 `$0.138499448`。
+- `forgeflow`：7/30 通过，Completion `23.33%`，Hidden Test `23.33%`，Regression `10.00%`，Human Intervention `10.00%`，平均成本 `$0.0050`，P95 `130700 ms`。74 次请求，输入 149807、缓存命中 73344、输出 199841、推理 182845 Token，正式运行成本 `$0.149230328`。
+- 合计 90 个终态 Observation、159 次模型请求；输入 351092、缓存命中 179328、输出 477854、推理 438035 Token。正式 Evidence 成本 `$0.354427016`；加上同一授权下此前诊断 `$0.045562336` 后，授权周期总成本 `$0.399989352`，按 2026-09-01 中国外汇交易中心中间价 1 USD = 6.7809 CNY 换算约 `2.7123 CNY`，低于 10 元授权和 `$1.40` 代码硬上限。
+- 所有 90 个 Observation 均有成本和时长；Secret 检测 0，危险命令执行 0。失败样本原样保留：`model_output_invalid` 51、显式测试失败 4、隐藏测试失败 6、`internal_error` 3；9 个 Observation 记录人工介入，其中 3 个终态为 `approval_required`。没有删除失败后重跑成成功。
+- 原始 Evidence SHA-256：`9674C3A46E2226672BB8D29B97E23F181A0E899E7384E3A84673F7766DF8DDDC`；私有 JSON 报告 SHA-256：`F58D631F9E3D89A163921013C041B8C5445F8974D979EB837A8A5D30959E7FD3`；私有 Markdown 报告 SHA-256：`50224CC2F139ABC175C6E55002CA949A50439211EE96FB26641767101605494E`。三份文件都位于 `.forgeflow/evals` 并由 `.gitignore` 排除，只提交本节脱敏汇总。
+- 这些指标显示完整 ForgeFlow 当前并未优于简化基线，不能据此宣传性能提升；它们构成后续 Prompt/模型候选版本的真实初始对照。阶段 3 技术 Evidence 已完整，但进入阶段 4 仍需仓库所有者人工复核并签署 `release-reports/stage-3-eval-review-template.md`。
+
 ## 尚未完成，禁止提前声明
 
-- [ ] 三种模式各 30 个终态 Observation，共 90 次真实执行。
-- [ ] 成本和 P95 延迟数据完整。
-- [ ] JSON/Markdown 对比报告已生成并人工复核。
+- [x] 三种模式各 30 个终态 Observation，共 90 次真实执行。
+- [x] 成本和 P95 延迟数据完整。
+- [x] JSON/Markdown 对比报告已生成并完成技术完整性检查。
+- [ ] JSON/Markdown 对比报告已由仓库所有者人工复核。
 - [ ] 脱敏汇总已由人工签署 Promotion 结论。
-- [ ] 原始 Evidence 已确认未进入 Git/GitHub。
+- [x] 原始 Evidence 已确认由 `.gitignore` 排除，未进入当前 Git 候选修改。
 
 这些项目完成前，阶段 3 保持“进行中”，不能进入阶段 4。

@@ -29,8 +29,8 @@
 - [x] Go 测试、Vet、Staticcheck、govulncheck 和前端检查通过。
 - [x] 项目已有首个 Git commit 和可解析的 `HEAD`（`11473a7`）。
 - [x] 代码已由仓库所有者手动上传到 GitHub。
-- [ ] 30 个 Eval Case 已绑定真实 fixture commit。
-- [ ] 三种模式的真实 Eval 报告已生成。
+- [x] 30 个 Eval Case 已绑定真实 fixture commit。
+- [x] 三种模式的真实 Eval 报告已生成。
 - [ ] 公网 Staging 已完成验收。
 
 因此，下一步不是继续增加普通页面，而是关闭最后的发布门禁。
@@ -396,11 +396,11 @@ go run ./cmd/forgeflow eval `
 
 ### 7.4 Eval 验收
 
-- [ ] 三种模式各完成 30 个 Case，共 90 次受控执行。
-- [ ] 没有缺失成本和 P95 延迟数据。
-- [ ] 报告包含完成率、隐藏测试通过率、回归率、人工介入率、成本和延迟。
-- [ ] 报告能追溯到精确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
-- [ ] 不把结构验证结果伪装成模型成绩。
+- [x] 三种模式各完成 30 个 Case，共 90 次受控执行。
+- [x] 没有缺失成本和 P95 延迟数据。
+- [x] 报告包含完成率、隐藏测试通过率、回归率、人工介入率、成本和延迟。
+- [x] 报告能追溯到精确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
+- [x] 不把结构验证结果伪装成模型成绩。
 - [ ] 由人工审核报告并签署 Promotion 结论。
 
 真实 Evidence 默认保存在 `.forgeflow/evals`，不要上传原始 Evidence 到 GitHub。只允许把经过人工脱敏的汇总报告手动提交到专门的 release-report 目录。
@@ -415,11 +415,11 @@ go run ./cmd/forgeflow eval `
 
 ### 7.6 阶段 3 退出门槛
 
-- [ ] 三种模式各 30 个 Case 均有终态 Observation。
-- [ ] 失败、拒绝、超时和人工介入没有被排除在统计外。
-- [ ] 成本和延迟指标完整，没有用估算值冒充真实值。
-- [ ] Grader 在 Agent 工作区外运行隐藏测试。
-- [ ] 报告可追溯至准确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
+- [x] 三种模式各 30 个 Case 均有终态 Observation。
+- [x] 失败、拒绝、超时和人工介入没有被排除在统计外。
+- [x] 成本和延迟指标完整，没有用估算值冒充真实值。
+- [x] Grader 在 Agent 工作区外运行隐藏测试。
+- [x] 报告可追溯至准确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
 - [ ] 脱敏汇总报告已人工批准；原始 Evidence 未上传 GitHub。
 
 ---
@@ -914,7 +914,7 @@ Release 应包含：
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
-| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；PR #11 已合并；45-Observation 非高峰试运行及 5-Case ForgeFlow 全链路诊断已脱敏汇总；代码级总费用硬门禁已在本地完成并等待人工提交，完整 90 次基线等待该变更合并和新连续窗口 |
+| 3 三基线 Eval | 进行中（待人工签署） | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #12 已合并；正式 90-Observation Evidence 和私有 JSON/Markdown 报告已完成技术审计，等待仓库所有者人工复核与 Promotion 签署 |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
@@ -922,4 +922,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 3：真实三基线 Eval 进行中**。PR #11 已合并，执行器、隔离 Grader、双 Provider 计费、价格窗口、Reasoning 配置追踪、失败终态、原子 Evidence 和发布报告人工复核边界均已通过门禁。仓库所有者已授权 30 个 Fixture 的限定数据范围，并为当前诊断及后续同轮完整基线设置 10 元人民币总上限。首轮非高峰试运行保存 45 个终态 Observation，累计 `$0.146233848`；随后 5-Case ForgeFlow 峰值诊断中 `feature-03` 完整通过，5 个样本累计 `$0.045562336`，全部 Secret/危险命令计数为 0。两组结果均为私有试运行证据，不能拼接或伪装成完整报告。当前本地分支已实现调用前最坏费用预留、三模式共享上限、既有 Evidence/外部费用累计和预算配置漂移拒绝；必须先由仓库所有者人工提交并合并，之后才能在新的足够长连续价格窗口中使用全新 Evidence 路径从头完成 90 次并生成可人工复核的 JSON/Markdown 对比报告。当前不得勾选阶段 3 退出门槛或进入阶段 4。
+当前处于**阶段 3：真实三基线 Eval 待人工签署**。PR #12 已合并；正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，在单一非高峰价格窗口完成三种模式各 30 个 Case，共 90 个终态 Observation 和 159 次模型请求。正式 Evidence 成本 `$0.354427016`；加上同一 10 元授权下此前诊断后总成本 `$0.399989352`（约 `2.7123 CNY`）。成本/时长缺失、Secret 检测和危险命令执行均为 0。真实通过数分别为 `single_agent 8/30`、`planner_developer 11/30`、`forgeflow 7/30`，完整 ForgeFlow 当前没有优于简化基线，不得宣传虚构提升。私有 Evidence 与 JSON/Markdown 报告仅保存在 `.forgeflow/evals`；脱敏技术汇总和 SHA-256 已写入阶段 3 审计。仓库所有者人工复核并签署 Promotion 结论前，最后一项退出门槛保持未完成，不能进入阶段 4。
