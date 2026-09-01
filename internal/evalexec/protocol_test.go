@@ -2,6 +2,7 @@ package evalexec
 
 import (
 	"context"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -18,6 +19,72 @@ func TestValidateChangeSetRejectsForbiddenAndBudgetOverflow(t *testing.T) {
 	}
 	if err := validateChangeSet(solution{Decision: fulleval.DecisionImplement, ChangedFiles: []string{"a.go"}, Patch: "--- a/a.go\n+++ b/a.go\n+a\n+b\n+c\n"}, evalCase); err == nil {
 		t.Fatal("expected diff budget rejection")
+	}
+}
+
+func TestMeterRefusesCallBeforeProviderWhenCostBudgetCannotReserveMaximum(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed"}}}
+	budget, err := NewCostBudget(0.001, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meter := &meter{
+		provider: provider,
+		pricing: UsagePricing{
+			Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10,
+			CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30,
+			Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour),
+		},
+		budget: budget,
+		now:    func() time.Time { return now },
+	}
+	_, err = meter.call(context.Background(), model.Request{Model: "test", Input: "small", MaxOutputTokens: 100}, "test", time.Second)
+	if !errors.Is(err, ErrCostBudgetExceeded) {
+		t.Fatalf("error=%v want cost budget exceeded", err)
+	}
+	if provider.CallCount() != 0 {
+		t.Fatal("provider was called without a conservative cost reservation")
+	}
+}
+
+func TestMeterCommitsMeasuredCostToSharedBudget(t *testing.T) {
+	now := time.Unix(100, 0).UTC()
+	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", Usage: model.Usage{InputTokens: 100, OutputTokens: 20}}}}
+	budget, err := NewCostBudget(1, 0.25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pricing := UsagePricing{
+		Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10,
+		CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30,
+		Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour),
+	}
+	meter := &meter{provider: provider, pricing: pricing, budget: budget, now: func() time.Time { return now }}
+	if _, err := meter.call(context.Background(), model.Request{Model: "test", MaxOutputTokens: 100}, "test", time.Second); err != nil {
+		t.Fatal(err)
+	}
+	measured := (100.0*10 + 20.0*30) / 1_000_000
+	spent, remaining := budget.Snapshot()
+	if math.Abs(spent-(0.25+measured)) > 1e-12 {
+		t.Fatalf("spent=%f want=%f", spent, 0.25+measured)
+	}
+	if math.Abs(remaining-(0.75-measured)) > 1e-12 {
+		t.Fatalf("remaining=%f want=%f", remaining, 0.75-measured)
+	}
+}
+
+func TestNewCostBudgetRejectsAlreadyExceededCampaign(t *testing.T) {
+	_, err := NewCostBudget(1, 1.01)
+	if !errors.Is(err, ErrCostBudgetExceeded) {
+		t.Fatalf("error=%v want cost budget exceeded", err)
+	}
+}
+
+func TestExecutorRequiresCostBudget(t *testing.T) {
+	_, err := NewMux(Options{Provider: &model.FakeProvider{}})
+	if err == nil || !strings.Contains(err.Error(), "cost budget is required") {
+		t.Fatalf("error=%v want required cost budget", err)
 	}
 }
 

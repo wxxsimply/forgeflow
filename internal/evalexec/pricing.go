@@ -2,6 +2,7 @@ package evalexec
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -23,6 +24,25 @@ type UsagePricing struct {
 	OutputUSDPerMillionTokens float64
 	Source                    string
 	ValidUntil                time.Time
+}
+
+// MaxRequestCost returns a conservative authorization amount. A UTF-8 byte is
+// treated as at most one input token, with additional room for provider message
+// framing. Cached input is intentionally priced at the highest applicable input
+// rate because cache behavior is not known before the response arrives.
+func (p UsagePricing) MaxRequestCost(request model.Request) (float64, error) {
+	if request.MaxOutputTokens <= 0 {
+		return 0, fmt.Errorf("model request must set a positive output token limit")
+	}
+	inputTokens := len([]byte(request.Instructions)) + len([]byte(request.Input)) +
+		len([]byte(request.ResponseFormat.Name)) + len([]byte(request.ResponseFormat.Description)) +
+		len(request.ResponseFormat.Schema) + 2048
+	inputRate := math.Max(p.InputUSDPerMillionTokens, p.CachedUSDPerMillionTokens)
+	if p.Mode == PricingModeCacheReadWrite {
+		inputRate = math.Max(inputRate, p.CacheWriteUSDPerMillion)
+	}
+	return float64(inputTokens)/1_000_000*inputRate +
+		float64(request.MaxOutputTokens)/1_000_000*p.OutputUSDPerMillionTokens, nil
 }
 
 func (p UsagePricing) Validate(now time.Time) error {

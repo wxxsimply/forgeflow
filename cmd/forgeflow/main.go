@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -264,6 +265,8 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	pricingMode := set.String("pricing-mode", "", "required pricing mode: cache_hit_miss or cache_read_write")
 	pricingSource := set.String("pricing-source", "", "HTTPS pricing source recorded in evidence")
 	pricingValidUntil := set.String("pricing-valid-until", "", "RFC3339 deadline before the selected prices change")
+	maxTotalCostUSD := set.Float64("max-total-cost-usd", 0, "hard USD ceiling shared by this full eval campaign")
+	priorCostUSD := set.Float64("prior-cost-usd", 0, "authorized campaign cost already spent outside this evidence file")
 	limit := set.Int("limit", 0, "maximum newly executed cases across all modes; 0 runs all remaining")
 	if err := set.Parse(args); err != nil {
 		return err
@@ -330,8 +333,21 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	absoluteGrader, _ := filepath.Abs(*graderRepository)
 	absoluteWorkspaces, _ := filepath.Abs(*workspaceRoot)
 	absoluteOutput, _ := filepath.Abs(*output)
+	recorder := fulleval.FileRecorder{Path: absoluteOutput}
+	existingEvidence, err := recorder.Load()
+	if err != nil {
+		return err
+	}
+	recordedCostUSD, err := recordedEvidenceCost(existingEvidence)
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.cost_evidence", "existing eval evidence cannot be safely charged against the budget")
+	}
+	costBudget, err := evalexec.NewCostBudget(*maxTotalCostUSD, *priorCostUSD+recordedCostUSD)
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeBudget, "eval.execute.cost_budget", "eval cost budget is invalid or exhausted")
+	}
 	executor, err := evalexec.NewMux(evalexec.Options{
-		Provider: provider, Pricing: pricing,
+		Provider: provider, Pricing: pricing, CostBudget: costBudget,
 		FixtureRepository: absoluteFixture, GraderRepository: absoluteGrader, WorkspaceRoot: absoluteWorkspaces,
 		Model: *modelName, ReasoningEffort: *reasoningEffort, MaxOutputTokens: *maxOutputTokens,
 		CallTimeout: *callTimeout, CommandTimeout: *commandTimeout, ContextMaxBytes: *contextMaxBytes,
@@ -341,11 +357,11 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	}
 	configurations := make([]fulleval.Configuration, 0, len(modes))
 	for _, mode := range modes {
-		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, strings.TrimSpace(*reasoningEffort), rootCommit, fixtureHead, graderCommit, pricing))
+		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, strings.TrimSpace(*reasoningEffort), rootCommit, fixtureHead, graderCommit, pricing, *maxTotalCostUSD, *priorCostUSD))
 	}
 	file, err := fulleval.RunResumable(ctx, fulleval.ResumableOptions{
 		Dataset: dataset, Configurations: configurations, Executor: executor,
-		Recorder: fulleval.FileRecorder{Path: absoluteOutput}, MaxNewCases: *limit,
+		Recorder: recorder, MaxNewCases: *limit,
 		OnCompleted: func(mode fulleval.Mode, caseID string, completed, total int) {
 			fmt.Fprintf(os.Stderr, "eval %s %s recorded (%d/%d)\n", mode, caseID, completed, total)
 		},
@@ -361,7 +377,8 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 			complete = false
 		}
 	}
-	return printJSON(map[string]any{"dataset": dataset.Name, "modes": modes, "observations": observations, "complete": complete, "evidence": absoluteOutput})
+	spentUSD, remainingUSD := costBudget.Snapshot()
+	return printJSON(map[string]any{"dataset": dataset.Name, "modes": modes, "observations": observations, "complete": complete, "evidence": absoluteOutput, "campaignCostUsd": spentUSD, "remainingCostUsd": remainingUSD})
 }
 
 func parseEvalModes(value string) ([]fulleval.Mode, error) {
@@ -381,7 +398,7 @@ func parseEvalModes(value string) ([]fulleval.Mode, error) {
 	return result, nil
 }
 
-func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEffort, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing) fulleval.Configuration {
+func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEffort, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing, maxTotalCostUSD, priorCostUSD float64) fulleval.Configuration {
 	agents := []string{"single_agent"}
 	prompts := map[string]string{"single_agent": "eval/single-agent/v1"}
 	if mode == fulleval.ModePlannerDeveloper {
@@ -406,7 +423,25 @@ func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEff
 		ExecutionEnvironment: runtime.GOOS + "/" + runtime.GOARCH + " " + runtime.Version(),
 		ModelProvider:        providerName, PricingMode: string(pricing.Mode), PricingSource: pricing.Source,
 		PricingValidUntil: pricing.ValidUntil.UTC().Format(time.RFC3339), PricingUSDPerMTok: prices,
+		MaxTotalCostUSD: maxTotalCostUSD, PriorCostUSD: priorCostUSD,
 	}
+}
+
+func recordedEvidenceCost(file fulleval.EvidenceFile) (float64, error) {
+	total := 0.0
+	for _, run := range file.Runs {
+		for _, observation := range run.Observations {
+			if observation.CostUSD == nil {
+				return 0, fmt.Errorf("%s/%s has no measured cost", run.Configuration.Mode, observation.CaseID)
+			}
+			value := *observation.CostUSD
+			if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+				return 0, fmt.Errorf("%s/%s has invalid measured cost", run.Configuration.Mode, observation.CaseID)
+			}
+			total += value
+		}
+	}
+	return total, nil
 }
 
 func cleanGitCommit(ctx context.Context, directory string) (string, error) {

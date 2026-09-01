@@ -176,10 +176,12 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
   --cached-input-usd-per-million <当前真实缓存输入价格> `
   --cache-write-input-usd-per-million <仅cache_read_write模式需要> `
   --output-usd-per-million <当前真实输出价格> `
+  --max-total-cost-usd <本轮完整Eval的硬费用上限> `
+  --prior-cost-usd <同一授权中已在其他Evidence花费的USD> `
   --output .forgeflow\evals\evidence.json
 ```
 
-命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项；价格有效期不足以覆盖下一次模型调用时会在付费请求前停止。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
+命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，额度不足或价格有效期不足时都不会联系 Provider。预算和此前费用会写入 Evidence 配置，不能在同一路径上偷偷改大。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
 Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 
