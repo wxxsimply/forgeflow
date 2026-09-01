@@ -84,8 +84,30 @@ func (c *Catalog) Prompts() []Prompt {
 
 func (c *Catalog) Prompt(agent, version string) (Prompt, error) {
 	prompt, ok := c.prompts[agent+"|"+version]
-	if !ok {
-		return Prompt{}, fmt.Errorf("prompt version is not embedded in this release")
+	if ok {
+		return prompt, nil
 	}
-	return prompt, nil
+	switch agent {
+	case "planner":
+		loaded, err := planner.NewPromptLoader(nil).Load(version)
+		if err == nil {
+			return Prompt{Agent: agent, Version: loaded.Version, SHA256: loaded.SHA256, Configured: false}, nil
+		}
+	case "developer":
+		loaded, err := developer.NewPromptLoader(nil).Load(version)
+		if err == nil {
+			return Prompt{Agent: agent, Version: loaded.Version, SHA256: loaded.SHA256, Configured: false}, nil
+		}
+	case "reviewer":
+		loaded, err := reviewer.NewPromptLoader(nil).Load(version)
+		if err == nil {
+			return Prompt{Agent: agent, Version: loaded.Version, SHA256: loaded.SHA256, Configured: false}, nil
+		}
+	case "security":
+		loaded, err := security.NewPromptLoader(nil).Load(version)
+		if err == nil {
+			return Prompt{Agent: agent, Version: loaded.Version, SHA256: loaded.SHA256, Configured: false}, nil
+		}
+	}
+	return Prompt{}, fmt.Errorf("prompt version is not embedded in this release")
 }

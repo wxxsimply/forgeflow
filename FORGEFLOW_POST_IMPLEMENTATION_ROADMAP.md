@@ -330,7 +330,7 @@ go run ./cmd/forgeflow eval `
 
 ## 7. 阶段 3：完成并运行真实三基线 Eval
 
-> 当前状态：进行中
+> 当前状态：已完成（2026-09-01；仓库所有者已签署 `APPROVED AS BASELINE`，签署记录为 PR #13 与本次明确确认）
 > 进入条件：阶段 2 的 30 个 Fixture 全部验证通过。  
 > 本阶段目标：完成执行器，运行三种模式并生成不含虚构数据的真实对比报告。
 
@@ -401,7 +401,7 @@ go run ./cmd/forgeflow eval `
 - [x] 报告包含完成率、隐藏测试通过率、回归率、人工介入率、成本和延迟。
 - [x] 报告能追溯到精确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
 - [x] 不把结构验证结果伪装成模型成绩。
-- [ ] 由人工审核报告并签署 Promotion 结论。
+- [x] 由人工审核报告并签署 Promotion 结论。
 
 真实 Evidence 默认保存在 `.forgeflow/evals`，不要上传原始 Evidence 到 GitHub。只允许把经过人工脱敏的汇总报告手动提交到专门的 release-report 目录。
 
@@ -420,13 +420,13 @@ go run ./cmd/forgeflow eval `
 - [x] 成本和延迟指标完整，没有用估算值冒充真实值。
 - [x] Grader 在 Agent 工作区外运行隐藏测试。
 - [x] 报告可追溯至准确 Git、模型、Reasoning、Prompt、Policy 和 Tool 版本。
-- [ ] 脱敏汇总报告已人工批准；原始 Evidence 未上传 GitHub。
+- [x] 脱敏汇总报告已人工批准；原始 Evidence 未上传 GitHub。
 
 ---
 
 ## 8. 阶段 4：完善 Prompt 和模型发布治理
 
-> 当前状态：未开始  
+> 当前状态：进行中（2026-09-01 开始）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
 > 本阶段目标：让数据库治理记录、镜像内版本和 Worker 实际运行版本保持一致。
 
@@ -470,10 +470,10 @@ go run ./cmd/forgeflow eval `
 
 ### 8.5 阶段 4 退出门槛
 
-- [ ] Worker 版本与 Active Release 不一致时 Readiness 失败。
+- [x] Worker 版本与 Active Release 不一致时 Readiness 失败。
 - [ ] Promotion 不会修改正在执行的 Run 所绑定版本。
 - [ ] 旧 Prompt 仍嵌入可回滚镜像。
-- [ ] Checkpoint 恢复校验 Prompt、模型、Policy 和 Tool 版本。
+- [x] Checkpoint 恢复校验 Prompt、模型、Policy 和 Tool 版本。
 - [ ] Promotion 和 rollback 都经过人工批准并可审计。
 
 ---
@@ -796,7 +796,7 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 - [ ] 首次 Git commit 和 GitHub 主仓库已建立。
 - [ ] GitHub 分支保护和必需 CI 已启用。
 - [ ] 30 个真实 fixture commit 已验证。
-- [ ] 三基线报告已生成并人工签署。
+- [x] 三基线报告已生成并人工签署。
 - [ ] Prompt/模型 Promotion 与 rollback 演练通过。
 - [ ] Staging HTTPS 全链路通过。
 - [ ] Sandbox 安全边界通过真实 smoke test。
@@ -914,12 +914,12 @@ Release 应包含：
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
-| 3 三基线 Eval | 进行中（待人工签署） | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #12 已合并；正式 90-Observation Evidence 和私有 JSON/Markdown 报告已完成技术审计，等待仓库所有者人工复核与 Promotion 签署 |
-| 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
+| 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`；Worker Active Release Readiness 与恢复版本守卫已通过本地验证，等待 PR 和 Promotion/rollback 演练 |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
 | 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 3：真实三基线 Eval 待人工签署**。PR #12 已合并；正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，在单一非高峰价格窗口完成三种模式各 30 个 Case，共 90 个终态 Observation 和 159 次模型请求。正式 Evidence 成本 `$0.354427016`；加上同一 10 元授权下此前诊断后总成本 `$0.399989352`（约 `2.7123 CNY`）。成本/时长缺失、Secret 检测和危险命令执行均为 0。真实通过数分别为 `single_agent 8/30`、`planner_developer 11/30`、`forgeflow 7/30`，完整 ForgeFlow 当前没有优于简化基线，不得宣传虚构提升。私有 Evidence 与 JSON/Markdown 报告仅保存在 `.forgeflow/evals`；脱敏技术汇总和 SHA-256 已写入阶段 3 审计。仓库所有者人工复核并签署 Promotion 结论前，最后一项退出门槛保持未完成，不能进入阶段 4。
+当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，完成三种模式各 30 个 Case、共 90 个终态 Observation 和 159 次模型请求；仓库所有者 `wxxsimply` 已于 `2026-09-01T13:09:19Z` 人工复核，并以 PR #13 和明确确认签署 `APPROVED AS BASELINE`。该结果仅作为真实初始对照，不构成完整 ForgeFlow 优于简化基线或 Production 发布获批的声明。阶段 4 将补齐 Worker Active Release Readiness、Checkpoint 的 Prompt/模型/Policy/Tool 版本守卫，以及 Promotion/rollback 演练证据。

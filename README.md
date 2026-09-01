@@ -118,6 +118,7 @@ Linux/macOS 也可以执行 `make verify`。两者都会检查格式、运行测
 | `FORGEFLOW_ARTIFACT_ROOT` | `.forgeflow/artifacts` | Artifact 大对象目录 |
 | `FORGEFLOW_WORKER_LEASE_TTL` | `30s` | Worker Job 租约时长 |
 | `FORGEFLOW_WORKER_METRICS_ADDRESS` | `127.0.0.1:9091` | Worker 内部健康与 Metrics 地址 |
+| `FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES` | `false` | 启用后 Worker 启动、接 Job 和 `/readyz` 都要求数据库 Active Prompt/模型 Release 与镜像完全一致；受控 Staging/Production 必须设为 `true` |
 | `OPENAI_API_KEY` | 无 | OpenAI-compatible Provider 凭据；兼容变量名，禁止写入仓库 |
 | `FORGEFLOW_DOCKER_ENABLED` | `false` | 是否允许真实 Docker 沙箱执行 |
 | `FORGEFLOW_SANDBOX_IMAGE` | 无 | 启用 Docker 时必须是固定 sha256 digest 的镜像 |

@@ -17,7 +17,9 @@ import (
 	"forgeflow/internal/config"
 	"forgeflow/internal/developer"
 	"forgeflow/internal/domain"
+	"forgeflow/internal/governance"
 	"forgeflow/internal/graph"
+	"forgeflow/internal/lifecycle"
 	"forgeflow/internal/model"
 	"forgeflow/internal/observability"
 	"forgeflow/internal/planner"
@@ -73,6 +75,20 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err := pg.CheckSchema(ctx, db); err != nil {
 		return err
 	}
+	var releaseReadiness func(context.Context) error
+	if configuration.EnforceActiveReleases {
+		catalog, err := governance.NewCatalog(configuration)
+		if err != nil {
+			return fmt.Errorf("build worker release catalog: %w", err)
+		}
+		releases := governance.NewStore(db)
+		releaseReadiness = func(checkContext context.Context) error {
+			return governance.ValidateActiveReleases(checkContext, releases, catalog)
+		}
+		if err := releaseReadiness(ctx); err != nil {
+			return fmt.Errorf("worker active release preflight failed: %w", err)
+		}
+	}
 	provider, err := workerModelProvider(configuration)
 	if err != nil {
 		return err
@@ -105,6 +121,11 @@ func run(ctx context.Context, configuration config.Config) error {
 		LeaseTTL: configuration.WorkerLeaseTTL, HeartbeatInterval: configuration.WorkerHeartbeatInterval,
 		EmptyPollInterval: configuration.WorkerPollInterval,
 		Handler: worker.HandlerFunc(func(jobContext context.Context, leased queue.LeasedJob) error {
+			if releaseReadiness != nil {
+				if err := releaseReadiness(jobContext); err != nil {
+					return fmt.Errorf("worker is not release-ready: %w", err)
+				}
+			}
 			var payload struct {
 				RunID string `json:"runId"`
 			}
@@ -129,7 +150,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	go func() { dispatchErrors <- dispatchLoop(ctx, jobQueue, configuration.WorkerPollInterval) }()
 	workerErrors := make(chan error, 1)
 	go func() { workerErrors <- processor.Run(ctx) }()
-	statusServer := &http.Server{Addr: configuration.WorkerMetricsAddress, Handler: workerStatusHandler(), ReadHeaderTimeout: 3 * time.Second, IdleTimeout: 30 * time.Second}
+	statusServer := &http.Server{Addr: configuration.WorkerMetricsAddress, Handler: workerStatusHandler(releaseReadiness), ReadHeaderTimeout: 3 * time.Second, IdleTimeout: 30 * time.Second}
 	statusErrors := make(chan error, 1)
 	go func() {
 		slog.Info("ForgeFlow worker status server listening", "address", configuration.WorkerMetricsAddress)
@@ -182,7 +203,11 @@ func workerModelProvider(configuration config.Config) (model.Provider, error) {
 
 func workerApplication(configuration config.Config, store checkpoint.Store, planAgent planner.Planner, provider model.Provider) (*application.Service, error) {
 	if configuration.WorkflowMode == "planning" {
-		return application.NewService(store, planAgent), nil
+		validator, err := workerResumeValidator(configuration, "", nil)
+		if err != nil {
+			return nil, err
+		}
+		return application.NewServiceWithResumeValidator(store, graph.PlanningDefinition(planAgent), validator), nil
 	}
 	if provider == nil {
 		return nil, fmt.Errorf("development workflow requires a model provider")
@@ -208,7 +233,8 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 	if err := toolruntime.RegisterCommandTools(registry, runner, configuration.SandboxImage); err != nil {
 		return nil, err
 	}
-	tools, err := toolruntime.NewRuntime(registry, policy.DefaultEngine())
+	policyEngine := policy.DefaultEngine()
+	tools, err := toolruntime.NewRuntime(registry, policyEngine)
 	if err != nil {
 		return nil, err
 	}
@@ -246,15 +272,56 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 	if err != nil {
 		return nil, err
 	}
-	return application.NewServiceWithDefinition(store, definition), nil
+	toolVersions := map[string]string{}
+	for _, specification := range registry.Specs() {
+		toolVersions[specification.Name] = specification.Version
+	}
+	validator, err := workerResumeValidator(configuration, policyEngine.Version(), toolVersions)
+	if err != nil {
+		return nil, err
+	}
+	return application.NewServiceWithResumeValidator(store, definition, validator), nil
 }
 
-func workerStatusHandler() http.Handler {
+func workerResumeValidator(configuration config.Config, policyVersion string, toolVersions map[string]string) (lifecycle.Validator, error) {
+	catalog, err := governance.NewCatalog(configuration)
+	if err != nil {
+		return nil, err
+	}
+	promptVersions, promptSHA256, modelVersions := map[string]string{}, map[string]string{}, map[string]string{}
+	for _, agent := range catalog.Agents() {
+		prompt, err := catalog.Prompt(agent.Name, agent.PromptVersion)
+		if err != nil {
+			return nil, err
+		}
+		promptVersions[agent.Name], promptSHA256[agent.Name], modelVersions[agent.Name] = prompt.Version, prompt.SHA256, agent.Model
+	}
+	return lifecycle.NewValidator(lifecycle.Options{
+		CurrentPolicyVersion:   policyVersion,
+		ExpectedPromptVersions: promptVersions, ExpectedPromptSHA256: promptSHA256,
+		ExpectedModelVersions: modelVersions, ExpectedToolVersions: toolVersions,
+	})
+}
+
+func workerStatusHandler(readiness ...func(context.Context) error) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		if len(readiness) > 0 && readiness[0] != nil {
+			if err := readiness[0](r.Context()); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"status":"not_ready","reason":"active_release_mismatch"}`))
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ready"}`))
 	})
 	mux.Handle("GET /metrics", observability.DefaultMetrics().Handler())
 	return mux

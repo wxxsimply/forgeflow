@@ -21,13 +21,21 @@ type Validator interface {
 type Options struct {
 	GitBinary              string
 	ExpectedPolicyVersions []string
+	CurrentPolicyVersion   string
 	ExpectedPromptVersions map[string]string
+	ExpectedPromptSHA256   map[string]string
+	ExpectedModelVersions  map[string]string
+	ExpectedToolVersions   map[string]string
 }
 
 type ResumeValidator struct {
 	gitBinary              string
 	expectedPolicyVersions []string
+	currentPolicyVersion   string
 	expectedPromptVersions map[string]string
+	expectedPromptSHA256   map[string]string
+	expectedModelVersions  map[string]string
+	expectedToolVersions   map[string]string
 }
 
 func NewValidator(options Options) (*ResumeValidator, error) {
@@ -45,11 +53,28 @@ func NewValidator(options Options) (*ResumeValidator, error) {
 		}
 		promptVersions[agent] = version
 	}
-	return &ResumeValidator{gitBinary: options.GitBinary, expectedPolicyVersions: policyVersions, expectedPromptVersions: promptVersions}, nil
+	promptSHA256, err := normalizedBindings(options.ExpectedPromptSHA256, "prompt SHA")
+	if err != nil {
+		return nil, err
+	}
+	modelVersions, err := normalizedBindings(options.ExpectedModelVersions, "model")
+	if err != nil {
+		return nil, err
+	}
+	toolVersions, err := normalizedBindings(options.ExpectedToolVersions, "tool")
+	if err != nil {
+		return nil, err
+	}
+	return &ResumeValidator{
+		gitBinary: options.GitBinary, expectedPolicyVersions: policyVersions,
+		currentPolicyVersion:   strings.TrimSpace(options.CurrentPolicyVersion),
+		expectedPromptVersions: promptVersions, expectedPromptSHA256: promptSHA256,
+		expectedModelVersions: modelVersions, expectedToolVersions: toolVersions,
+	}, nil
 }
 
 func (v *ResumeValidator) Capture(state *domain.RunState) domain.ResumeGuard {
-	guard := domain.ResumeGuard{CapturedAt: time.Now().UTC(), PolicyVersions: []string{}, PromptBindings: []string{}}
+	guard := domain.ResumeGuard{CapturedAt: time.Now().UTC(), PolicyVersions: []string{}, PromptBindings: []string{}, ModelBindings: []string{}, ToolBindings: []string{}}
 	if state.Workspace != nil {
 		guard.WorkspaceID = state.Workspace.ID
 		guard.WorkspacePath = state.Workspace.Path
@@ -60,10 +85,16 @@ func (v *ResumeValidator) Capture(state *domain.RunState) domain.ResumeGuard {
 		if call.PolicyVersion != "" {
 			policies = append(policies, call.PolicyVersion)
 		}
+		if call.ToolName != "" && call.ToolVersion != "" {
+			guard.ToolBindings = append(guard.ToolBindings, call.ToolName+"|"+call.ToolVersion)
+		}
 	}
 	bindings := make([]string, 0, len(state.ModelInvocations))
 	for _, call := range state.ModelInvocations {
 		bindings = append(bindings, call.Agent+"|"+call.PromptVersion+"|"+call.PromptSHA256)
+		if call.Agent != "" && call.Model != "" {
+			guard.ModelBindings = append(guard.ModelBindings, call.Agent+"|"+call.Model)
+		}
 	}
 	if state.PendingApproval != nil {
 		guard.ApprovalID = state.PendingApproval.ApprovalID
@@ -75,6 +106,8 @@ func (v *ResumeValidator) Capture(state *domain.RunState) domain.ResumeGuard {
 	}
 	guard.PolicyVersions = uniqueSorted(policies)
 	guard.PromptBindings = uniqueSorted(bindings)
+	guard.ModelBindings = uniqueSorted(guard.ModelBindings)
+	guard.ToolBindings = uniqueSorted(guard.ToolBindings)
 	return guard
 }
 
@@ -87,25 +120,36 @@ func (v *ResumeValidator) Validate(ctx context.Context, state *domain.RunState) 
 	current.CapturedAt = expected.CapturedAt
 	if expected.WorkspaceID != current.WorkspaceID || expected.WorkspacePath != current.WorkspacePath || expected.BaseCommit != current.BaseCommit ||
 		expected.ApprovalID != current.ApprovalID || expected.ApprovalInputSHA != current.ApprovalInputSHA || expected.ApprovalPolicy != current.ApprovalPolicy ||
-		!slices.Equal(expected.PolicyVersions, current.PolicyVersions) || !slices.Equal(expected.PromptBindings, current.PromptBindings) {
-		return fmt.Errorf("run state, prompt, policy, workspace, or approval changed while paused")
+		!slices.Equal(expected.PolicyVersions, current.PolicyVersions) || !slices.Equal(expected.PromptBindings, current.PromptBindings) ||
+		!slices.Equal(expected.ModelBindings, current.ModelBindings) || !slices.Equal(expected.ToolBindings, current.ToolBindings) {
+		return fmt.Errorf("run state, prompt, model, policy, tool, workspace, or approval changed while paused")
 	}
 	for _, required := range v.expectedPolicyVersions {
 		if _, exists := slices.BinarySearch(expected.PolicyVersions, required); !exists {
 			return fmt.Errorf("required policy version %q is incompatible with paused run", required)
 		}
 	}
-	for agent, version := range v.expectedPromptVersions {
-		prefix := agent + "|" + version + "|"
-		found := false
-		for _, binding := range expected.PromptBindings {
-			if strings.HasPrefix(binding, prefix) {
-				found = true
-				break
-			}
+	for _, binding := range expected.PromptBindings {
+		parts := strings.Split(binding, "|")
+		if len(parts) != 3 {
+			return fmt.Errorf("prompt binding %q is invalid", binding)
 		}
-		if !found {
-			return fmt.Errorf("prompt version for %q is incompatible with paused run", agent)
+		version, configured := v.expectedPromptVersions[parts[0]]
+		if len(v.expectedPromptVersions) > 0 && (!configured || parts[1] != version || (v.expectedPromptSHA256[parts[0]] != "" && parts[2] != v.expectedPromptSHA256[parts[0]])) {
+			return fmt.Errorf("prompt binding for %q is incompatible with paused run", parts[0])
+		}
+	}
+	if err := validateVersionBindings("model", expected.ModelBindings, v.expectedModelVersions); err != nil {
+		return err
+	}
+	if err := validateVersionBindings("tool", expected.ToolBindings, v.expectedToolVersions); err != nil {
+		return err
+	}
+	if v.currentPolicyVersion != "" {
+		for _, version := range expected.PolicyVersions {
+			if version != v.currentPolicyVersion {
+				return fmt.Errorf("policy version %q is incompatible with current worker", version)
+			}
 		}
 	}
 	if expected.WorkspacePath == "" {
@@ -123,6 +167,32 @@ func (v *ResumeValidator) Validate(ctx context.Context, state *domain.RunState) 
 	}
 	if strings.TrimSpace(string(output)) != expected.BaseCommit {
 		return fmt.Errorf("paused workspace base commit changed")
+	}
+	return nil
+}
+
+func normalizedBindings(values map[string]string, kind string) (map[string]string, error) {
+	result := make(map[string]string, len(values))
+	for name, version := range values {
+		name, version = strings.TrimSpace(name), strings.TrimSpace(version)
+		if name == "" || version == "" {
+			return nil, fmt.Errorf("expected %s binding is invalid", kind)
+		}
+		result[name] = version
+	}
+	return result, nil
+}
+
+func validateVersionBindings(kind string, bindings []string, expected map[string]string) error {
+	for _, binding := range bindings {
+		parts := strings.Split(binding, "|")
+		if len(parts) != 2 {
+			return fmt.Errorf("%s binding %q is invalid", kind, binding)
+		}
+		version, configured := expected[parts[0]]
+		if len(expected) > 0 && (!configured || version != parts[1]) {
+			return fmt.Errorf("%s version for %q is incompatible with paused run", kind, parts[0])
+		}
 	}
 	return nil
 }

@@ -96,7 +96,7 @@ func (s *Server) promotePrompt(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	if !uuidPattern.MatchString(input.EvalRunID) || len(input.Comment) > 2000 {
+	if !uuidPattern.MatchString(input.EvalRunID) || strings.TrimSpace(input.Comment) == "" || len(input.Comment) > 2000 {
 		s.fail(w, r, validation("evalRunId or comment is invalid"))
 		return
 	}
@@ -112,6 +112,11 @@ func (s *Server) promotePrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	if candidate.Configuration.PromptVersions[agent] != promptVersion {
 		s.fail(w, r, validation("eval report does not bind the requested prompt version"))
+		return
+	}
+	catalogAgent, ok := catalogAgentByName(s.options.Catalog, agent)
+	if !ok || candidate.Configuration.ModelVersions[agent] != catalogAgent.Model {
+		s.fail(w, r, validation("eval report does not bind the configured model version"))
 		return
 	}
 	currentRelease, currentErr := s.options.Governance.ActiveRelease(r.Context(), agent)
@@ -138,12 +143,12 @@ func (s *Server) promotePrompt(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, apperror.New(apperror.CodeConflict, err.Error()))
 		return
 	}
-	release := governance.PromptRelease{ID: domain.NewID(), Agent: agent, Version: promptVersion, PromptSHA256: prompt.SHA256, EvalRunID: input.EvalRunID, PromotedBy: p.User.ID, Comment: input.Comment, Active: true, CreatedAt: time.Now().UTC()}
+	release := governance.PromptRelease{ID: domain.NewID(), Agent: agent, Version: promptVersion, PromptSHA256: prompt.SHA256, Model: catalogAgent.Model, EvalRunID: input.EvalRunID, PromotedBy: p.User.ID, Comment: input.Comment, Active: true, CreatedAt: time.Now().UTC()}
 	if err := s.options.Governance.Promote(r.Context(), release); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.audit(r, p.User.ID, "prompt.promote", "prompt_release", release.ID, map[string]any{"agent": agent, "version": version, "evalRunId": input.EvalRunID})
+	s.audit(r, p.User.ID, "prompt.promote", "prompt_release", release.ID, map[string]any{"agent": agent, "version": version, "model": release.Model, "evalRunId": input.EvalRunID, "reason": input.Comment})
 	writeJSON(w, http.StatusCreated, release)
 }
 
@@ -161,7 +166,7 @@ func (s *Server) rollbackPrompt(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	if !uuidPattern.MatchString(input.ReleaseID) || len(input.Comment) > 2000 {
+	if !uuidPattern.MatchString(input.ReleaseID) || strings.TrimSpace(input.Comment) == "" || len(input.Comment) > 2000 {
 		s.fail(w, r, validation("releaseId or comment is invalid"))
 		return
 	}
@@ -170,8 +175,14 @@ func (s *Server) rollbackPrompt(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, notFound(checkpoint.ErrNotFound))
 		return
 	}
-	if _, err := s.options.Catalog.Prompt(target.Agent, target.Version); err != nil {
+	embeddedPrompt, err := s.options.Catalog.Prompt(target.Agent, target.Version)
+	if err != nil || embeddedPrompt.SHA256 != target.PromptSHA256 {
 		s.fail(w, r, apperror.New(apperror.CodeConflict, "rollback target is not embedded in this release"))
+		return
+	}
+	catalogAgent, ok := catalogAgentByName(s.options.Catalog, target.Agent)
+	if !ok || catalogAgent.Model != target.Model {
+		s.fail(w, r, apperror.New(apperror.CodeConflict, "rollback model is not configured in this release"))
 		return
 	}
 	active, err := s.options.Governance.ActiveRelease(r.Context(), target.Agent)
@@ -183,11 +194,20 @@ func (s *Server) rollbackPrompt(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, apperror.New(apperror.CodeConflict, "target release is already active"))
 		return
 	}
-	release := governance.PromptRelease{ID: domain.NewID(), Agent: target.Agent, Version: target.Version, PromptSHA256: target.PromptSHA256, EvalRunID: target.EvalRunID, PromotedBy: p.User.ID, RollbackOf: active.ID, Comment: input.Comment, Active: true, CreatedAt: time.Now().UTC()}
+	release := governance.PromptRelease{ID: domain.NewID(), Agent: target.Agent, Version: target.Version, PromptSHA256: target.PromptSHA256, Model: target.Model, EvalRunID: target.EvalRunID, PromotedBy: p.User.ID, RollbackOf: active.ID, Comment: input.Comment, Active: true, CreatedAt: time.Now().UTC()}
 	if err := s.options.Governance.Promote(r.Context(), release); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.audit(r, p.User.ID, "prompt.rollback", "prompt_release", release.ID, map[string]any{"agent": release.Agent, "targetReleaseId": target.ID, "rollbackOf": active.ID})
+	s.audit(r, p.User.ID, "prompt.rollback", "prompt_release", release.ID, map[string]any{"agent": release.Agent, "model": release.Model, "evalRunId": release.EvalRunID, "targetReleaseId": target.ID, "rollbackOf": active.ID, "reason": input.Comment})
 	writeJSON(w, http.StatusCreated, release)
+}
+
+func catalogAgentByName(catalog *governance.Catalog, name string) (governance.Agent, bool) {
+	for _, agent := range catalog.Agents() {
+		if agent.Name == name {
+			return agent, true
+		}
+	}
+	return governance.Agent{}, false
 }

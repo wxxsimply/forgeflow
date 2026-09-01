@@ -39,6 +39,45 @@ func TestValidatorChecksWorkspaceBaseCommit(t *testing.T) {
 	}
 }
 
+func TestValidatorChecksPromptModelPolicyAndToolBindings(t *testing.T) {
+	state := domain.NewRunState(domain.NewRunInput{Task: "x", RepositoryPath: "."})
+	state.ModelInvocations = []domain.ModelInvocation{{
+		Agent: "planner", Model: "model-v1", PromptVersion: "planner/v1", PromptSHA256: strings.Repeat("a", 64),
+	}}
+	state.ToolCallAudits = []domain.ToolCallAudit{{
+		ToolName: "run_test", ToolVersion: "v1", PolicyVersion: "policy/v1",
+	}}
+	validator, err := NewValidator(Options{
+		CurrentPolicyVersion:   "policy/v1",
+		ExpectedPromptVersions: map[string]string{"planner": "planner/v1"},
+		ExpectedPromptSHA256:   map[string]string{"planner": strings.Repeat("a", 64)},
+		ExpectedModelVersions:  map[string]string{"planner": "model-v1"},
+		ExpectedToolVersions:   map[string]string{"run_test": "v1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard := validator.Capture(state)
+	state.ResumeGuard = &guard
+	if err := validator.Validate(context.Background(), state); err != nil {
+		t.Fatalf("matching bindings rejected: %v", err)
+	}
+
+	incompatible, err := NewValidator(Options{
+		CurrentPolicyVersion:   "policy/v2",
+		ExpectedPromptVersions: map[string]string{"planner": "planner/v1"},
+		ExpectedPromptSHA256:   map[string]string{"planner": strings.Repeat("a", 64)},
+		ExpectedModelVersions:  map[string]string{"planner": "model-v2"},
+		ExpectedToolVersions:   map[string]string{"run_test": "v2"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := incompatible.Validate(context.Background(), state); err == nil {
+		t.Fatal("validator accepted incompatible runtime bindings")
+	}
+}
+
 func git(t *testing.T, directory string, args ...string) string {
 	t.Helper()
 	command := exec.Command("git", append([]string{"-C", directory}, args...)...)

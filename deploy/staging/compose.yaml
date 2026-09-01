@@ -127,6 +127,7 @@ services:
     environment:
       <<: *app-environment
       FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091
+      FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES: ${FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES:-true}
       FORGEFLOW_SANDBOX_WORKSPACE_ROOT: /var/lib/forgeflow/workspaces
       FORGEFLOW_DOCKER_ENABLED: ${FORGEFLOW_DOCKER_ENABLED:-false}
       FORGEFLOW_SANDBOX_IMAGE: ${FORGEFLOW_SANDBOX_IMAGE:-}
@@ -148,7 +149,7 @@ services:
       otel-collector:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9091/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9091/readyz"]
       interval: 10s
       timeout: 3s
       retries: 10

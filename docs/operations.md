@@ -34,13 +34,14 @@ Bootstrap 只运行一次：创建 `bootstrap_admin_password` Secret，在 `stag
 
 部署顺序固定为：构建不可变版本镜像 → PostgreSQL 健康 → 显式 Migration → API/Worker/Web 健康 → Caddy。Release manifest 写入 `.forgeflow/deploy/releases`，包含前一版本、Git SHA 和 Compose 镜像清单。
 
-Prompt Promotion 不会对运行中的 Worker 做隐式热替换。候选镜像必须同时保留可回滚的旧 Prompt，并按“drain Worker → 部署候选 API（Worker 暂停）→ 导入真实 Eval → Admin Promotion → 使用与 Active Release 一致的 Prompt 环境重启 Worker”的顺序发布。Promotion/rollback 表是治理记录，不等同于镜像发布；版本、SHA 和 Worker 配置不一致时禁止恢复流量。
+Prompt Promotion 不会对运行中的 Worker 做隐式热替换。候选镜像必须同时保留可回滚的旧 Prompt，并按“drain Worker → 部署候选 API（Worker 暂停）→ 导入真实 Eval → Admin Promotion → 使用与 Active Release 一致的 Prompt/模型环境重启 Worker”的顺序发布。Promotion/rollback 表是治理记录，不等同于镜像发布；`FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES=true` 时，任一 Agent 的 Prompt version、Prompt SHA 或模型与 Active Release 不一致都会让 Worker 启动预检或 `/readyz` 失败，并在领取新 Job 前再次阻断。首次启用门禁时先保持 Worker 停止，只启动 Migration/API，完成四个 Agent 的初始 Promotion 后再启动 Worker。
 
 ## 4. 日常检查
 
 ```powershell
 docker compose --env-file deploy/staging/staging.env -f deploy/staging/compose.yaml ps
 Invoke-WebRequest https://<domain>/healthz
+docker compose --env-file deploy/staging/staging.env -f deploy/staging/compose.yaml exec worker wget -qO- http://127.0.0.1:9091/readyz
 docker compose --env-file deploy/staging/staging.env -f deploy/staging/compose.yaml logs --since 30m api worker
 ```
 

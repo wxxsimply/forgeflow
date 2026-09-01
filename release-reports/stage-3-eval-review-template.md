@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 3 Eval 人工审核与 Promotion 结论
 
-> 状态：`DRAFT / NOT APPROVED`
+> 状态：`APPROVED AS BASELINE`
 > 说明：只有三种模式各 30 个终态 Observation、完整指标和人工复核全部完成后，才能复制并签署本模板。`TBD` 不得替换为估算或虚构数据。
 
 ## 1. 审核范围与可追溯性
@@ -72,20 +72,20 @@
 
 人工结论只能选择一项：
 
-- [ ] `APPROVED AS BASELINE`：接受为后续候选版本的真实对照基线，但不等同于 Production 发布批准。
+- [x] `APPROVED AS BASELINE`：接受为后续候选版本的真实对照基线，但不等同于 Production 发布批准。
 - [ ] `REJECTED / RERUN REQUIRED`：证据或配置无效，必须使用新 Evidence 路径重新执行。
 - [ ] `BLOCKED`：存在安全、隐私、成本或治理阻断，禁止进入阶段 4。
 
-结论理由：技术 Evidence 和脱敏报告已完整，但完整 ForgeFlow 通过率 `7/30`，低于 `planner_developer` 的 `11/30` 和 `single_agent` 的 `8/30`。是否接受其作为真实初始对照基线，必须由仓库所有者人工复核并签署；在此之前保持 `DRAFT / NOT APPROVED`。
+结论理由：技术 Evidence 和脱敏报告完整，仓库所有者已人工复核真实结果，并接受其作为后续候选版本的初始对照基线。完整 ForgeFlow 通过率 `7/30`，低于 `planner_developer` 的 `11/30` 和 `single_agent` 的 `8/30`；本次批准不构成性能优势声明，也不等同于 Production 发布批准。
 
 ## 7. 人工签署
 
 | 字段 | 签署值 |
 |---|---|
-| 审核人 | `TBD` |
-| 角色 | `TBD` |
-| UTC 时间 | `TBD` |
-| 批准/拒绝的报告 commit | `TBD（完整 40 位 SHA）` |
-| 签署方式或外部审批记录 | `TBD` |
+| 审核人 | `wxxsimply` |
+| 角色 | `仓库所有者` |
+| UTC 时间 | `2026-09-01T13:09:19Z` |
+| 批准/拒绝的报告 commit | `6a30e33d546ea0b51a0c2af3dde8e3d62b507bd8` |
+| 签署方式或外部审批记录 | `仓库所有者在 Codex 当前任务中明确确认；GitHub PR #13 为报告合并与签署记录` |
 
-未填写签署字段、保留 `TBD` 或同时选择多个结论时，本文件保持 `DRAFT / NOT APPROVED`，不得作为阶段 3 退出证据。
+本结论仅批准该报告作为真实基线；任何 Prompt、模型或 Production 发布仍须通过后续阶段的独立 Promotion、回滚和发布门禁。

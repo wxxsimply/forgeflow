@@ -27,6 +27,7 @@ type PromptRelease struct {
 	Agent        string    `json:"agent"`
 	Version      string    `json:"version"`
 	PromptSHA256 string    `json:"promptSha256"`
+	Model        string    `json:"model"`
 	EvalRunID    string    `json:"evalRunId"`
 	PromotedBy   string    `json:"promotedBy"`
 	RollbackOf   string    `json:"rollbackOf,omitempty"`
@@ -108,7 +109,7 @@ func InitialPromotionAllowed(report fulleval.Report) error {
 }
 
 func (s *Store) ActiveRelease(ctx context.Context, agent string) (PromptRelease, error) {
-	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE agent=$1 AND active`, agent))
+	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE agent=$1 AND active`, agent))
 	if errors.Is(err, sql.ErrNoRows) {
 		return PromptRelease{}, checkpoint.ErrNotFound
 	}
@@ -116,7 +117,7 @@ func (s *Store) ActiveRelease(ctx context.Context, agent string) (PromptRelease,
 }
 
 func (s *Store) ListReleases(ctx context.Context) ([]PromptRelease, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,agent,version,prompt_sha256,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases ORDER BY created_at DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (s *Store) ListReleases(ctx context.Context) ([]PromptRelease, error) {
 }
 
 func (s *Store) GetRelease(ctx context.Context, id string) (PromptRelease, error) {
-	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE id=$1`, id))
+	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE id=$1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return PromptRelease{}, checkpoint.ErrNotFound
 	}
@@ -142,7 +143,7 @@ func (s *Store) GetRelease(ctx context.Context, id string) (PromptRelease, error
 
 func scanRelease(row scanner) (PromptRelease, error) {
 	var release PromptRelease
-	err := row.Scan(&release.ID, &release.Agent, &release.Version, &release.PromptSHA256, &release.EvalRunID, &release.PromotedBy, &release.RollbackOf, &release.Comment, &release.Active, &release.CreatedAt)
+	err := row.Scan(&release.ID, &release.Agent, &release.Version, &release.PromptSHA256, &release.Model, &release.EvalRunID, &release.PromotedBy, &release.RollbackOf, &release.Comment, &release.Active, &release.CreatedAt)
 	return release, err
 }
 
@@ -155,7 +156,7 @@ func (s *Store) Promote(ctx context.Context, release PromptRelease) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE prompt_releases SET active=false WHERE agent=$1 AND active`, release.Agent); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO prompt_releases(id,agent,version,prompt_sha256,eval_run_id,promoted_by,rollback_of,comment,active,created_at) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,'')::uuid,$8,true,$9)`, release.ID, release.Agent, release.Version, release.PromptSHA256, release.EvalRunID, release.PromotedBy, release.RollbackOf, release.Comment, release.CreatedAt)
+	_, err = tx.ExecContext(ctx, `INSERT INTO prompt_releases(id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,rollback_of,comment,active,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid,$9,true,$10)`, release.ID, release.Agent, release.Version, release.PromptSHA256, release.Model, release.EvalRunID, release.PromotedBy, release.RollbackOf, release.Comment, release.CreatedAt)
 	if err != nil {
 		return err
 	}
