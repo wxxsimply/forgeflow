@@ -910,7 +910,7 @@ Release 应包含：
 | 0 本地封板审查 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-19 | `docs/stage-0-seal-audit.md`、`docs/third-party-dependency-review.md` |
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
-| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；PR #8 已合并；45-Observation 非高峰试运行已保存并脱敏汇总，完整 90 次基线等待新的连续价格窗口和全新 Evidence |
+| 3 三基线 Eval | 进行中 | 仓库所有者 | 2026-08-31 |  | `docs/stage-3-eval-executor-audit.md`；PR #9 已合并；45-Observation 非高峰试运行及 5-Case ForgeFlow 全链路诊断已脱敏汇总，完整 90 次基线等待新连续窗口和全新 Evidence |
 | 4 Prompt/模型治理 | 未开始 | 待填写 |  |  |  |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
@@ -918,4 +918,4 @@ Release 应包含：
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 3：真实三基线 Eval 进行中**。PR #8 已合并，执行器、隔离 Grader、双 Provider 计费、价格窗口、Reasoning 配置追踪、失败终态和原子 Evidence 均已通过门禁。仓库所有者已授权 30 个 Fixture 的限定数据范围和本阶段付费；首轮非高峰试运行保存了 `single_agent` 30/30、`planner_developer` 15/30，共 45 个终态 Observation、60 次模型请求，累计成本 `$0.146233848`，Secret/危险命令计数为 0。该试运行因人工暂停并跨越价格窗口而终止，只作为私有试运行证据保留，不能拼接或伪装成完整报告。下一步在新的足够长连续价格窗口中使用全新 Evidence 路径从头完成 90 次，生成并人工复核 JSON/Markdown 对比报告。当前不得勾选阶段 3 退出门槛或进入阶段 4。
+当前处于**阶段 3：真实三基线 Eval 进行中**。PR #9 已合并，执行器、隔离 Grader、双 Provider 计费、价格窗口、Reasoning 配置追踪、失败终态和原子 Evidence 均已通过门禁。仓库所有者已授权 30 个 Fixture 的限定数据范围，并为当前诊断及后续同轮完整基线设置 10 元人民币总上限。首轮非高峰试运行保存 45 个终态 Observation，累计 `$0.146233848`；随后 5-Case ForgeFlow 峰值诊断中 `feature-03` 完整通过，5 个样本累计 `$0.045562336`，全部 Secret/危险命令计数为 0。两组结果均为私有试运行证据，不能拼接或伪装成完整报告。下一步在新的足够长连续价格窗口中使用全新 Evidence 路径、逐 Observation 费用检查，从头完成 90 次并生成可人工复核的 JSON/Markdown 对比报告。当前不得勾选阶段 3 退出门槛或进入阶段 4。

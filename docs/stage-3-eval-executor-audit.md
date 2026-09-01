@@ -1,7 +1,7 @@
 # ForgeFlow 阶段 3：三基线执行器审计
 
 > 日期：2026-08-31～2026-09-01
-> 状态：执行器与双 Provider 计费及 Reasoning 配置追踪已合并；45-Observation 试运行已完成，完整 90 次基线等待新的连续价格窗口
+> 状态：执行器与双 Provider 计费及 Reasoning 配置追踪已合并；45-Observation 试运行和 5-Case ForgeFlow 全链路诊断已完成，完整 90 次基线等待新的连续价格窗口
 > 数据集：`software/v1`
 
 ## 已完成的本地实现
@@ -133,6 +133,17 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evid
 - 用户主动暂停后付费进程已终止；恢复时原价格有效期已经结束。根据配置漂移门禁，本次 45-Observation Evidence 保留为私有试运行证据，不与后续价格窗口混写，也不计作完整三基线报告。
 
 完整 90 次正式基线必须在新的、足够长的连续官方价格窗口中使用全新 Evidence 路径从头执行。不得删除上述失败样本、把部分结果拼接成完整报告，或提前勾选阶段 3 退出门槛。
+
+## 2026-09-01 ForgeFlow 全链路峰值窗口诊断
+
+- 仓库所有者额外授权当前时段继续使用 DeepSeek，人民币费用上限为 10 元；本次诊断及后续同轮完整基线均受该总上限约束。
+- 主仓库 commit：`7f3bbd0`（PR #9 已合并）；模型与 Reasoning 继续固定为 `deepseek-v4-flash/low`。诊断发生在官方峰值窗口，采用缓存命中 `$0.014/M`、未命中 `$0.44/M`、输出 `$1.32/M` 的真实费率。
+- 使用独立私有 Evidence 和 `--modes forgeflow --limit 5` 执行 `feature-01`～`feature-05`。共保存 5 个终态 Observation、12 次模型请求、输入 24914 Token（缓存命中 11904）、输出 30054 Token、推理 27073 Token；成本 `$0.045562336`，P95 延迟 69887 ms。
+- `feature-03` 为 `completed`：生成的补丁可应用，显式测试和私有隐藏测试均通过，并完成 4 次模型角色调用。其余 4 个 Case 为 `failed/model_output_invalid`，均按真实失败保留，没有删除或重试。
+- 5 个 Case 的 Secret 检测和危险命令执行计数均为 0；Private Grader、隐藏测试、原始 Evidence 和凭据没有发送给 Provider，原始 Evidence 继续由 `.gitignore` 排除。
+- 该诊断证明完整 ForgeFlow 链可以真实走通，但只是小样本诊断，不计作 90 次正式基线。诊断结束后已确认没有付费进程残留。
+
+北京时间 18:00 的一次性续跑已配置为使用足够长的非高峰窗口、新 Evidence 路径和每次 1 个 Observation 的费用检查。本次 `$0.045562336` 必须计入 10 元人民币总上限；保守估计下一次调用可能越限时，必须在调用前停止。
 
 ## 尚未完成，禁止提前声明
 
