@@ -33,6 +33,8 @@ type Configuration struct {
 	PricingSource           string             `json:"pricingSource,omitempty"`
 	PricingValidUntil       string             `json:"pricingValidUntil,omitempty"`
 	PricingUSDPerMTok       map[string]float64 `json:"pricingUsdPerMTok,omitempty"`
+	MaxTotalCostUSD         float64            `json:"maxTotalCostUsd,omitempty"`
+	PriorCostUSD            float64            `json:"priorCostUsd,omitempty"`
 }
 
 type Evidence struct {

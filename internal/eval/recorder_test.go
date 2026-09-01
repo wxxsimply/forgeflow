@@ -80,3 +80,23 @@ func TestFileRecorderRejectsChangedReasoningEffort(t *testing.T) {
 		t.Fatal("expected changed reasoning effort to be rejected")
 	}
 }
+
+func TestFileRecorderRejectsChangedCostBudget(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration := evidenceFor(dataset, ModeSingleAgent, true).Configuration
+	configuration.MaxTotalCostUSD = 1
+	configuration.PriorCostUSD = 0.1
+	path := filepath.Join(t.TempDir(), "evidence.json")
+	recorder := FileRecorder{Path: path}
+	if err := recorder.Append(context.Background(), Evidence{Dataset: dataset.Name, Configuration: configuration, ObservedAt: time.Unix(1, 0), Observations: []Observation{}}); err != nil {
+		t.Fatal(err)
+	}
+	configuration.MaxTotalCostUSD = 2
+	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Mode) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
+	if err == nil {
+		t.Fatal("expected changed cost budget to be rejected")
+	}
+}

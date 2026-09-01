@@ -37,7 +37,7 @@ go run ./cmd/forgeflow eval --suite software/v1 --validate-only
 go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
 
 # 使用三条执行链采集的真实 evidence 生成对比报告
-go run ./cmd/forgeflow eval execute --suite software/v1 --fixture-repository D:\fixtures\forgeflow-eval-fixtures --grader-repository D:\fixtures\forgeflow-eval-grader --modes single_agent,planner_developer,forgeflow --input-usd-per-million <真实价格> --cached-input-usd-per-million <真实缓存价格> --output-usd-per-million <真实价格> --output .forgeflow/evals/evidence.json
+go run ./cmd/forgeflow eval execute --suite software/v1 --fixture-repository D:\fixtures\forgeflow-eval-fixtures --grader-repository D:\fixtures\forgeflow-eval-grader --modes single_agent,planner_developer,forgeflow --input-usd-per-million <真实价格> --cached-input-usd-per-million <真实缓存价格> --output-usd-per-million <真实价格> --max-total-cost-usd <硬上限> --prior-cost-usd <同一授权此前已花费用> --output .forgeflow/evals/evidence.json
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evidence.json --format json --output .forgeflow/evals/comparison.json
 go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow/evals/evidence.json --format markdown --output .forgeflow/evals/comparison.md
 

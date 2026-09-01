@@ -21,6 +21,7 @@ const (
 type Options struct {
 	Provider          model.Provider
 	Pricing           UsagePricing
+	CostBudget        *CostBudget
 	FixtureRepository string
 	GraderRepository  string
 	WorkspaceRoot     string
@@ -40,6 +41,9 @@ type core struct {
 func newCore(options Options) (*core, error) {
 	if options.Provider == nil {
 		return nil, fmt.Errorf("eval model provider is required")
+	}
+	if options.CostBudget == nil {
+		return nil, fmt.Errorf("eval cost budget is required")
 	}
 	for name, value := range map[string]string{"fixture repository": options.FixtureRepository, "grader repository": options.GraderRepository, "workspace root": options.WorkspaceRoot, "model": options.Model} {
 		if strings.TrimSpace(value) == "" {
@@ -136,6 +140,7 @@ func (m *Mux) Execute(ctx context.Context, evalCase fulleval.Case, mode fulleval
 type meter struct {
 	provider model.Provider
 	pricing  UsagePricing
+	budget   *CostBudget
 	usage    model.Usage
 	requests int
 	cost     float64
@@ -150,6 +155,17 @@ func (m *meter) call(ctx context.Context, request model.Request, agent string, t
 	if err := m.pricing.CanStart(now(), timeout); err != nil {
 		return model.Response{}, err
 	}
+	var reservation *costReservation
+	if m.budget != nil {
+		maximumCost, err := m.pricing.MaxRequestCost(request)
+		if err != nil {
+			return model.Response{}, err
+		}
+		reservation, err = m.budget.reserve(maximumCost)
+		if err != nil {
+			return model.Response{}, err
+		}
+	}
 	callContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	observabilityPricing := model.Pricing{InputUSDPerMillionTokens: m.pricing.InputUSDPerMillionTokens, OutputUSDPerMillionTokens: m.pricing.OutputUSDPerMillionTokens}
@@ -163,10 +179,17 @@ func (m *meter) call(ctx context.Context, request model.Request, agent string, t
 	m.usage.ReasoningTokens += response.Usage.ReasoningTokens
 	cost, pricingErr := m.pricing.Estimate(response.Usage)
 	if pricingErr != nil {
+		reservation.cancel()
 		if err != nil {
 			return response, errors.Join(err, pricingErr)
 		}
 		return response, pricingErr
+	}
+	if budgetErr := reservation.commit(cost); budgetErr != nil {
+		if err != nil {
+			return response, errors.Join(err, budgetErr)
+		}
+		return response, budgetErr
 	}
 	m.cost += cost
 	return response, err
@@ -204,7 +227,7 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 	for _, name := range evalCase.HiddenTests {
 		observation.HiddenTestResults[name] = false
 	}
-	usage := &meter{provider: c.options.Provider, pricing: c.options.Pricing}
+	usage := &meter{provider: c.options.Provider, pricing: c.options.Pricing, budget: c.options.CostBudget}
 	defer func() {
 		duration := time.Since(started).Milliseconds()
 		cost := usage.cost
@@ -246,6 +269,9 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 		return observation, fmt.Errorf("unsupported eval mode %q", mode)
 	}
 	if err != nil {
+		if errors.Is(err, ErrCostBudgetExceeded) {
+			return observation, err
+		}
 		terminalFailure(&observation, err, workspace.Path, c.options)
 		return observation, nil
 	}
@@ -297,6 +323,9 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 			review, reviewErr := c.assess(ctx, usage, "reviewer", evalCase, diff.Patch, testOutput, reviewerSchema)
 			security, securityErr := c.assess(ctx, usage, "security", evalCase, diff.Patch, testOutput, securitySchema)
 			if reviewErr != nil || securityErr != nil {
+				if errors.Is(reviewErr, ErrCostBudgetExceeded) || errors.Is(securityErr, ErrCostBudgetExceeded) {
+					return observation, errors.Join(reviewErr, securityErr)
+				}
 				terminalFailure(&observation, errors.Join(reviewErr, securityErr), workspace.Path, c.options)
 				return observation, nil
 			}
@@ -320,6 +349,9 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 			}
 			repaired, repairErr := c.develop(ctx, usage, evalCase, plan{Decision: fulleval.DecisionImplement, Rationale: "repair deterministic failures", FilesLikelyAffected: observation.ChangedFiles, Steps: append(review.Findings, security.Findings...)}, currentSnapshot, testOutput)
 			if repairErr != nil {
+				if errors.Is(repairErr, ErrCostBudgetExceeded) {
+					return observation, repairErr
+				}
 				terminalFailure(&observation, repairErr, workspace.Path, c.options)
 				return observation, nil
 			}

@@ -81,10 +81,14 @@ go run ./cmd/forgeflow eval execute `
   --input-usd-per-million <当前缓存未命中价格> `
   --cached-input-usd-per-million <当前缓存命中价格> `
   --output-usd-per-million <当前输出价格> `
+  --max-total-cost-usd <将本轮人民币授权按执行时汇率换算后的USD硬上限> `
+  --prior-cost-usd 0.045562336 `
   --output .forgeflow\evals\evidence.json
 ```
 
-DeepSeek 高峰与非高峰价格不同。完整三基线必须在同一个官方价格窗口内运行；优先选择周末或足够长的非高峰窗口。可先增加 `--limit 1` 做一次付费 smoke，确认结构化输出、Token 和成本正确后去掉该参数，原命令会从下一个 Case 继续。如果价格窗口到期，必须停止并使用新的 Evidence 路径，不能用新价格续写旧配置。
+DeepSeek 高峰与非高峰价格不同。完整三基线必须在同一个官方价格窗口内运行；优先选择周末或足够长的非高峰窗口。执行前记录人民币兑美元汇率的来源、查询时间和保守换算结果，`--max-total-cost-usd` 不得高于 10 元人民币对应的美元额度；峰值诊断的 `$0.045562336` 通过 `--prior-cost-usd` 计入同一授权。可先增加 `--limit 1` 做一次付费 smoke，确认结构化输出、Token 和成本正确后去掉该参数，原命令会从下一个 Case 继续。如果价格窗口到期，必须停止并使用新的 Evidence 路径，不能用新价格续写旧配置。
+
+费用门禁在每次 Provider 调用前按“请求 UTF-8 字节数 + 消息封装余量 + `max-output-tokens`”计算保守 Token 上限，并使用当前计费模式下最高的输入费率预留额度。调用完成后预留额替换为 Provider 返回 Token 的实测费用；三种模式共享同一个并发安全预算。断点恢复会重新汇总 Evidence 内所有 Observation 的费用。若下一次调用的保守最大费用超过剩余额度，命令以 `budget_exhausted` 停止且不会调用 Provider；已有 Evidence 保持完整。
 
 完成 90 个 Observation 后生成私有 JSON 与 Markdown 对比报告：
 
@@ -144,7 +148,7 @@ go run ./cmd/forgeflow eval --suite software/v1 --evidence .forgeflow\evals\evid
 - 5 个 Case 的 Secret 检测和危险命令执行计数均为 0；Private Grader、隐藏测试、原始 Evidence 和凭据没有发送给 Provider，原始 Evidence 继续由 `.gitignore` 排除。
 - 该诊断证明完整 ForgeFlow 链可以真实走通，但只是小样本诊断，不计作 90 次正式基线。诊断结束后已确认没有付费进程残留。
 
-北京时间 18:00 的一次性续跑已配置为使用足够长的非高峰窗口、新 Evidence 路径和每次 1 个 Observation 的费用检查。本次 `$0.045562336` 必须计入 10 元人民币总上限；保守估计下一次调用可能越限时，必须在调用前停止。
+北京时间 18:00 的一次性续跑已配置为使用足够长的非高峰窗口、新 Evidence 路径和费用检查。本次 `$0.045562336` 必须计入 10 元人民币总上限。正式运行必须基于包含代码级费用门禁的已合并 commit，传入固定的 `--max-total-cost-usd` 和 `--prior-cost-usd 0.045562336`；若该 commit 尚未合并，自动化必须停止且不得发起付费调用。
 
 ## 尚未完成，禁止提前声明
 
