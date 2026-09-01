@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：代码门禁已实现并通过重点测试；等待人工提交 PR、合并后执行受控 Promotion/rollback 演练
+> 状态：代码门禁已实现并通过本地验证；远端分支已推送但尚未创建 PR，等待 PostgreSQL CI 和合并后的受控 Promotion/rollback 演练
 
 ## 1. 已实现的控制
 
@@ -26,8 +26,11 @@
 - Worker `/readyz` 对治理不一致返回 HTTP 503，对匹配状态返回 HTTP 200。
 - 暂停 Run 的 Prompt、模型、Policy、Tool 绑定匹配时可恢复，不兼容 Worker 配置会拒绝恢复。
 - Migration、Governance、Lifecycle、Config、Worker 和 HTTP API 重点测试通过。
+- 新增 PostgreSQL API 集成测试，验证两次 Promotion 和一次 rollback 均保留不可变 Release 历史、只有一个 Active Release、审计记录包含操作者/原因/Eval Run ID，并逐字节确认 Promotion 前后的既有 Run checkpoint 没有被改写。
 - `./scripts/verify.ps1` 全仓验证通过，包含 Go test/vet、可用时的 Staticcheck、Migration 契约、三套二进制构建以及前端类型检查、测试和生产构建。
 - CI 固定版本 `go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...` 扫描通过，调用路径漏洞为 0。
+
+当前 Windows 主机没有可用的 `FORGEFLOW_TEST_POSTGRES_DSN`，Docker Desktop Linux Engine 也未能启动，因此新增 PostgreSQL 集成测试在本地按既有测试契约明确显示为 `SKIP`，没有伪装成通过。GitHub `PostgreSQL integration` Job 会启动 PostgreSQL 17，并以 `FORGEFLOW_TEST_POSTGRES_DSN` 实际执行该测试；PR 合并前必须以该 Job 的成功结果作为数据库证据。
 
 ## 4. 合并后人工演练（不得由自动化代签）
 
@@ -43,6 +46,6 @@
 
 ## 5. 当前未完成
 
-- GitHub PR 尚未由仓库所有者人工提交和合并。
+- 远端分支 `codex/stage-4-release-readiness` 已包含 commit `8428f84`，但 GitHub 尚无对应 PR；本轮新增集成测试和审计更新也尚未人工提交。
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
 - 没有新增候选 Prompt 或模型；旧版本保留能力已实现，但仍需在真实双版本镜像中验收。
