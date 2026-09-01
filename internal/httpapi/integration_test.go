@@ -20,6 +20,7 @@ import (
 	"forgeflow/internal/config"
 	"forgeflow/internal/controlplane"
 	"forgeflow/internal/domain"
+	fulleval "forgeflow/internal/eval"
 	"forgeflow/internal/governance"
 	"forgeflow/internal/httpapi"
 	"forgeflow/internal/planner"
@@ -175,6 +176,105 @@ func TestLoginRateLimitAndUniformFailure(t *testing.T) {
 	}
 }
 
+func TestPromptPromotionRollbackIsImmutableAuditedAndDoesNotRewriteRuns(t *testing.T) {
+	f := newFixture(t, auth.NewMemoryLimiter(20, time.Minute))
+	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
+	ctx := context.Background()
+	governanceStore := governance.NewStore(f.db)
+	cost, latency := 0.01, 1000.0
+	createEval := func() string {
+		t.Helper()
+		id := domain.NewID()
+		report := fulleval.Report{
+			Configuration: fulleval.Configuration{
+				Mode:           fulleval.ModeForgeFlow,
+				ModelVersions:  map[string]string{"planner": "test-model"},
+				PromptVersions: map[string]string{"planner": "planner/v1"},
+			},
+			Total: 30, Passed: 30,
+			Metrics: fulleval.Metrics{AverageCostUSD: &cost, P95LatencyMS: &latency},
+		}
+		err := governanceStore.CreateEvalRun(ctx, governance.EvalRun{
+			ID: id, CreatedBy: admin.userID, Dataset: "software", DatasetVersion: "v1",
+			Status: "completed", Report: fulleval.ComparisonReport{Reports: []fulleval.Report{report}}, CreatedAt: time.Now().UTC(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	run, err := f.runs.CreateQueued(ctx, application.CreateInput{OwnerID: admin.userID, Task: "preserve bound release", RepositoryPath: "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var before []byte
+	if err := f.db.QueryRow("SELECT state_json FROM runs WHERE id=$1", run.RunID).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+
+	firstEval := createEval()
+	response := f.request(t, admin, http.MethodPost, "/api/v1/prompts/planner/v1/promote", "{\"evalRunId\":\""+firstEval+"\",\"comment\":\"initial approved release\"}", true, nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("initial promotion status=%d body=%s", response.StatusCode, read(response))
+	}
+	var first governance.PromptRelease
+	decodeResponse(t, response, &first)
+	if first.Model != "test-model" || !first.Active {
+		t.Fatalf("initial release=%+v", first)
+	}
+
+	secondEval := createEval()
+	response = f.request(t, admin, http.MethodPost, "/api/v1/prompts/planner/v1/promote", "{\"evalRunId\":\""+secondEval+"\",\"comment\":\"approved replacement release\"}", true, nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("replacement promotion status=%d body=%s", response.StatusCode, read(response))
+	}
+	var second governance.PromptRelease
+	decodeResponse(t, response, &second)
+
+	var after []byte
+	if err := f.db.QueryRow("SELECT state_json FROM runs WHERE id=$1", run.RunID).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("promotion rewrote an existing run checkpoint")
+	}
+
+	response = f.request(t, admin, http.MethodPost, "/api/v1/prompts/planner/rollback", "{\"releaseId\":\""+first.ID+"\",\"comment\":\"approved rollback drill\"}", true, nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("rollback status=%d body=%s", response.StatusCode, read(response))
+	}
+	var rollback governance.PromptRelease
+	decodeResponse(t, response, &rollback)
+	if rollback.ID == first.ID || rollback.ID == second.ID || rollback.RollbackOf != second.ID || rollback.EvalRunID != firstEval || !rollback.Active {
+		t.Fatalf("rollback did not create an immutable release: %+v", rollback)
+	}
+
+	var releaseCount, activeCount int
+	if err := f.db.QueryRow("SELECT count(*),count(*) FILTER (WHERE active) FROM prompt_releases WHERE agent='planner'").Scan(&releaseCount, &activeCount); err != nil {
+		t.Fatal(err)
+	}
+	if releaseCount != 3 || activeCount != 1 {
+		t.Fatalf("release history count=%d active=%d", releaseCount, activeCount)
+	}
+	for _, check := range []struct {
+		id, action, reason string
+	}{
+		{first.ID, "prompt.promote", "initial approved release"},
+		{second.ID, "prompt.promote", "approved replacement release"},
+		{rollback.ID, "prompt.rollback", "approved rollback drill"},
+	} {
+		var actor, action string
+		var details []byte
+		if err := f.db.QueryRow("SELECT actor_id::text,action,details FROM audit_log WHERE resource_id=$1", check.id).Scan(&actor, &action, &details); err != nil {
+			t.Fatal(err)
+		}
+		if actor != admin.userID || action != check.action || !bytes.Contains(details, []byte(check.reason)) || !bytes.Contains(details, []byte("\"evalRunId\"")) {
+			t.Fatalf("audit actor=%q action=%q details=%s", actor, action, details)
+		}
+	}
+}
+
 type loginState struct{ session, csrf, sessionID, userID string }
 
 func (f *apiFixture) login(t *testing.T, email, password, old string) loginState {
@@ -271,7 +371,12 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 	}
 	runStore := checkpoint.NewPostgresStore(db)
 	runs := application.NewService(runStore, planner.Mock{})
-	catalog, err := governance.NewCatalog(config.Config{PlannerPromptVersion: "planner/v1", DeveloperPromptVersion: "developer/v1", ReviewerPromptVersion: "reviewer/v1", SecurityPromptVersion: "security/v1"})
+	catalog, err := governance.NewCatalog(config.Config{
+		PlannerModel: "test-model", PlannerPromptVersion: "planner/v1",
+		DeveloperModel: "test-model", DeveloperPromptVersion: "developer/v1",
+		ReviewerModel: "test-model", ReviewerPromptVersion: "reviewer/v1",
+		SecurityModel: "test-model", SecurityPromptVersion: "security/v1",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
