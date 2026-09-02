@@ -49,4 +49,5 @@
 ## 5. 当前未完成
 
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
-- 没有新增候选 Prompt 或模型；旧版本保留能力已实现，但仍需在真实双版本镜像中验收。
+- `developer/v2` 已作为候选新增并保留 `developer/v1`，但仍需候选 PR CI、合并后 Eval 对照和真实双版本镜像验收；详见 `docs/stage-4-developer-prompt-v2-candidate.md`。
+- 没有候选模型变更。
