@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"forgeflow/internal/apperror"
+	"forgeflow/internal/developer"
 	"forgeflow/internal/domain"
 	fulleval "forgeflow/internal/eval"
 	"forgeflow/internal/model"
@@ -27,7 +28,6 @@ var decisionValues = []fulleval.Decision{
 
 var solutionSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["decision","rationale","changedFiles","patch"],"properties":{"decision":{"type":"string","enum":["implement","clarify","deny","require_approval"]},"rationale":{"type":"string"},"changedFiles":{"type":"array","items":{"type":"string"}},"patch":{"type":"string"}}}`)
 var planSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["decision","rationale","filesLikelyAffected","steps"],"properties":{"decision":{"type":"string","enum":["implement","clarify","deny","require_approval"]},"rationale":{"type":"string"},"filesLikelyAffected":{"type":"array","items":{"type":"string"}},"steps":{"type":"array","items":{"type":"string"}}}}`)
-var implementationSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["summary","changedFiles","patch"],"properties":{"summary":{"type":"string"},"changedFiles":{"type":"array","items":{"type":"string"}},"patch":{"type":"string"}}}`)
 var reviewerSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["approved","requiresApproval","findings"],"properties":{"approved":{"type":"boolean"},"requiresApproval":{"type":"boolean"},"findings":{"type":"array","items":{"type":"string"}}}}`)
 var securitySchema = reviewerSchema
 
@@ -46,7 +46,7 @@ func (c *core) single(ctx context.Context, usage *meter, evalCase fulleval.Case,
 	return output, nil
 }
 
-func (c *core) planned(ctx context.Context, usage *meter, evalCase fulleval.Case, snapshot string) (solution, error) {
+func (c *core) planned(ctx context.Context, usage *meter, evalCase fulleval.Case, snapshot string, workspace domain.WorkspaceRef) (solution, error) {
 	input := fmt.Sprintf("Task:\n%s\n\nForbidden paths: %s\nBudgets: max changed files=%d, max diff lines=%d.\n\nRepository snapshot:\n%s", evalCase.Task, strings.Join(evalCase.ForbiddenFiles, ", "), evalCase.Budget.MaxChangedFiles, evalCase.Budget.MaxDiffLines, snapshot)
 	var planned plan
 	if err := c.generate(ctx, usage, "planner", "eval_plan", planSchema, commonRules+" Decide whether work may proceed and create a bounded implementation plan. Do not produce a patch.", input, &planned); err != nil {
@@ -58,16 +58,121 @@ func (c *core) planned(ctx context.Context, usage *meter, evalCase fulleval.Case
 	if planned.Decision != fulleval.DecisionImplement {
 		return solution{Decision: planned.Decision, Rationale: planned.Rationale, ChangedFiles: []string{}}, nil
 	}
-	return c.develop(ctx, usage, evalCase, planned, snapshot, "No prior test output.")
+	return c.develop(ctx, usage, evalCase, planned, workspace, nil, "")
 }
 
-func (c *core) develop(ctx context.Context, usage *meter, evalCase fulleval.Case, planned plan, snapshot, priorEvidence string) (solution, error) {
-	input := fmt.Sprintf("Task:\n%s\n\nPlan rationale: %s\nAllowed files: %s\nSteps: %s\nForbidden paths: %s\nPrior validation/review evidence:\n%s\n\nCurrent repository snapshot:\n%s", evalCase.Task, planned.Rationale, strings.Join(planned.FilesLikelyAffected, ", "), strings.Join(planned.Steps, "; "), strings.Join(evalCase.ForbiddenFiles, ", "), truncate(priorEvidence, 16*1024), snapshot)
-	var output implementation
-	if err := c.generate(ctx, usage, "developer", "eval_implementation", implementationSchema, commonRules+" Implement the approved plan. Return a complete unified diff, declared changed files, and a short summary.", input, &output); err != nil {
+func (c *core) develop(ctx context.Context, usage *meter, evalCase fulleval.Case, planned plan, workspace domain.WorkspaceRef, currentDiff *domain.DiffArtifact, priorEvidence string) (solution, error) {
+	approvedPlan, err := evalDeveloperPlan(planned, evalCase)
+	if err != nil {
 		return solution{}, err
 	}
+	var previousTest *domain.TestAssessment
+	if strings.TrimSpace(priorEvidence) != "" {
+		previousTest = &domain.TestAssessment{
+			Program: evalCase.ValidationCommand.Program, Args: append([]string(nil), evalCase.ValidationCommand.Args...),
+			Stdout: truncate(priorEvidence, 16*1024), Passed: false,
+		}
+	}
+	bundle, err := c.developerContext.Build(ctx, developer.Input{
+		RunID: "eval-" + evalCase.ID, NodeID: "developer", Task: evalCase.Task,
+		Plan: approvedPlan, Workspace: workspace, Budget: evalRunBudget(evalCase),
+		ToolNames: []string{"read_file", "apply_patch"}, PreviousTest: previousTest, CurrentDiff: currentDiff,
+	})
+	if err != nil {
+		return solution{}, err
+	}
+	input, err := c.developerPrompt.RenderUser(bundle)
+	if err != nil {
+		return solution{}, err
+	}
+	response, err := usage.call(ctx, model.Request{
+		Model: c.options.Model, Instructions: c.developerPrompt.System, Input: input,
+		MaxOutputTokens: c.options.MaxOutputTokens, ReasoningEffort: c.options.ReasoningEffort,
+		ResponseFormat: model.ResponseFormat{
+			Name: "implementation_result", Description: "A bounded ForgeFlow implementation patch and evidence summary",
+			Schema: developer.ImplementationResultSchema(), Strict: true,
+		},
+	}, "developer", c.options.CallTimeout)
+	if err != nil {
+		return solution{}, err
+	}
+	output, err := developer.DecodeImplementationResult(response.OutputText)
+	if err != nil {
+		return solution{}, err
+	}
+	if len(output.RequestedApprovals) > 0 {
+		return solution{Decision: fulleval.DecisionRequireApproval, Rationale: output.Summary, ChangedFiles: []string{}}, nil
+	}
+	approvedFiles := make(map[string]struct{}, len(approvedPlan.FilesLikelyAffected))
+	for _, path := range approvedPlan.FilesLikelyAffected {
+		approvedFiles[path] = struct{}{}
+	}
+	for _, path := range output.ChangedFiles {
+		if _, approved := approvedFiles[path]; !approved {
+			return solution{}, apperror.New(apperror.CodeModelOutput, "developer declared a file outside the approved eval plan")
+		}
+	}
 	return solution{Decision: fulleval.DecisionImplement, Rationale: output.Summary, ChangedFiles: output.ChangedFiles, Patch: output.Patch}, nil
+}
+
+func evalDeveloperPlan(planned plan, evalCase fulleval.Case) (domain.ExecutionPlan, error) {
+	steps := make([]domain.PlanStep, 0, len(planned.Steps))
+	for index, description := range planned.Steps {
+		steps = append(steps, domain.PlanStep{
+			ID: fmt.Sprintf("step-%d", index+1), Description: description,
+			AcceptanceCriteria: []string{"Complete the approved step within the eval case budget."}, DependsOn: []string{},
+		})
+	}
+	result := domain.ExecutionPlan{
+		Summary: planned.Rationale, Assumptions: []string{},
+		FilesLikelyAffected: append([]string(nil), planned.FilesLikelyAffected...),
+		Steps:               steps, Risks: []domain.PlanRisk{},
+		TestStrategy: []string{strings.TrimSpace(strings.Join(append([]string{evalCase.ValidationCommand.Program}, evalCase.ValidationCommand.Args...), " "))},
+	}
+	if err := result.Validate(); err != nil {
+		return domain.ExecutionPlan{}, apperror.Wrap(err, apperror.CodeModelOutput, "eval.developer.plan", "planner output cannot form a production developer plan")
+	}
+	if len(result.FilesLikelyAffected) > evalCase.Budget.MaxChangedFiles {
+		return domain.ExecutionPlan{}, apperror.New(apperror.CodeBudget, "planner file budget exceeded")
+	}
+	for _, candidate := range result.FilesLikelyAffected {
+		for _, forbidden := range evalCase.ForbiddenFiles {
+			blocked := strings.TrimSuffix(filepath.ToSlash(filepath.Clean(forbidden)), "/")
+			if candidate == blocked || strings.HasPrefix(candidate, blocked+"/") {
+				return domain.ExecutionPlan{}, apperror.New(apperror.CodePolicyDenied, "planner selected a forbidden path")
+			}
+		}
+	}
+	return result, nil
+}
+
+func evalRunBudget(evalCase fulleval.Case) domain.RunBudget {
+	budget := domain.DefaultRunBudget(evalCase.Budget.MaxIterations)
+	budget.MaxChangedFiles = evalCase.Budget.MaxChangedFiles
+	budget.MaxDiffLines = evalCase.Budget.MaxDiffLines
+	budget.MaxEstimatedCostUSD = evalCase.Budget.MaxCostUSD
+	return budget
+}
+
+func sameFileSet(left, right []string) bool {
+	left = slices.Clone(left)
+	right = slices.Clone(right)
+	slices.Sort(left)
+	slices.Sort(right)
+	return slices.Equal(left, right)
+}
+
+func filesWithinApprovedSet(actual, approved []string) bool {
+	allowed := make(map[string]struct{}, len(approved))
+	for _, path := range approved {
+		allowed[path] = struct{}{}
+	}
+	for _, path := range actual {
+		if _, ok := allowed[path]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *core) assess(ctx context.Context, usage *meter, agent string, evalCase fulleval.Case, patch, testOutput string, schema json.RawMessage) (assessment, error) {

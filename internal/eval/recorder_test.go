@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-type baselineExecutorFunc func(context.Context, Case, Mode) (Observation, error)
+type baselineExecutorFunc func(context.Context, Case, Configuration) (Observation, error)
 
-func (f baselineExecutorFunc) Execute(ctx context.Context, evalCase Case, mode Mode) (Observation, error) {
-	return f(ctx, evalCase, mode)
+func (f baselineExecutorFunc) Execute(ctx context.Context, evalCase Case, configuration Configuration) (Observation, error) {
+	return f(ctx, evalCase, configuration)
 }
 
 func TestRunResumableWritesEachCaseOnce(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRunResumableWritesEachCaseOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := 0
-	executor := baselineExecutorFunc(func(_ context.Context, evalCase Case, _ Mode) (Observation, error) {
+	executor := baselineExecutorFunc(func(_ context.Context, evalCase Case, _ Configuration) (Observation, error) {
 		calls++
 		value := passingObservation(evalCase, true)
 		value.Outcome = "completed"
@@ -56,7 +56,7 @@ func TestFileRecorderRejectsChangedConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	configuration.GitCommit = "0000000000000000000000000000000000000002"
-	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Mode) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
+	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Configuration) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
 	if err == nil {
 		t.Fatal("expected changed configuration to be rejected")
 	}
@@ -75,7 +75,7 @@ func TestFileRecorderRejectsChangedReasoningEffort(t *testing.T) {
 		t.Fatal(err)
 	}
 	configuration.ReasoningEffort = "medium"
-	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Mode) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
+	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Configuration) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
 	if err == nil {
 		t.Fatal("expected changed reasoning effort to be rejected")
 	}
@@ -95,7 +95,7 @@ func TestFileRecorderRejectsChangedCostBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	configuration.MaxTotalCostUSD = 2
-	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Mode) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
+	_, err = RunResumable(context.Background(), ResumableOptions{Dataset: dataset, Configurations: []Configuration{configuration}, Executor: baselineExecutorFunc(func(context.Context, Case, Configuration) (Observation, error) { return Observation{}, nil }), Recorder: recorder})
 	if err == nil {
 		t.Fatal("expected changed cost budget to be rejected")
 	}

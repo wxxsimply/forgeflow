@@ -34,6 +34,8 @@
 
 合并证据：PR #14 合并 commit `43d676c86c68c25486e14ae0aab466057d05e941`；PR #15 合并 commit `6509f7b33bbdd5b3372bb9c3d7710cbf85397162`。
 
+Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f2415980df81`，四项必需检查全部成功；生产默认仍为 `developer/v1`。
+
 ## 4. 合并后人工演练（不得由自动化代签）
 
 1. [x] 人工复核并合并阶段 4 代码与 PostgreSQL 集成测试 PR。
@@ -49,5 +51,5 @@
 ## 5. 当前未完成
 
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
-- `developer/v2` 已作为候选新增并保留 `developer/v1`，但仍需候选 PR CI、合并后 Eval 对照和真实双版本镜像验收；详见 `docs/stage-4-developer-prompt-v2-candidate.md`。
+- `developer/v2` 已作为候选新增并保留 `developer/v1`，但仍需 Eval 对照和真实双版本镜像验收；详见 `docs/stage-4-developer-prompt-v2-candidate.md`。
 - 没有候选模型变更。

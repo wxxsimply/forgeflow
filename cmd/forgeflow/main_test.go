@@ -4,7 +4,18 @@ import (
 	"testing"
 
 	fulleval "forgeflow/internal/eval"
+	"forgeflow/internal/evalexec"
 )
+
+func TestEvalConfigurationBindsProductionDeveloperPrompt(t *testing.T) {
+	pricing := evalexec.UsagePricing{}
+	for _, mode := range []fulleval.Mode{fulleval.ModePlannerDeveloper, fulleval.ModeForgeFlow} {
+		configuration := evalConfiguration(mode, "deepseek", "model-v1", "none", "developer/v2", "0000000000000000000000000000000000000001", "0000000000000000000000000000000000000002", "0000000000000000000000000000000000000003", pricing, 1, 0)
+		if configuration.PromptVersions["developer"] != "developer/v2" {
+			t.Fatalf("mode %s recorded developer prompt %q", mode, configuration.PromptVersions["developer"])
+		}
+	}
+}
 
 func TestRecordedEvidenceCostSumsAllModes(t *testing.T) {
 	first, second := 0.25, 0.75
