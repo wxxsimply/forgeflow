@@ -16,7 +16,7 @@ import (
 // reserved for infrastructure failures that happened before a billable model
 // call. Terminal case failures must be represented by Observation.
 type BaselineExecutor interface {
-	Execute(context.Context, Case, Mode) (Observation, error)
+	Execute(context.Context, Case, Configuration) (Observation, error)
 }
 
 type EvidenceRecorder interface {
@@ -119,7 +119,7 @@ func RunResumable(ctx context.Context, options ResumableOptions) (EvidenceFile, 
 				}
 				return latest, err
 			}
-			observation, err := options.Executor.Execute(ctx, evalCase, configuration.Mode)
+			observation, err := options.Executor.Execute(ctx, evalCase, configuration)
 			if err != nil {
 				return EvidenceFile{}, fmt.Errorf("execute %s/%s before terminal evidence: %w", configuration.Mode, evalCase.ID, err)
 			}

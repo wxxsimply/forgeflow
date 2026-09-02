@@ -258,6 +258,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	callTimeout := set.Duration("call-timeout", configuration.DeveloperTimeout, "timeout per model request")
 	commandTimeout := set.Duration("command-timeout", 10*time.Minute, "timeout per explicit or hidden test command")
 	contextMaxBytes := set.Int("context-max-bytes", configuration.DeveloperContextMaxBytes, "maximum repository snapshot bytes")
+	developerPromptVersion := set.String("developer-prompt-version", configuration.DeveloperPromptVersion, "embedded production Developer prompt used by planner_developer and forgeflow")
 	inputPrice := set.Float64("input-usd-per-million", configuration.PlannerInputUSDPerMTok, "real input token price in USD per million")
 	cachedInputPrice := set.Float64("cached-input-usd-per-million", 0, "real cached-input token price in USD per million")
 	cacheWritePrice := set.Float64("cache-write-input-usd-per-million", 0, "real cache-write input token price in USD per million")
@@ -351,13 +352,14 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 		FixtureRepository: absoluteFixture, GraderRepository: absoluteGrader, WorkspaceRoot: absoluteWorkspaces,
 		Model: *modelName, ReasoningEffort: *reasoningEffort, MaxOutputTokens: *maxOutputTokens,
 		CallTimeout: *callTimeout, CommandTimeout: *commandTimeout, ContextMaxBytes: *contextMaxBytes,
+		DeveloperPromptVersion: strings.TrimSpace(*developerPromptVersion),
 	})
 	if err != nil {
 		return err
 	}
 	configurations := make([]fulleval.Configuration, 0, len(modes))
 	for _, mode := range modes {
-		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, strings.TrimSpace(*reasoningEffort), rootCommit, fixtureHead, graderCommit, pricing, *maxTotalCostUSD, *priorCostUSD))
+		configurations = append(configurations, evalConfiguration(mode, strings.TrimSpace(*providerName), *modelName, strings.TrimSpace(*reasoningEffort), strings.TrimSpace(*developerPromptVersion), rootCommit, fixtureHead, graderCommit, pricing, *maxTotalCostUSD, *priorCostUSD))
 	}
 	file, err := fulleval.RunResumable(ctx, fulleval.ResumableOptions{
 		Dataset: dataset, Configurations: configurations, Executor: executor,
@@ -398,15 +400,15 @@ func parseEvalModes(value string) ([]fulleval.Mode, error) {
 	return result, nil
 }
 
-func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEffort, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing, maxTotalCostUSD, priorCostUSD float64) fulleval.Configuration {
+func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEffort, developerPromptVersion, gitSHA, fixtureSHA, graderSHA string, pricing evalexec.UsagePricing, maxTotalCostUSD, priorCostUSD float64) fulleval.Configuration {
 	agents := []string{"single_agent"}
 	prompts := map[string]string{"single_agent": "eval/single-agent/v1"}
 	if mode == fulleval.ModePlannerDeveloper {
 		agents = []string{"planner", "developer"}
-		prompts = map[string]string{"planner": "eval/planner/v1", "developer": "eval/developer/v1"}
+		prompts = map[string]string{"planner": "eval/planner/v1", "developer": developerPromptVersion}
 	} else if mode == fulleval.ModeForgeFlow {
 		agents = []string{"planner", "developer", "reviewer", "security"}
-		prompts = map[string]string{"planner": "eval/planner/v1", "developer": "eval/developer/v1", "reviewer": "eval/reviewer/v1", "security": "eval/security/v1", "judge": "eval/judge/v1"}
+		prompts = map[string]string{"planner": "eval/planner/v1", "developer": developerPromptVersion, "reviewer": "eval/reviewer/v1", "security": "eval/security/v1", "judge": "eval/judge/v1"}
 	}
 	models := map[string]string{}
 	for _, agent := range agents {
@@ -684,7 +686,7 @@ Commands:
   inspect [--repository <path>] [--base <ref>]
   eval    [--suite planner/v1]
   eval    --suite software/v1 --validate-only [--limit 6] [--fixture-repository <path>]
-  eval    execute --suite software/v1 --fixture-repository <path> --grader-repository <private-path> --modes single_agent,planner_developer,forgeflow --output <private-evidence.json>
+  eval    execute --suite software/v1 --fixture-repository <path> --grader-repository <private-path> --modes single_agent,planner_developer,forgeflow [--developer-prompt-version developer/v1] --output <private-evidence.json>
   eval    --suite software/v1 --evidence <file> [--format json|markdown] [--output <file>]
   eval    --promote-current <report.json> --promote-candidate <report.json> --approve
   plan    --task <text> [--repository <path>] [--base <ref>] [--mode mock]

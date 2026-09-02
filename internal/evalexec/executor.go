@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"forgeflow/internal/apperror"
+	"forgeflow/internal/developer"
 	"forgeflow/internal/domain"
 	fulleval "forgeflow/internal/eval"
 	"forgeflow/internal/model"
@@ -19,23 +21,26 @@ const (
 )
 
 type Options struct {
-	Provider          model.Provider
-	Pricing           UsagePricing
-	CostBudget        *CostBudget
-	FixtureRepository string
-	GraderRepository  string
-	WorkspaceRoot     string
-	Model             string
-	ReasoningEffort   string
-	MaxOutputTokens   int
-	CallTimeout       time.Duration
-	CommandTimeout    time.Duration
-	ContextMaxBytes   int
+	Provider               model.Provider
+	Pricing                UsagePricing
+	CostBudget             *CostBudget
+	FixtureRepository      string
+	GraderRepository       string
+	WorkspaceRoot          string
+	Model                  string
+	ReasoningEffort        string
+	MaxOutputTokens        int
+	CallTimeout            time.Duration
+	CommandTimeout         time.Duration
+	ContextMaxBytes        int
+	DeveloperPromptVersion string
 }
 
 type core struct {
-	options    Options
-	workspaces repository.WorkspaceManager
+	options          Options
+	workspaces       repository.WorkspaceManager
+	developerPrompt  developer.Prompt
+	developerContext *developer.ContextBuilder
 }
 
 func newCore(options Options) (*core, error) {
@@ -68,11 +73,21 @@ func newCore(options Options) (*core, error) {
 	if options.ContextMaxBytes > 1024*1024 {
 		return nil, fmt.Errorf("eval context cannot exceed 1 MiB")
 	}
+	if strings.TrimSpace(options.DeveloperPromptVersion) == "" {
+		options.DeveloperPromptVersion = "developer/v1"
+	}
+	developerPrompt, err := developer.NewPromptLoader(nil).Load(options.DeveloperPromptVersion)
+	if err != nil {
+		return nil, fmt.Errorf("load eval developer prompt: %w", err)
+	}
 	manager, err := repository.NewGitWorkspaceManager(options.WorkspaceRoot, repository.DefaultLimits())
 	if err != nil {
 		return nil, err
 	}
-	return &core{options: options, workspaces: manager}, nil
+	return &core{
+		options: options, workspaces: manager, developerPrompt: developerPrompt,
+		developerContext: developer.NewContextBuilder(repository.DefaultLimits(), options.ContextMaxBytes),
+	}, nil
 }
 
 type SingleAgentExecutor struct{ core *core }
@@ -92,13 +107,28 @@ func NewForgeFlow(options Options) (*ForgeFlowExecutor, error) {
 	return &ForgeFlowExecutor{core: value}, err
 }
 
-func (e *SingleAgentExecutor) Execute(ctx context.Context, evalCase fulleval.Case, _ fulleval.Mode) (fulleval.Observation, error) {
+func (e *SingleAgentExecutor) Execute(ctx context.Context, evalCase fulleval.Case, configuration fulleval.Configuration) (fulleval.Observation, error) {
+	if configuration.Mode != fulleval.ModeSingleAgent {
+		return fulleval.Observation{}, fmt.Errorf("single-agent executor received mode %q", configuration.Mode)
+	}
 	return e.core.execute(ctx, evalCase, fulleval.ModeSingleAgent)
 }
-func (e *PlannerDeveloperExecutor) Execute(ctx context.Context, evalCase fulleval.Case, _ fulleval.Mode) (fulleval.Observation, error) {
+func (e *PlannerDeveloperExecutor) Execute(ctx context.Context, evalCase fulleval.Case, configuration fulleval.Configuration) (fulleval.Observation, error) {
+	if configuration.Mode != fulleval.ModePlannerDeveloper {
+		return fulleval.Observation{}, fmt.Errorf("planner-developer executor received mode %q", configuration.Mode)
+	}
+	if err := e.core.validateDeveloperPromptBinding(configuration); err != nil {
+		return fulleval.Observation{}, err
+	}
 	return e.core.execute(ctx, evalCase, fulleval.ModePlannerDeveloper)
 }
-func (e *ForgeFlowExecutor) Execute(ctx context.Context, evalCase fulleval.Case, _ fulleval.Mode) (fulleval.Observation, error) {
+func (e *ForgeFlowExecutor) Execute(ctx context.Context, evalCase fulleval.Case, configuration fulleval.Configuration) (fulleval.Observation, error) {
+	if configuration.Mode != fulleval.ModeForgeFlow {
+		return fulleval.Observation{}, fmt.Errorf("ForgeFlow executor received mode %q", configuration.Mode)
+	}
+	if err := e.core.validateDeveloperPromptBinding(configuration); err != nil {
+		return fulleval.Observation{}, err
+	}
 	return e.core.execute(ctx, evalCase, fulleval.ModeForgeFlow)
 }
 
@@ -124,17 +154,25 @@ func NewMux(options Options) (*Mux, error) {
 	return &Mux{Single: single, PlannerDeveloper: plannerDeveloper, ForgeFlow: forgeFlow}, nil
 }
 
-func (m *Mux) Execute(ctx context.Context, evalCase fulleval.Case, mode fulleval.Mode) (fulleval.Observation, error) {
-	switch mode {
+func (m *Mux) Execute(ctx context.Context, evalCase fulleval.Case, configuration fulleval.Configuration) (fulleval.Observation, error) {
+	switch configuration.Mode {
 	case fulleval.ModeSingleAgent:
-		return m.Single.Execute(ctx, evalCase, mode)
+		return m.Single.Execute(ctx, evalCase, configuration)
 	case fulleval.ModePlannerDeveloper:
-		return m.PlannerDeveloper.Execute(ctx, evalCase, mode)
+		return m.PlannerDeveloper.Execute(ctx, evalCase, configuration)
 	case fulleval.ModeForgeFlow:
-		return m.ForgeFlow.Execute(ctx, evalCase, mode)
+		return m.ForgeFlow.Execute(ctx, evalCase, configuration)
 	default:
-		return fulleval.Observation{}, fmt.Errorf("unsupported eval mode %q", mode)
+		return fulleval.Observation{}, fmt.Errorf("unsupported eval mode %q", configuration.Mode)
 	}
+}
+
+func (c *core) validateDeveloperPromptBinding(configuration fulleval.Configuration) error {
+	recorded := strings.TrimSpace(configuration.PromptVersions["developer"])
+	if recorded == "" || recorded != c.developerPrompt.Version {
+		return fmt.Errorf("eval developer prompt binding mismatch: executor=%q evidence=%q", c.developerPrompt.Version, recorded)
+	}
+	return nil
 }
 
 type meter struct {
@@ -209,12 +247,6 @@ type plan struct {
 	Steps               []string          `json:"steps"`
 }
 
-type implementation struct {
-	Summary      string   `json:"summary"`
-	ChangedFiles []string `json:"changedFiles"`
-	Patch        string   `json:"patch"`
-}
-
 type assessment struct {
 	Approved         bool     `json:"approved"`
 	RequiresApproval bool     `json:"requiresApproval"`
@@ -264,7 +296,7 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 	case fulleval.ModeSingleAgent:
 		chosen, err = c.single(ctx, usage, evalCase, snapshot)
 	case fulleval.ModePlannerDeveloper, fulleval.ModeForgeFlow:
-		chosen, err = c.planned(ctx, usage, evalCase, snapshot)
+		chosen, err = c.planned(ctx, usage, evalCase, snapshot, workspace)
 	default:
 		return observation, fmt.Errorf("unsupported eval mode %q", mode)
 	}
@@ -307,6 +339,10 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 		terminalFailure(&observation, err, workspace.Path, c.options)
 		return observation, nil
 	}
+	if !sameFileSet(chosen.ChangedFiles, observation.ChangedFiles) {
+		terminalFailure(&observation, apperror.New(apperror.CodeModelOutput, "applied patch files do not match developer changedFiles"), workspace.Path, c.options)
+		return observation, nil
+	}
 
 	testOutput, testErr := runCommand(ctx, workspace.Path, evalCase.ValidationCommand, c.options.CommandTimeout)
 	observation.ExplicitTestsPassed = testErr == nil
@@ -342,12 +378,12 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 			if observation.Iterations >= evalCase.Budget.MaxIterations {
 				break
 			}
-			currentSnapshot, snapshotErr := repositorySnapshot(ctx, workspace.Path, c.options.ContextMaxBytes)
-			if snapshotErr != nil {
-				terminalFailure(&observation, snapshotErr, workspace.Path, c.options)
-				return observation, nil
+			repairSteps := append(append([]string(nil), review.Findings...), security.Findings...)
+			if len(repairSteps) == 0 {
+				repairSteps = []string{"Repair the deterministic validation failure shown in the previous test evidence."}
 			}
-			repaired, repairErr := c.develop(ctx, usage, evalCase, plan{Decision: fulleval.DecisionImplement, Rationale: "repair deterministic failures", FilesLikelyAffected: observation.ChangedFiles, Steps: append(review.Findings, security.Findings...)}, currentSnapshot, testOutput)
+			approvedRepairFiles := append([]string(nil), observation.ChangedFiles...)
+			repaired, repairErr := c.develop(ctx, usage, evalCase, plan{Decision: fulleval.DecisionImplement, Rationale: "repair deterministic failures", FilesLikelyAffected: approvedRepairFiles, Steps: repairSteps}, workspace, &diff, testOutput)
 			if repairErr != nil {
 				if errors.Is(repairErr, ErrCostBudgetExceeded) {
 					return observation, repairErr
@@ -366,6 +402,10 @@ func (c *core) execute(ctx context.Context, evalCase fulleval.Case, mode fulleva
 			observation.Iterations++
 			if err := c.refreshDiff(ctx, workspace, &observation, evalCase); err != nil {
 				terminalFailure(&observation, err, workspace.Path, c.options)
+				return observation, nil
+			}
+			if !filesWithinApprovedSet(observation.ChangedFiles, approvedRepairFiles) {
+				terminalFailure(&observation, apperror.New(apperror.CodeModelOutput, "repair patch changed a file outside the approved eval plan"), workspace.Path, c.options)
 				return observation, nil
 			}
 			testOutput, testErr = runCommand(ctx, workspace.Path, evalCase.ValidationCommand, c.options.CommandTimeout)
