@@ -471,7 +471,7 @@ go run ./cmd/forgeflow eval `
 ### 8.5 阶段 4 退出门槛
 
 - [x] Worker 版本与 Active Release 不一致时 Readiness 失败。
-- [ ] Promotion 不会修改正在执行的 Run 所绑定版本。
+- [x] Promotion 不会修改正在执行的 Run 所绑定版本。
 - [ ] 旧 Prompt 仍嵌入可回滚镜像。
 - [x] Checkpoint 恢复校验 Prompt、模型、Policy 和 Tool 版本。
 - [ ] Promotion 和 rollback 都经过人工批准并可审计。
@@ -916,9 +916,13 @@ Release 应包含：
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
  codex/stage-4-release-readiness
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`；Worker Active Release Readiness 与恢复版本守卫已通过本地验证；PR #15 的 PostgreSQL integration 已验证 Promotion/rollback 不可变性和 Run checkpoint 隔离，等待清理分支重新通过 CI 后执行人工演练 |
+
+ codex/stage-4-release-readiness
 | 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`；Worker Active Release Readiness 与恢复版本守卫已通过本地验证，Promotion/rollback 不可变性与 Run checkpoint 隔离的 PostgreSQL 测试待 PR CI 实跑，之后执行人工演练 |
 
 | 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`；Worker Active Release Readiness 与恢复版本守卫已通过本地验证，等待 PR 和 Promotion/rollback 演练 |
+ main
  main
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
