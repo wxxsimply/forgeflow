@@ -31,6 +31,31 @@ func TestDecodeImplementationResultIsStrictAndValidatesPaths(t *testing.T) {
 	}
 }
 
+func TestPromptLoaderKeepsV1AlongsideV2Candidate(t *testing.T) {
+	loader := NewPromptLoader(nil)
+	v1, err := loader.Load("developer/v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := loader.Load("developer/v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.SHA256 == "" || v2.SHA256 == "" || v1.SHA256 == v2.SHA256 {
+		t.Fatalf("prompt digests do not identify distinct immutable versions: v1=%q v2=%q", v1.SHA256, v2.SHA256)
+	}
+	if !strings.Contains(v2.System, "exactly these six top-level keys") {
+		t.Fatal("v2 prompt is missing its strict output self-check")
+	}
+	rendered, err := v2.RenderUser(ContextBundle{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rendered, "<developer_context>") {
+		t.Fatal("v2 user prompt did not render the bounded context envelope")
+	}
+}
+
 func TestContextBuilderIncludesOnlyApprovedFilesAndProjectRules(t *testing.T) {
 	workspace := t.TempDir()
 	writeFile(t, filepath.Join(workspace, "AGENTS.md"), "trusted project rule boundary")

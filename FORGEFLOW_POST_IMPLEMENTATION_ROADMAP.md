@@ -915,7 +915,7 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`；PR #14/#15 已合并且四项必需检查通过，Worker Readiness、恢复版本守卫、Promotion/rollback 不可变性和 Run checkpoint 隔离已有自动证据，等待真实双版本人工演练 |
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`、`docs/stage-4-developer-prompt-v2-candidate.md`；PR #14/#15 已合并且四项必需检查通过，Developer v2 候选等待 PR CI、Eval 对照和真实双版本人工演练 |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
 | 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
