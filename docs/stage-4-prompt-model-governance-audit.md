@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：治理代码、Developer v2 候选和生产 Eval 绑定已分别由 PR #14、#15、#20、#21 合并并通过四项必需检查；等待候选 Eval 和受控双版本 Promotion/rollback 人工演练
+> 状态：治理代码、Developer v2 候选、生产 Eval 绑定和受控双运行脚本已分别由 PR #14、#15、#20、#21、#22 合并并通过四项必需检查；正在补齐多模式候选差异报告，随后执行候选 Eval 和受控双版本 Promotion/rollback 人工演练
 
 ## 1. 已实现的控制
 
@@ -37,6 +37,8 @@
 Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f2415980df81`，四项必需检查全部成功；生产默认仍为 `developer/v1`。
 
 生产 Eval Prompt 绑定由 PR #21 合并，commit 为 `76ede9b4e875adf7e9494d7c0c38eb5f767b8de6`，四项必需检查全部成功。执行器会加载实际版本化 Prompt、复用生产响应 Schema，并在 Provider 调用前拒绝 Evidence 配置与实际 Prompt 不一致的运行。
+
+受控双运行脚本由 PR #22 合并，commit 为 `ca3390e6c25d2c665d1e8078e3b76c8b599128a2`。脚本强制精确 SHA、独立 Evidence 路径、同一价格窗口、共享 `1.00 USD` 硬上限、显式付费确认和安全断点恢复；PR 四项必需检查全部成功。
 
 ## 4. 合并后人工演练（不得由自动化代签）
 

@@ -1,6 +1,6 @@
 # ForgeFlow Developer Prompt v2 候选说明
 
-> 状态：候选 Prompt 已由 PR #20 合并，生产 Eval 绑定已由 PR #21 合并；两者均通过四项必需检查。尚未完成候选 Eval、Promotion 或部署批准。
+> 状态：候选 Prompt 已由 PR #20 合并，生产 Eval 绑定已由 PR #21 合并，受控双运行脚本已由 PR #22 合并；均通过四项必需检查。多模式候选差异报告正在补齐，尚未完成候选 Eval、Promotion 或部署批准。
 
 ## 1. 候选目的
 

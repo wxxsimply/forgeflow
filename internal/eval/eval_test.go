@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -65,6 +66,78 @@ func TestComparisonRequiresAllThreeModes(t *testing.T) {
 	}
 	if len(report.Reports) != 3 || report.Markdown() == "" {
 		t.Fatalf("report=%+v", report)
+	}
+}
+
+func TestCandidateComparisonRequiresOnlyDeveloperPromptAndPriorCostToDiffer(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v1", 0), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v2", 9), time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := BuildCandidateComparison(current, candidate, time.Unix(3, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.CurrentPromptVersion != "developer/v1" || report.CandidatePromptVersion != "developer/v2" || len(report.Modes) != 3 {
+		t.Fatalf("report=%+v", report)
+	}
+	if !report.PromotionGate.Allowed || !strings.Contains(report.Markdown(), "developer/v1` -> `developer/v2") {
+		t.Fatalf("gate=%+v markdown=%q", report.PromotionGate, report.Markdown())
+	}
+}
+
+func TestCandidateComparisonRejectsConfigurationDriftAndIdenticalPrompt(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v1", 0), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	samePrompt, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v1", 9), time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildCandidateComparison(current, samePrompt, time.Unix(3, 0)); err == nil {
+		t.Fatal("expected identical developer prompts to be rejected")
+	}
+
+	driftedEvidence := candidateComparisonEvidence(dataset, "developer/v2", 9)
+	driftedEvidence.Runs[2].Configuration.ModelVersions["developer"] = "different-model"
+	drifted, err := BuildComparison(dataset, driftedEvidence, time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildCandidateComparison(current, drifted, time.Unix(3, 0)); err == nil {
+		t.Fatal("expected model drift to be rejected")
+	}
+}
+
+func TestCandidateComparisonRejectsUnlinkedCampaignCost(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v1", 0), time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := BuildComparison(dataset, candidateComparisonEvidence(dataset, "developer/v2", 8), time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildCandidateComparison(current, candidate, time.Unix(3, 0)); err == nil {
+		t.Fatal("expected unlinked candidate prior campaign cost to be rejected")
 	}
 }
 
@@ -143,6 +216,29 @@ func evidenceFor(dataset Dataset, mode Mode, measured bool) Evidence {
 		Dataset: dataset.Name, ObservedAt: time.Unix(1, 0), Observations: observations,
 		Configuration: Configuration{Mode: mode, ModelVersions: map[string]string{"planner": "test-model"}, PromptVersions: map[string]string{"planner": "planner/v1"}, PolicyVersion: "policy/v1", ToolVersions: map[string]string{"run_test": "v1"}, GitCommit: "0000000000000000000000000000000000000001"},
 	}
+}
+
+func candidateComparisonEvidence(dataset Dataset, developerPrompt string, priorCost float64) EvidenceFile {
+	runs := make([]Evidence, 0, 3)
+	for _, mode := range []Mode{ModeSingleAgent, ModePlannerDeveloper, ModeForgeFlow} {
+		evidence := evidenceFor(dataset, mode, true)
+		evidence.Configuration = Configuration{
+			Mode: mode, ReasoningEffort: "low", ModelVersions: map[string]string{"developer": "model-v1"},
+			PromptVersions: map[string]string{"single_agent": "eval/single-agent/v1"},
+			PolicyVersion:  "policy/v1", ToolVersions: map[string]string{"run_test": "v1"},
+			GitCommit:               "0000000000000000000000000000000000000001",
+			FixtureRepositoryCommit: "0000000000000000000000000000000000000002",
+			GraderCommit:            "0000000000000000000000000000000000000003",
+			ExecutionEnvironment:    "test", ModelProvider: "deepseek", PricingMode: "cache_hit_miss",
+			PricingSource: "https://example.com/pricing", PricingValidUntil: "2030-01-01T00:00:00Z",
+			PricingUSDPerMTok: map[string]float64{"input": 1, "output": 2}, MaxTotalCostUSD: 20, PriorCostUSD: priorCost,
+		}
+		if mode != ModeSingleAgent {
+			evidence.Configuration.PromptVersions = map[string]string{"planner": "eval/planner/v1", "developer": developerPrompt}
+		}
+		runs = append(runs, evidence)
+	}
+	return EvidenceFile{Runs: runs}
 }
 
 func passingObservation(evalCase Case, measured bool) Observation {

@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Developer v1/v2 Eval 操作手册
 
-> 状态：脚本待 PR 合并；在获得干净、可追溯的合并 SHA 前不得启动正式付费 Eval。
+> 状态：受控双运行脚本已由 PR #22 合并；多模式候选差异报告能力待当前 PR 合并。在获得包含全部报告能力的干净、可追溯合并 SHA 前不得启动正式付费 Eval。
 
 ## 1. 目的与边界
 
@@ -80,11 +80,11 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 ## 6. 完成后的人工门禁
 
-脚本只有在 v1 和 v2 都得到三种模式各 30 个完整 Observation 后才生成两份私有 JSON 报告。完成后：
+脚本只有在 v1 和 v2 都得到三种模式各 30 个完整 Observation 后，才生成两份私有三模式报告，以及 JSON/Markdown 两种格式的候选差异报告。差异报告会拒绝模型、Reasoning、代码、Fixture、Grader、Policy、Tool、执行环境、价格或预算漂移，只允许 Developer Prompt version 和累计 campaign cost 不同；它会列出三种模式的指标增量和现有 ForgeFlow Promotion Gate 结果，但不会代替人工批准。后续使用三模式报告调用 Promotion CLI 时会再次执行同一可比性校验，不能绕过。完成后：
 
 1. 人工核对两份报告的 Git、Fixture、Grader、模型、Reasoning、Prompt、Policy、Tool 和价格记录一致，只有 Developer Prompt version/SHA 不同。
 2. 核对完成率、隐藏测试通过率、回归率、人工介入率、成本和 P95 延迟；不得排除失败样本。
-3. 生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。
+3. 根据 `release-reports/stage-4-developer-v2-review-template.md` 生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。
 4. Admin 明确选择 `REJECTED`、`APPROVED AS CANDIDATE` 或 `APPROVED FOR PROMOTION`，记录原因和 Eval Run ID。
 5. 只有 `APPROVED FOR PROMOTION` 才进入 drain、双版本镜像、Readiness、Promotion 和 rollback 演练。
 

@@ -1,8 +1,8 @@
-# ForgeFlow 完成度审计（2026-08-30 更新）
+# ForgeFlow 完成度审计（2026-09-03 更新）
 
 ## 结论
 
-ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的核心代码和部署资产已落地，但项目目前仍不满足 `v1.0.0` 最终发布条件。Git/GitHub 基线已经完成，30 个 Eval fixture SHA 已替换为本地独立仓库中的真实 commit，并通过隔离 Grader 双向审计；仍缺少两个 Private Eval 仓库的人工上传与远端权限复验、真实三基线模型证据、域名、Registry、服务器 Secret 和公网 Staging 验收环境。
+ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。项目目前仍不满足 `v1.0.0` 最终发布条件：阶段 4 的 Developer v2 候选对照、人工 Promotion/rollback 和双版本镜像演练尚未完成，后续还缺少 Registry、域名、服务器 Secret 和公网 Staging 验收环境。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
@@ -16,7 +16,7 @@ ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的
 | 7 PostgreSQL/Queue | 完成 | Migration、Outbox、租约、恢复、暂停/取消与数据库集成测试；CI 新增 PostgreSQL service 验证 |
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
-| 10 Observability/Eval | 部分完成 | 指标、Trace、Grader、报告、治理 API/UI 和 30 个本地真实 fixture 已完成；远端隔离复验与三基线 evidence 未完成 |
+| 10 Observability/Eval | 阶段 3 完成、阶段 4 进行中 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；Developer v2 候选对照与 Promotion/rollback 待完成 |
 | 11 部署/安全 | 部分完成 | Compose、mTLS 沙箱引擎、HTTPS、备份/恢复/告警/回滚脚本与文档已完成；真实 Staging 验收未完成 |
 
 ## 本轮补齐的工程缺口
@@ -38,19 +38,14 @@ ForgeFlow 的阶段 0～9 已具备可测试的工程实现；阶段 10、11 的
 - `govulncheck v1.6.0 ./...`：0 个可达漏洞。
 - `npm run check`：TypeScript、11 个 Vitest 测试和生产构建通过。
 - OpenAI/Staging Compose 合并配置：通过。
-- 临时 PostgreSQL 17 上的 Migration 1～4、`internal/postgres` 和 `internal/httpapi` 串行集成测试：通过；临时容器已删除。
+- PostgreSQL 17 CI 上的 Migration 1～5、`internal/postgres` 和 `internal/httpapi` 集成测试：通过。
 - Windows 本机 `go test -race` 无法启动，所有测试进程统一返回系统错误 `0xc0000139`；这不是数据竞争报告。Linux CI 保留 `go test -race ./...` 作为强制门禁。
 
 ## 仍需真实环境完成的发布门槛
 
-1. 由仓库所有者人工审核并通过 Pull Request 合并当前阶段 2 的主仓库改动。
-2. 人工创建并上传独立的 Private Fixture 与 Grader 仓库，配置最小权限，再从远端干净 clone 执行：
-
-   ```powershell
-   go run ./cmd/forgeflow eval --suite software/v1 --validate-only --fixture-repository D:\fixtures\forgeflow-eval-fixtures
-   ```
-
-3. 用真实 Provider 分别运行 `single_agent`、`planner_developer`、`forgeflow`，采集完整 Token、成本、延迟和测试证据，导入 Eval API。
-4. 准备域名、DNS、TLS 邮箱、镜像仓库 digest、OpenAI/PostgreSQL/Alert Secret 和专用 Staging 主机，执行 Preflight 与 Release。
+1. 使用同一精确 Git SHA、Fixture、Private Grader、模型、Reasoning、价格窗口和共享预算运行 Developer v1/v2 候选对照，并由 Admin 签署结论。
+2. 对获批候选完成 Worker drain、双版本镜像、Active Release Readiness、Promotion 和 rollback 演练；未获批则保留 `developer/v1`。
+3. 构建、扫描、签名并由发布负责人手动上传不可变镜像，记录 digest、SBOM 和漏洞门禁。
+4. 准备域名、DNS、TLS 邮箱、Registry、OpenAI/PostgreSQL/Alert Secret 和专用 Staging 主机，执行 Preflight 与 Release。
 5. 在 Staging 签署 HTTPS 全链路、Sandbox、告警投递、备份恢复、版本回滚和 3～5 分钟 Demo 证据。
-6. 只有上述结果全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传真实基线成绩。
+6. 只有上述结果及 Production 准备全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传候选改进结论。
