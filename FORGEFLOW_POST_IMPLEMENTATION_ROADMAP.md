@@ -426,7 +426,7 @@ go run ./cmd/forgeflow eval `
 
 ## 8. 阶段 4：完善 Prompt 和模型发布治理
 
-> 当前状态：进行中（2026-09-01 开始）
+> 当前状态：进行中（2026-09-01 开始；截至 2026-09-03，治理实现、Developer v2 和生产 Eval Prompt 绑定已合并）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
 > 本阶段目标：让数据库治理记录、镜像内版本和 Worker 实际运行版本保持一致。
 
@@ -915,11 +915,11 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`、`docs/stage-4-developer-prompt-v2-candidate.md`；PR #14/#15/#20 已合并且四项必需检查通过，Developer v2 候选等待真实绑定 Prompt 的 Eval 对照和双版本人工演练 |
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | `docs/stage-4-prompt-model-governance-audit.md`、`docs/stage-4-developer-prompt-v2-candidate.md`、`docs/stage-4-developer-v2-eval-runbook.md`；PR #14/#15/#20/#21 已合并且四项必需检查通过，下一门禁为受控 Developer v1/v2 Eval 对照和双版本人工演练 |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
 | 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，完成三种模式各 30 个 Case、共 90 个终态 Observation 和 159 次模型请求；仓库所有者 `wxxsimply` 已于 `2026-09-01T13:09:19Z` 人工复核，并以 PR #13 和明确确认签署 `APPROVED AS BASELINE`。该结果仅作为真实初始对照，不构成完整 ForgeFlow 优于简化基线或 Production 发布获批的声明。阶段 4 将补齐 Worker Active Release Readiness、Checkpoint 的 Prompt/模型/Policy/Tool 版本守卫，以及 Promotion/rollback 演练证据。
+当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，完成三种模式各 30 个 Case、共 90 个终态 Observation 和 159 次模型请求；仓库所有者 `wxxsimply` 已于 `2026-09-01T13:09:19Z` 人工复核，并以 PR #13 和明确确认签署 `APPROVED AS BASELINE`。该结果仅作为真实初始对照，不构成完整 ForgeFlow 优于简化基线或 Production 发布获批的声明。PR #14/#15 已完成 Worker Active Release Readiness、Checkpoint 版本守卫和不可变 Promotion/rollback 控制；PR #20/#21 已完成 Developer v2 候选及其生产 Eval 绑定。下一项是先合并受控双运行脚本，再用该精确合并 SHA 生成 v1/v2 对照，最后由 Admin 人工决定 Promotion 并完成 rollback 演练。

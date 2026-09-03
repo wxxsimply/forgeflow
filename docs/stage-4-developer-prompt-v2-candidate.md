@@ -1,6 +1,6 @@
 # ForgeFlow Developer Prompt v2 候选说明
 
-> 状态：候选 Prompt 已由 PR #20 合并并通过四项必需检查；尚未完成候选 Eval、Promotion 或部署批准。
+> 状态：候选 Prompt 已由 PR #20 合并，生产 Eval 绑定已由 PR #21 合并；两者均通过四项必需检查。尚未完成候选 Eval、Promotion 或部署批准。
 
 ## 1. 候选目的
 
@@ -30,9 +30,11 @@
 
 PR #20 合并 commit 为 `3302aeb7aa3725761bf614695ba8f2415980df81`；Go verification、PostgreSQL integration、Web verification 和 deployment `validate` 均成功。
 
+PR #21 合并 commit 为 `76ede9b4e875adf7e9494d7c0c38eb5f767b8de6`；Eval 执行器现在真实加载 `--developer-prompt-version` 指定的生产 Prompt，使用生产六字段响应契约，并在调用 Provider 前核对 Evidence 配置中的 Prompt version。四项必需检查均成功。
+
 ## 4. 合并后门禁
 
-1. Eval CLI 必须通过 `--developer-prompt-version` 加载生产 Prompt，并把同一版本写入 Evidence；禁止只修改报告标签。
+1. [x] Eval CLI 通过 `--developer-prompt-version` 加载生产 Prompt，并把同一版本写入 Evidence；不会只修改报告标签。
 2. 使用合并后的精确 Git SHA 构建候选 Eval。
 3. 以相同 Fixture、Private Grader、模型、Reasoning、Policy、Tool、预算和价格窗口运行当前版本与候选版本对照。
 4. 原始 Evidence 留在私有路径，只提交人工脱敏报告。
@@ -40,3 +42,5 @@ PR #20 合并 commit 为 `3302aeb7aa3725761bf614695ba8f2415980df81`；Go verific
 6. 通过门禁后仍需 Admin 人工批准，再执行 drain、双版本镜像部署、Readiness 校验和 rollback 演练。
 
 在上述步骤完成前，阶段 4 保持“进行中”，路线图中的双版本镜像和人工 Promotion/rollback 验收项不得勾选。
+
+双运行的参数、预算和恢复步骤见 `docs/stage-4-developer-v2-eval-runbook.md`。受控脚本必须先经 PR 合并；正式 Evidence 必须记录该合并后的精确 SHA，不能在有未提交修改的工作区运行。
