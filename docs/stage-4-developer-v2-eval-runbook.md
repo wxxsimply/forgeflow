@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Developer v1/v2 Eval 操作手册
 
-> 状态：受控双运行脚本已由 PR #22 合并；多模式候选差异报告能力待当前 PR 合并。在获得包含全部报告能力的干净、可追溯合并 SHA 前不得启动正式付费 Eval。
+> 状态：受控双运行脚本已由 PR #22 合并，多模式候选差异报告已由 PR #23 合并；价格生效时间硬门禁待当前 PR 合并。在获得包含全部价格与报告门禁的干净、可追溯合并 SHA 前不得启动正式付费 Eval。
 
 ## 1. 目的与边界
 
@@ -26,17 +26,17 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 ## 3. 价格窗口
 
-价格会变化，每次执行前必须重新查看 DeepSeek 官方价格页，并把当次价格、来源和有效截止时间写进命令。不要从旧 Evidence 或本文复制过期价格。
+价格会变化，每次执行前必须重新查看 DeepSeek 官方价格页，并把当次价格、来源、生效时间和有效截止时间写进命令。不要从旧 Evidence 或本文复制过期价格。
 
 截至 2026-09-03，官方页面显示 `deepseek-v4-flash` 的 cache-hit、cache-miss 和 output 价格分峰值与低谷两档；工作日 UTC 01:00–04:00 和 06:00–10:00 为峰值，其余时段为低谷。该信息只是编写手册时的快照，执行者仍须在运行当天复核：
 
 `https://api-docs.deepseek.com/quick_start/pricing/`
 
-脚本默认要求价格窗口至少还剩 240 分钟，以降低 v1 和 v2 落入不同价格档的风险。若时间不足，脚本会在任何 Provider 请求前停止。
+脚本拒绝尚未开始或已经结束的价格窗口，并默认要求窗口至少还剩 240 分钟，以降低 v1 和 v2 落入不同价格档的风险。若窗口无效或时间不足，脚本会在读取 Key 内容和任何 Provider 请求前停止。
 
 ## 4. 预检
 
-以下示例价格仅展示参数格式，执行时必须替换为官网当时有效的值和窗口结束时间。`ExpectedGitCommit` 必须是包含本脚本的合并 commit，不能继续使用 PR #21 的旧 SHA。
+以下示例价格仅展示参数格式，执行时必须替换为官网当时有效的值和窗口开始/结束时间。`ExpectedGitCommit` 必须是包含本脚本的合并 commit，不能继续使用 PR #21 的旧 SHA。
 
 ```powershell
 ./scripts/stage-4-developer-prompt-eval.ps1 `
@@ -47,6 +47,7 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
   -InputUSDPerMillion <cache-miss价格> `
   -CachedInputUSDPerMillion <cache-hit价格> `
   -OutputUSDPerMillion <output价格> `
+  -PricingValidFrom <RFC3339窗口开始时间> `
   -PricingValidUntil <RFC3339窗口结束时间> `
   -MaxCampaignUSD 1.00 `
   -PreflightOnly
@@ -60,7 +61,7 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 - Key 文件存在，但脚本不会显示 Key 内容。
 - v1/v2 Evidence 和报告路径不同，且不会意外覆盖旧文件。
 - 模型和 Reasoning 显示为预期值。
-- 价格有效期至少剩余 240 分钟。
+- 当前时间已经进入所声明的价格窗口，且有效期至少剩余 240 分钟。
 
 ## 5. 正式运行与恢复
 
@@ -77,6 +78,8 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 ```
 
 不要修改 Campaign ID、SHA、Prompt、模型、Reasoning、价格、预算或仓库路径。Eval 自身会再次校验现有 Evidence 配置，拒绝预算或版本漂移。不要手动拼接、复制或编辑原始 Evidence。
+
+早期 Evidence 没有 `pricingValidFrom` 字段，仍可离线读取和审核，但不能续写为本阶段正式候选 Evidence；v1/v2 必须使用包含该字段的新路径共同运行。
 
 ## 6. 完成后的人工门禁
 

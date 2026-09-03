@@ -15,7 +15,7 @@
 - 显式测试只允许数据集固定的 `go`/`npm` 命令，结论取实际进程退出码；测试环境不继承 `OPENAI_API_KEY`。
 - 隐藏测试由 Agent 工作区外的 Private Grader 执行，Agent 不读取 Grader 源码或隐藏测试结果。
 - Observation 支持 `cache_hit_miss`（DeepSeek）和 `cache_read_write`（OpenAI）两种官方计费语义，分开记录普通输入、缓存读取、可选缓存写入、输出和推理 Token，并按各自费率计算真实成本。
-- Evidence 记录 Provider、计费模式、官方价格来源、价格有效截止时间和各项费率；有效期不足以覆盖下一次调用时会在发出付费请求前停止。
+- Evidence 记录 Provider、计费模式、官方价格来源、价格生效/截止时间和各项费率；窗口尚未开始或有效期不足以覆盖下一次调用时会在发出付费请求前停止。
 - 拒绝、超时、审批请求、模型输出错误和测试失败都形成 Observation，不从统计中删除。
 - Evidence 在每个 Case 后通过同目录临时文件、Sync 和原子 Rename 更新；同配置重跑会跳过已记录 Case。
 - 恢复时若 Git、模型、Reasoning、Prompt、Policy、Tool、Fixture 或 Grader 配置变化，会要求使用新的 Evidence 路径。
@@ -29,7 +29,7 @@
 2. Private Grader 工作区干净，并记录精确 Git SHA。
 3. 30 个 Fixture SHA 全部可解析，并记录 Fixture HEAD。
 4. OpenAI-compatible Provider Key 只通过兼容变量 `OPENAI_API_KEY` 从当前进程环境注入；变量名不代表必须使用 OpenAI。
-5. 显式选择 Provider 和计费模式，并提供当前真实价格、官方 HTTPS 来源及 RFC3339 有效截止时间。
+5. 显式选择 Provider 和计费模式，并提供当前真实价格、官方 HTTPS 来源及 RFC3339 生效/截止时间。
 6. `cache_hit_miss` 只接受普通输入、缓存命中和输出价格；`cache_read_write` 还必须提供缓存写入价格。
 7. 三种模式和输出路径合法；原始 Evidence 位于 Git 忽略的 `.forgeflow/evals`。
 
@@ -77,6 +77,7 @@ go run ./cmd/forgeflow eval execute `
   --model deepseek-v4-flash `
   --pricing-mode cache_hit_miss `
   --pricing-source https://api-docs.deepseek.com/quick_start/pricing/ `
+  --pricing-valid-from <当前峰谷价格窗口开始时间，RFC3339> `
   --pricing-valid-until <当前峰谷价格窗口结束时间，RFC3339> `
   --input-usd-per-million <当前缓存未命中价格> `
   --cached-input-usd-per-million <当前缓存命中价格> `

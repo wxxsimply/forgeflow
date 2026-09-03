@@ -114,7 +114,7 @@ func comparisonForCLI(developerPrompt string, priorCost float64) fulleval.Compar
 				PolicyVersion: "policy/v1", ToolVersions: map[string]string{"run_test": "v1"}, GitCommit: "0000000000000000000000000000000000000001",
 				FixtureRepositoryCommit: "0000000000000000000000000000000000000002", GraderCommit: "0000000000000000000000000000000000000003",
 				ExecutionEnvironment: "test", ModelProvider: "deepseek", PricingMode: "cache_hit_miss", PricingSource: "https://example.com/pricing",
-				PricingValidUntil: "2030-01-01T00:00:00Z", PricingUSDPerMTok: map[string]float64{"input": 1, "output": 2}, MaxTotalCostUSD: 1, PriorCostUSD: priorCost,
+				PricingValidFrom: "2029-12-31T00:00:00Z", PricingValidUntil: "2030-01-01T00:00:00Z", PricingUSDPerMTok: map[string]float64{"input": 1, "output": 2}, MaxTotalCostUSD: 1, PriorCostUSD: priorCost,
 			},
 			Total: 30, Passed: 30, Grades: grades,
 			Metrics: fulleval.Metrics{CompletionRate: 1, HiddenTestPassRate: 1, AverageCostUSD: &cost, P95LatencyMS: &latency}, Unavailable: []string{},

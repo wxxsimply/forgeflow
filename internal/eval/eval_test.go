@@ -230,7 +230,7 @@ func candidateComparisonEvidence(dataset Dataset, developerPrompt string, priorC
 			FixtureRepositoryCommit: "0000000000000000000000000000000000000002",
 			GraderCommit:            "0000000000000000000000000000000000000003",
 			ExecutionEnvironment:    "test", ModelProvider: "deepseek", PricingMode: "cache_hit_miss",
-			PricingSource: "https://example.com/pricing", PricingValidUntil: "2030-01-01T00:00:00Z",
+			PricingSource: "https://example.com/pricing", PricingValidFrom: "2029-12-31T00:00:00Z", PricingValidUntil: "2030-01-01T00:00:00Z",
 			PricingUSDPerMTok: map[string]float64{"input": 1, "output": 2}, MaxTotalCostUSD: 20, PriorCostUSD: priorCost,
 		}
 		if mode != ModeSingleAgent {

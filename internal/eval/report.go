@@ -31,6 +31,7 @@ type Configuration struct {
 	ModelProvider           string             `json:"modelProvider,omitempty"`
 	PricingMode             string             `json:"pricingMode,omitempty"`
 	PricingSource           string             `json:"pricingSource,omitempty"`
+	PricingValidFrom        string             `json:"pricingValidFrom,omitempty"`
 	PricingValidUntil       string             `json:"pricingValidUntil,omitempty"`
 	PricingUSDPerMTok       map[string]float64 `json:"pricingUsdPerMTok,omitempty"`
 	MaxTotalCostUSD         float64            `json:"maxTotalCostUsd,omitempty"`
