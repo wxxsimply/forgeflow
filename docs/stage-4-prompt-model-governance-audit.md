@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：治理代码、Developer v2 候选、生产 Eval 绑定、受控双运行、多模式候选差异报告和价格生效窗口门禁已分别由 PR #14、#15、#20、#21、#22、#23、#24 合并并通过四项必需检查；正式候选 Eval 和受控双版本 Promotion/rollback 人工演练尚未执行
+> 状态：治理代码、Developer v2 候选、生产 Eval 绑定、受控双运行、多模式候选差异报告、价格生效窗口门禁和受控治理演练工具已由 PR #14、#15、#20、#21、#22、#23、#24、#25 合并并通过四项必需检查；正式候选 Eval 和受控双版本 Promotion/rollback 人工演练尚未执行
 
 ## 1. 已实现的控制
 
@@ -44,6 +44,8 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 
 价格生效窗口门禁由 PR #24 合并，commit 为 `37d7fb606a2eb9662297875a09a9a2978a1dbfd8`。Eval CLI、Evidence、断点恢复和阶段 4 双运行脚本会在任何 Provider 调用前拒绝尚未生效、已经过期、起止倒置或剩余时长不足的价格窗口；PR 四项必需检查全部成功。
 
+受控 Promotion/rollback 演练工具由 PR #25 合并，commit 为 `27a520cc7d95d28267d5f6aed9ddbfcc65a03f4a`。工具默认只读，Eval 导入、Promotion 与 rollback 使用互不复用的显式确认开关，私有记录不包含凭据或原始 Evidence；PR 四项必需检查全部成功。
+
 ## 4. 合并后人工演练（不得由自动化代签）
 
 1. [x] 人工复核并合并阶段 4 代码与 PostgreSQL 集成测试 PR。
@@ -62,3 +64,4 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 - `developer/v2` 已作为候选新增并保留 `developer/v1`，生产 Eval 绑定也已完成；下一门禁是按 `docs/stage-4-developer-v2-eval-runbook.md` 生成同条件 Eval 对照，再进行真实双版本镜像验收。
 - 没有候选模型变更。
 - Promotion/rollback 的安全操作步骤见 `docs/stage-4-governance-drill-runbook.md`；该工具不会代替正式 Eval、Admin 批准、Worker drain 或人工签署。
+- 当前待合并改动为 API/Worker 健康端点增加构建 Git SHA，并要求治理演练在变更前核对运行镜像身份；合并和 CI 成功前不得将其记为验收通过。

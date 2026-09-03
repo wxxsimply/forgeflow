@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)] [uri]$BaseUri,
     [Parameter(Mandatory = $true)] [string]$Email,
     [Parameter(Mandatory = $true)] [Security.SecureString]$Password,
+    [Parameter(Mandatory = $true)] [ValidatePattern('^[0-9a-fA-F]{40}$')] [string]$ExpectedAPIGitCommit,
     [ValidateSet('Inspect', 'ImportEval', 'Promote', 'Rollback')] [string]$Action = 'Inspect',
     [ValidateSet('planner', 'developer', 'reviewer', 'security')] [string]$Agent = 'developer',
     [string]$PromptVersion,
@@ -10,6 +11,7 @@ param(
     [string]$Comment,
     [string]$EvidencePath,
     [uri]$WorkerReadinessUri,
+    [string]$ExpectedWorkerGitCommit,
     [ValidateSet(200, 503)] [int]$ExpectedReadinessStatus = 200,
     [switch]$AllowInsecureLocalhost,
     [switch]$ConfirmEvalImport,
@@ -57,17 +59,9 @@ function Invoke-ForgeFlow {
     Invoke-WebRequest @parameters
 }
 
-function Get-ReadinessStatus {
+function Get-ReadinessResponse {
     param([uri]$Uri)
-    try {
-        return [int](Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 10).StatusCode
-    }
-    catch {
-        if ($null -ne $_.Exception.Response) {
-            return [int]$_.Exception.Response.StatusCode
-        }
-        throw
-    }
+    Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck
 }
 
 function Get-PromptCatalog {
@@ -97,6 +91,15 @@ if ($BaseUri.Scheme -ne 'https') {
     }
 }
 
+$ExpectedAPIGitCommit = $ExpectedAPIGitCommit.ToLowerInvariant()
+if ($null -ne $WorkerReadinessUri) {
+    if ($ExpectedWorkerGitCommit -notmatch '^[0-9a-fA-F]{40}$') { throw 'WorkerReadinessUri requires a 40-character -ExpectedWorkerGitCommit.' }
+    $ExpectedWorkerGitCommit = $ExpectedWorkerGitCommit.ToLowerInvariant()
+}
+elseif (-not [string]::IsNullOrWhiteSpace($ExpectedWorkerGitCommit)) {
+    throw 'ExpectedWorkerGitCommit may only be used with -WorkerReadinessUri.'
+}
+
 if (($ConfirmEvalImport -and $Action -ne 'ImportEval') -or
     ($ConfirmPromotion -and $Action -ne 'Promote') -or
     ($ConfirmRollback -and $Action -ne 'Rollback')) {
@@ -122,10 +125,11 @@ switch ($Action) {
 }
 
 $result = [ordered]@{
-    schemaVersion = 'forgeflow.governance-drill/v1'
+    schemaVersion = 'forgeflow.governance-drill/v2'
     action = $Action
     recordedAt = (Get-Date).ToUniversalTime().ToString('o')
     baseUri = $origin
+    apiBuild = $null
     operatorId = $null
     workerReadiness = $null
     before = $null
@@ -134,6 +138,11 @@ $result = [ordered]@{
 }
 
 try {
+    $apiHealth = (Invoke-ForgeFlow -Method GET -Path '/healthz').Content | ConvertFrom-Json
+    if ($apiHealth.status -ne 'ok') { throw "API health status is $($apiHealth.status), expected ok." }
+    if ($apiHealth.gitCommit -ne $ExpectedAPIGitCommit) { throw "API Git commit $($apiHealth.gitCommit) does not match expected $ExpectedAPIGitCommit." }
+    $result.apiBuild = [ordered]@{ serviceVersion = $apiHealth.serviceVersion; gitCommit = $apiHealth.gitCommit }
+
     $credential = New-Object System.Management.Automation.PSCredential('unused', $Password)
     $plainPassword = $credential.GetNetworkCredential().Password
     $loginResponse = Invoke-ForgeFlow -Method POST -Path '/api/v1/auth/login' -Body @{ email = $Email; password = $plainPassword; remember = $false }
@@ -156,9 +165,14 @@ try {
         if ($WorkerReadinessUri.Scheme -ne 'https' -and $WorkerReadinessUri.Host -notin @('127.0.0.1', 'localhost', '::1')) {
             throw 'WorkerReadinessUri must use HTTPS unless it targets localhost.'
         }
-        $status = Get-ReadinessStatus $WorkerReadinessUri
-        $result.workerReadiness = [ordered]@{ uri = $WorkerReadinessUri.AbsoluteUri; expectedStatus = $ExpectedReadinessStatus; actualStatus = $status }
+        $readinessResponse = Get-ReadinessResponse $WorkerReadinessUri
+        $readiness = $readinessResponse.Content | ConvertFrom-Json
+        $status = [int]$readinessResponse.StatusCode
+        $result.workerReadiness = [ordered]@{ uri = $WorkerReadinessUri.AbsoluteUri; expectedStatus = $ExpectedReadinessStatus; actualStatus = $status; serviceVersion = $readiness.serviceVersion; gitCommit = $readiness.gitCommit }
+        if ($readiness.gitCommit -ne $ExpectedWorkerGitCommit) { throw "Worker Git commit $($readiness.gitCommit) does not match expected $ExpectedWorkerGitCommit." }
         if ($status -ne $ExpectedReadinessStatus) { throw "Worker readiness returned $status; expected $ExpectedReadinessStatus." }
+        $expectedBodyStatus = if ($ExpectedReadinessStatus -eq 200) { 'ready' } else { 'not_ready' }
+        if ($readiness.status -ne $expectedBodyStatus) { throw "Worker readiness body status is $($readiness.status); expected $expectedBodyStatus." }
     }
 
     switch ($Action) {

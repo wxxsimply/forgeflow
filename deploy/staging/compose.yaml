@@ -57,6 +57,8 @@ services:
       context: ../..
       dockerfile: Dockerfile
       target: cli
+      args:
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     command: ["db", "migrate"]
     read_only: true
     security_opt:
@@ -82,6 +84,8 @@ services:
       context: ../..
       dockerfile: Dockerfile
       target: api
+      args:
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     environment:
       <<: *app-environment
       FORGEFLOW_HTTP_ADDRESS: 0.0.0.0:8080
@@ -124,6 +128,8 @@ services:
       context: ../..
       dockerfile: Dockerfile
       target: worker
+      args:
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     environment:
       <<: *app-environment
       FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/domain"
 	"forgeflow/internal/observability"
 )
@@ -18,15 +19,19 @@ func TestWorkerStatusHandlerExposesHealthAndMetrics(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = telemetry.Shutdown(context.Background()) })
 
+	info := buildinfo.New("0.12.0-rc.1", "abcdef0123456789abcdef0123456789abcdef01")
 	for path, expected := range map[string]string{"/healthz": "\"status\":\"ok\"", "/readyz": "\"status\":\"ready\"", "/metrics": "text/plain"} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		response := httptest.NewRecorder()
-		workerStatusHandler().ServeHTTP(response, request)
+		workerStatusHandler(info).ServeHTTP(response, request)
 		if response.Code != http.StatusOK {
 			t.Fatalf("%s status=%d", path, response.Code)
 		}
 		if path != "/metrics" && !strings.Contains(response.Body.String(), expected) {
 			t.Fatalf("health body=%s", response.Body.String())
+		}
+		if path != "/metrics" && (!strings.Contains(response.Body.String(), info.ServiceVersion) || !strings.Contains(response.Body.String(), info.GitCommit)) {
+			t.Fatalf("health omitted build identity: %s", response.Body.String())
 		}
 		if path == "/metrics" && !strings.Contains(response.Header().Get("Content-Type"), expected) {
 			t.Fatalf("metrics content type=%s", response.Header().Get("Content-Type"))
@@ -35,10 +40,11 @@ func TestWorkerStatusHandlerExposesHealthAndMetrics(t *testing.T) {
 }
 
 func TestWorkerReadinessFailsClosedOnReleaseMismatch(t *testing.T) {
+	info := buildinfo.New("0.12.0-rc.1", "abcdef0123456789abcdef0123456789abcdef01")
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	response := httptest.NewRecorder()
-	workerStatusHandler(func(context.Context) error { return context.Canceled }).ServeHTTP(response, request)
-	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "active_release_mismatch") {
+	workerStatusHandler(info, func(context.Context) error { return context.Canceled }).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "active_release_mismatch") || !strings.Contains(response.Body.String(), info.GitCommit) {
 		t.Fatalf("readiness status=%d body=%s", response.Code, response.Body.String())
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"forgeflow/internal/apperror"
 	"forgeflow/internal/application"
 	"forgeflow/internal/auth"
+	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/controlplane"
 	"forgeflow/internal/domain"
@@ -45,6 +46,8 @@ type Options struct {
 	RepositoryRoots []string
 	MutationLimiter auth.Limiter
 	MetricsEnabled  bool
+	ServiceVersion  string
+	GitCommit       string
 	Governance      *governance.Store
 	Catalog         *governance.Catalog
 }
@@ -88,9 +91,8 @@ func New(options Options) (*Server, error) {
 		return nil, fmt.Errorf("at least one repository root is required")
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
+	info := buildinfo.New(options.ServiceVersion, options.GitCommit)
+	mux.HandleFunc("GET /healthz", healthHandler(info))
 	if options.MetricsEnabled {
 		mux.Handle("GET /metrics", observability.DefaultMetrics().Handler())
 	}
@@ -127,6 +129,12 @@ func New(options Options) (*Server, error) {
 	mux.Handle("POST /api/v1/prompts/{agent}/rollback", s.protected(true, http.HandlerFunc(s.rollbackPrompt)))
 	s.handler = s.requestContext(s.observeHTTP(mux))
 	return s, nil
+}
+
+func healthHandler(info buildinfo.Info) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "serviceVersion": info.ServiceVersion, "gitCommit": info.GitCommit})
+	}
 }
 
 type responseObserver struct {

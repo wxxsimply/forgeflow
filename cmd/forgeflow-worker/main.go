@@ -13,6 +13,7 @@ import (
 
 	"forgeflow/internal/application"
 	"forgeflow/internal/assessment"
+	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
 	"forgeflow/internal/developer"
@@ -150,7 +151,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	go func() { dispatchErrors <- dispatchLoop(ctx, jobQueue, configuration.WorkerPollInterval) }()
 	workerErrors := make(chan error, 1)
 	go func() { workerErrors <- processor.Run(ctx) }()
-	statusServer := &http.Server{Addr: configuration.WorkerMetricsAddress, Handler: workerStatusHandler(releaseReadiness), ReadHeaderTimeout: 3 * time.Second, IdleTimeout: 30 * time.Second}
+	statusServer := &http.Server{Addr: configuration.WorkerMetricsAddress, Handler: workerStatusHandler(buildinfo.New(configuration.ServiceVersion, buildinfo.Commit), releaseReadiness), ReadHeaderTimeout: 3 * time.Second, IdleTimeout: 30 * time.Second}
 	statusErrors := make(chan error, 1)
 	go func() {
 		slog.Info("ForgeFlow worker status server listening", "address", configuration.WorkerMetricsAddress)
@@ -303,25 +304,25 @@ func workerResumeValidator(configuration config.Config, policyVersion string, to
 	})
 }
 
-func workerStatusHandler(readiness ...func(context.Context) error) http.Handler {
+func workerStatusHandler(info buildinfo.Info, readiness ...func(context.Context) error) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "serviceVersion": info.ServiceVersion, "gitCommit": info.GitCommit})
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		if len(readiness) > 0 && readiness[0] != nil {
 			if err := readiness[0](r.Context()); err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(`{"status":"not_ready","reason":"active_release_mismatch"}`))
+				_ = json.NewEncoder(w).Encode(map[string]string{"status": "not_ready", "reason": "active_release_mismatch", "serviceVersion": info.ServiceVersion, "gitCommit": info.GitCommit})
 				return
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ready"}`))
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready", "serviceVersion": info.ServiceVersion, "gitCommit": info.GitCommit})
 	})
 	mux.Handle("GET /metrics", observability.DefaultMetrics().Handler())
 	return mux
