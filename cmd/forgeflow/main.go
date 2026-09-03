@@ -155,6 +155,9 @@ func runEval(ctx context.Context, args []string, configuration config.Config) er
 	if len(args) > 0 && args[0] == "execute" {
 		return runEvalExecute(ctx, args[1:], configuration)
 	}
+	if len(args) > 0 && args[0] == "compare" {
+		return runEvalCompare(args[1:])
+	}
 	set := flag.NewFlagSet("eval", flag.ContinueOnError)
 	suite := set.String("suite", "planner/v1", "eval suite")
 	evidencePath := set.String("evidence", "", "software/v1 evidence JSON")
@@ -241,6 +244,61 @@ func runEval(ctx context.Context, args []string, configuration config.Config) er
 		return apperror.New(apperror.CodeModelOutput, "planner eval suite has failures")
 	}
 	return nil
+}
+
+func runEvalCompare(args []string) error {
+	set := flag.NewFlagSet("eval compare", flag.ContinueOnError)
+	currentPath := set.String("current", "", "current three-mode comparison report JSON")
+	candidatePath := set.String("candidate", "", "candidate three-mode comparison report JSON")
+	format := set.String("format", "json", "candidate comparison format: json or markdown")
+	output := set.String("output", "", "optional candidate comparison output path")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*currentPath) == "" || strings.TrimSpace(*candidatePath) == "" {
+		return apperror.New(apperror.CodeValidation, "--current and --candidate are required")
+	}
+	load := func(path string) (fulleval.ComparisonReport, error) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fulleval.ComparisonReport{}, err
+		}
+		var report fulleval.ComparisonReport
+		if err := json.Unmarshal(data, &report); err != nil {
+			return fulleval.ComparisonReport{}, err
+		}
+		return report, nil
+	}
+	current, err := load(*currentPath)
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.compare.current", "current comparison report is invalid")
+	}
+	candidate, err := load(*candidatePath)
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.compare.candidate", "candidate comparison report is invalid")
+	}
+	report, err := fulleval.BuildCandidateComparison(current, candidate, time.Now())
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.compare", "candidate comparison could not be generated")
+	}
+	var encoded []byte
+	switch *format {
+	case "json":
+		encoded, err = json.MarshalIndent(report, "", "  ")
+	case "markdown":
+		encoded = []byte(report.Markdown())
+	default:
+		return apperror.New(apperror.CodeValidation, "--format must be json or markdown")
+	}
+	if err != nil {
+		return err
+	}
+	encoded = append(encoded, '\n')
+	if *output != "" {
+		return os.WriteFile(*output, encoded, 0o600)
+	}
+	_, err = os.Stdout.Write(encoded)
+	return err
 }
 
 func runEvalExecute(ctx context.Context, args []string, configuration config.Config) error {
@@ -471,37 +529,41 @@ func runPromotion(currentPath, candidatePath string, humanApproved bool) error {
 	if currentPath == "" || candidatePath == "" {
 		return apperror.New(apperror.CodeValidation, "both --promote-current and --promote-candidate are required")
 	}
-	load := func(path string) (fulleval.Report, error) {
+	type promotionInput struct {
+		report     fulleval.Report
+		comparison *fulleval.ComparisonReport
+	}
+	load := func(path string) (promotionInput, error) {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return fulleval.Report{}, err
+			return promotionInput{}, err
 		}
 		var envelope struct {
 			SchemaVersion string `json:"schemaVersion"`
 		}
 		if err := json.Unmarshal(data, &envelope); err != nil {
-			return fulleval.Report{}, err
+			return promotionInput{}, err
 		}
 		switch envelope.SchemaVersion {
 		case "forgeflow.eval.report/v1":
 			var report fulleval.Report
 			if err := json.Unmarshal(data, &report); err != nil {
-				return fulleval.Report{}, err
+				return promotionInput{}, err
 			}
-			return report, nil
+			return promotionInput{report: report}, nil
 		case "forgeflow.eval.comparison/v1":
 			var comparison fulleval.ComparisonReport
 			if err := json.Unmarshal(data, &comparison); err != nil {
-				return fulleval.Report{}, err
+				return promotionInput{}, err
 			}
 			for _, report := range comparison.Reports {
 				if report.Configuration.Mode == fulleval.ModeForgeFlow {
-					return report, nil
+					return promotionInput{report: report, comparison: &comparison}, nil
 				}
 			}
-			return fulleval.Report{}, fmt.Errorf("comparison report has no forgeflow mode")
+			return promotionInput{}, fmt.Errorf("comparison report has no forgeflow mode")
 		default:
-			return fulleval.Report{}, fmt.Errorf("unsupported report schema %q", envelope.SchemaVersion)
+			return promotionInput{}, fmt.Errorf("unsupported report schema %q", envelope.SchemaVersion)
 		}
 	}
 	current, err := load(currentPath)
@@ -512,7 +574,19 @@ func runPromotion(currentPath, candidatePath string, humanApproved bool) error {
 	if err != nil {
 		return apperror.Wrap(err, apperror.CodeValidation, "eval.promotion.candidate", "candidate report is invalid")
 	}
-	decision := fulleval.CheckPromotion(current, candidate, fulleval.DefaultPromotionThresholds())
+	var decision fulleval.PromotionDecision
+	if current.comparison != nil || candidate.comparison != nil {
+		if current.comparison == nil || candidate.comparison == nil {
+			return apperror.New(apperror.CodeValidation, "current and candidate promotion inputs must use the same report schema")
+		}
+		comparison, err := fulleval.BuildCandidateComparison(*current.comparison, *candidate.comparison, time.Now())
+		if err != nil {
+			return apperror.Wrap(err, apperror.CodeValidation, "eval.promotion.comparability", "promotion reports are not comparable")
+		}
+		decision = comparison.PromotionGate
+	} else {
+		decision = fulleval.CheckPromotion(current.report, candidate.report, fulleval.DefaultPromotionThresholds())
+	}
 	if err := printJSON(decision); err != nil {
 		return err
 	}
@@ -688,6 +762,7 @@ Commands:
   eval    --suite software/v1 --validate-only [--limit 6] [--fixture-repository <path>]
   eval    execute --suite software/v1 --fixture-repository <path> --grader-repository <private-path> --modes single_agent,planner_developer,forgeflow [--developer-prompt-version developer/v1] --output <private-evidence.json>
   eval    --suite software/v1 --evidence <file> [--format json|markdown] [--output <file>]
+  eval    compare --current <comparison.json> --candidate <comparison.json> [--format json|markdown] [--output <file>]
   eval    --promote-current <report.json> --promote-candidate <report.json> --approve
   plan    --task <text> [--repository <path>] [--base <ref>] [--mode mock]
   show    --run <runId>

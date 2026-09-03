@@ -71,7 +71,7 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
 - OpenAPI 自动类型生成、前端状态测试、Chromium E2E 和 Axe 无障碍门禁
 - OpenTelemetry HTTP/Run/Node/Model/Tool span、W3C Trace Context 与无 Collector 安全降级
 - Prometheus 低基数指标：Run、节点、模型成本、工具、审批、Queue、认证和 429
-- 固定 30 Case 软件 Eval、隔离的三基线执行器、工作区外私有 Grader、原子断点恢复证据、JSON/Markdown 报告和 Prompt/模型 Promotion 门禁
+- 固定 30 Case 软件 Eval、隔离的三基线执行器、工作区外私有 Grader、原子断点恢复证据、JSON/Markdown 报告、受控 Prompt 候选差异报告和 Promotion 门禁
 - Go 1.26.6 多阶段 API/Worker/CLI 镜像、受 CSP/HSTS 保护的静态 Web 镜像
 - Caddy 自动 HTTPS、内部 Compose 网络、Docker Secret `_FILE` 注入和 API/Worker 权限隔离
 - Prometheus/Alertmanager/OTel Collector、备份校验、隔离恢复演练和 Schema 安全回滚
@@ -158,7 +158,7 @@ go run ./cmd/forgeflow inspect --repository . --base HEAD
 go run ./cmd/forgeflow eval --suite planner/v1
 ```
 
-阶段 10 的完整 30 Case、真实 evidence 报告和 Promotion 命令见 [Observability 与 Eval 说明](./docs/phase-10-observability-eval.md)。
+阶段 10 的完整 30 Case、真实 evidence 报告和 Promotion 命令见 [Observability 与 Eval 说明](./docs/phase-10-observability-eval.md)。Developer Prompt v1/v2 的受控运行见[阶段 4 Eval 操作手册](./docs/stage-4-developer-v2-eval-runbook.md)。
 
 三基线真实执行入口会拒绝脏工作区、缺失 Key、零价格和不干净 Grader，防止无法追溯或虚构成本的运行。原始 Evidence 默认写入已被 Git 忽略的 `.forgeflow/evals`：
 
@@ -183,7 +183,7 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
   --output .forgeflow\evals\evidence.json
 ```
 
-命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，额度不足或价格有效期不足时都不会联系 Provider。预算、此前费用和实际加载的 Developer Prompt 版本会写入 Evidence 配置，配置漂移时不能续写同一路径。候选对照必须分别使用 `--developer-prompt-version developer/v1` 与 `developer/v2`，并写入两个新的私有 Evidence 路径。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
+命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，额度不足或价格有效期不足时都不会联系 Provider。预算、此前费用和实际加载的 Developer Prompt 版本会写入 Evidence 配置，配置漂移时不能续写同一路径。候选对照必须分别使用 `--developer-prompt-version developer/v1` 与 `developer/v2`，并写入两个新的私有 Evidence 路径。`forgeflow eval compare` 会验证两份三模式报告除 Developer Prompt 和累计 campaign cost 外完全可比，输出各模式指标增量及自动 Gate 结果，但不会代替人工批准。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
 Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 
@@ -192,7 +192,7 @@ Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `de
 ./scripts/staging-release.ps1 -Release 0.11.0 -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。当前仓库尚未生成真实三基线报告，因此即使 Staging 工程资产可用，也不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4 的 Developer v2 对照、Promotion/rollback 和公网 Staging 尚未验收，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
@@ -244,4 +244,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～9 的工程实现已经完成，阶段 10/11 的代码与部署资产已落地，但项目尚未达到 `v1.0.0`：需要建立 30 个真实 Eval fixture commit 并采集三基线 evidence，还要在具备域名、Registry 和受限 Secret 的服务器完成 Staging HTTPS、告警、备份恢复、沙箱及回滚演练。准确状态与执行顺序见 [完成度审计](./docs/completion-audit.md)。
+阶段 0～3 已完成，阶段 4 正在完成 Developer Prompt 候选对照和治理演练，后续还需不可变镜像、公网 Staging、运维安全、Production 准备和 `v1.0.0` 发布验收。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。

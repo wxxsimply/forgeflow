@@ -124,9 +124,11 @@ $currentEvidence = Join-Path $evidenceDirectory "$CampaignId-developer-v1.json"
 $candidateEvidence = Join-Path $evidenceDirectory "$CampaignId-developer-v2.json"
 $currentReport = Join-Path $evidenceDirectory "$CampaignId-developer-v1-report.json"
 $candidateReport = Join-Path $evidenceDirectory "$CampaignId-developer-v2-report.json"
+$candidateComparisonJSON = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.json"
+$candidateComparisonMarkdown = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.md"
 
 if (-not $Resume) {
-    foreach ($path in @($currentEvidence, $candidateEvidence, $currentReport, $candidateReport)) {
+    foreach ($path in @($currentEvidence, $candidateEvidence, $currentReport, $candidateReport, $candidateComparisonJSON, $candidateComparisonMarkdown)) {
         if (Test-Path -LiteralPath $path) {
             throw "Refusing to overwrite an existing Eval artifact: $path. Use -Resume only for the same campaign."
         }
@@ -248,10 +250,27 @@ try {
         '--output', $candidateReport
     ) | Out-Null
 
+    Invoke-ForgeFlow -Arguments @(
+        'run', './cmd/forgeflow', 'eval', 'compare',
+        '--current', $currentReport,
+        '--candidate', $candidateReport,
+        '--format', 'json',
+        '--output', $candidateComparisonJSON
+    ) | Out-Null
+    Invoke-ForgeFlow -Arguments @(
+        'run', './cmd/forgeflow', 'eval', 'compare',
+        '--current', $currentReport,
+        '--candidate', $candidateReport,
+        '--format', 'markdown',
+        '--output', $candidateComparisonMarkdown
+    ) | Out-Null
+
     Write-Host 'Both Developer Prompt baselines completed.'
     Write-Host "Shared campaign cost: USD $totalCost"
     Write-Host "Current report: $currentReport"
     Write-Host "Candidate report: $candidateReport"
+    Write-Host "Candidate comparison JSON: $candidateComparisonJSON"
+    Write-Host "Candidate comparison Markdown: $candidateComparisonMarkdown"
     Write-Host 'Do not publish raw Evidence or Private Grader material. Promotion remains a separate human decision.'
 }
 finally {
