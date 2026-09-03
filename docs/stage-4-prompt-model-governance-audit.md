@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：代码门禁已由 PR #14 和 PR #15 合并，并通过四项必需检查；等待受控双版本 Promotion/rollback 人工演练
+> 状态：治理代码、Developer v2 候选和生产 Eval 绑定已分别由 PR #14、#15、#20、#21 合并并通过四项必需检查；等待候选 Eval 和受控双版本 Promotion/rollback 人工演练
 
 ## 1. 已实现的控制
 
@@ -36,6 +36,8 @@
 
 Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f2415980df81`，四项必需检查全部成功；生产默认仍为 `developer/v1`。
 
+生产 Eval Prompt 绑定由 PR #21 合并，commit 为 `76ede9b4e875adf7e9494d7c0c38eb5f767b8de6`，四项必需检查全部成功。执行器会加载实际版本化 Prompt、复用生产响应 Schema，并在 Provider 调用前拒绝 Evidence 配置与实际 Prompt 不一致的运行。
+
 ## 4. 合并后人工演练（不得由自动化代签）
 
 1. [x] 人工复核并合并阶段 4 代码与 PostgreSQL 集成测试 PR。
@@ -51,5 +53,5 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 ## 5. 当前未完成
 
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
-- `developer/v2` 已作为候选新增并保留 `developer/v1`，但仍需 Eval 对照和真实双版本镜像验收；详见 `docs/stage-4-developer-prompt-v2-candidate.md`。
+- `developer/v2` 已作为候选新增并保留 `developer/v1`，生产 Eval 绑定也已完成；下一门禁是按 `docs/stage-4-developer-v2-eval-runbook.md` 生成同条件 Eval 对照，再进行真实双版本镜像验收。
 - 没有候选模型变更。
