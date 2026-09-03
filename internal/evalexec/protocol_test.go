@@ -39,7 +39,7 @@ func TestDevelopUsesConfiguredProductionPromptAndSchema(t *testing.T) {
 	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", OutputText: string(output)}}}
 	pricing := UsagePricing{
 		Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 1, CachedUSDPerMillionTokens: 1,
-		OutputUSDPerMillionTokens: 1, Source: "https://example.com/pricing", ValidUntil: time.Now().UTC().Add(time.Hour),
+		OutputUSDPerMillionTokens: 1, Source: "https://example.com/pricing", ValidFrom: time.Now().UTC().Add(-time.Minute), ValidUntil: time.Now().UTC().Add(time.Hour),
 	}
 	budget, err := NewCostBudget(1, 0)
 	if err != nil {
@@ -139,7 +139,7 @@ func TestMeterRefusesCallBeforeProviderWhenCostBudgetCannotReserveMaximum(t *tes
 		pricing: UsagePricing{
 			Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10,
 			CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30,
-			Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour),
+			Source: "https://example.com/pricing", ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour),
 		},
 		budget: budget,
 		now:    func() time.Time { return now },
@@ -163,7 +163,7 @@ func TestMeterCommitsMeasuredCostToSharedBudget(t *testing.T) {
 	pricing := UsagePricing{
 		Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10,
 		CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30,
-		Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour),
+		Source: "https://example.com/pricing", ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour),
 	}
 	meter := &meter{provider: provider, pricing: pricing, budget: budget, now: func() time.Time { return now }}
 	if _, err := meter.call(context.Background(), model.Request{Model: "test", MaxOutputTokens: 100}, "test", time.Second); err != nil {
@@ -196,7 +196,7 @@ func TestExecutorRequiresCostBudget(t *testing.T) {
 func TestMeterUsesCacheReadWritePrices(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
 	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", Usage: model.Usage{InputTokens: 100, CachedInputTokens: 30, CacheWriteInputTokens: 20, OutputTokens: 20}}}}
-	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheReadWrite, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, CacheWriteUSDPerMillion: 12.5, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheReadWrite, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, CacheWriteUSDPerMillion: 12.5, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
 	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Second); err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestMeterUsesCacheReadWritePrices(t *testing.T) {
 func TestMeterUsesCacheHitMissPrices(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
 	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed", Usage: model.Usage{InputTokens: 100, CachedInputTokens: 40, OutputTokens: 20}}}}
-	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Hour)}, now: func() time.Time { return now }}
 	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Second); err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestMeterUsesCacheHitMissPrices(t *testing.T) {
 func TestMeterRefusesCallOutsidePricingWindow(t *testing.T) {
 	now := time.Unix(100, 0).UTC()
 	provider := &model.FakeProvider{Responses: []model.Response{{Status: "completed"}}}
-	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidUntil: now.Add(time.Second)}, now: func() time.Time { return now }}
+	meter := &meter{provider: provider, pricing: UsagePricing{Mode: PricingModeCacheHitMiss, InputUSDPerMillionTokens: 10, CachedUSDPerMillionTokens: 2, OutputUSDPerMillionTokens: 30, Source: "https://example.com/pricing", ValidFrom: now.Add(-time.Minute), ValidUntil: now.Add(time.Second)}, now: func() time.Time { return now }}
 	if _, err := meter.call(context.Background(), model.Request{Model: "test"}, "test", time.Minute); err == nil {
 		t.Fatal("expected pricing-window rejection")
 	}

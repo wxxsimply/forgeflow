@@ -29,6 +29,9 @@ param(
     [decimal]$OutputUSDPerMillion,
 
     [Parameter(Mandatory = $true)]
+    [datetimeoffset]$PricingValidFrom,
+
+    [Parameter(Mandatory = $true)]
     [datetimeoffset]$PricingValidUntil,
 
     [string]$FixtureRepository = 'D:\fixtures\forgeflow-eval-fixtures',
@@ -113,7 +116,16 @@ if (-not (Test-Path -LiteralPath $KeyFile -PathType Leaf)) {
     throw "DeepSeek API key file does not exist: $KeyFile"
 }
 
-$remainingWindow = $PricingValidUntil.ToUniversalTime() - [datetimeoffset]::UtcNow
+$now = [datetimeoffset]::UtcNow
+$pricingStart = $PricingValidFrom.ToUniversalTime()
+$pricingEnd = $PricingValidUntil.ToUniversalTime()
+if ($pricingEnd -le $pricingStart) {
+    throw 'PricingValidUntil must be later than PricingValidFrom.'
+}
+if ($now -lt $pricingStart) {
+    throw "Pricing window has not started. It begins at $($pricingStart.ToString('o', $InvariantCulture))."
+}
+$remainingWindow = $pricingEnd - $now
 if ($remainingWindow.TotalMinutes -lt $MinimumWindowMinutes) {
     throw "Pricing window has only $([math]::Floor($remainingWindow.TotalMinutes)) minutes remaining; at least $MinimumWindowMinutes are required."
 }
@@ -142,7 +154,8 @@ $inputPrice = ConvertTo-InvariantDecimal $InputUSDPerMillion
 $cachedInputPrice = ConvertTo-InvariantDecimal $CachedInputUSDPerMillion
 $outputPrice = ConvertTo-InvariantDecimal $OutputUSDPerMillion
 $campaignBudget = ConvertTo-InvariantDecimal $MaxCampaignUSD
-$pricingDeadline = $PricingValidUntil.ToUniversalTime().ToString('o', $InvariantCulture)
+$pricingStartText = $pricingStart.ToString('o', $InvariantCulture)
+$pricingDeadline = $pricingEnd.ToString('o', $InvariantCulture)
 
 Write-Host 'Stage 4 Developer Prompt Eval preflight passed.'
 Write-Host "ForgeFlow commit: $expectedGit"
@@ -150,6 +163,7 @@ Write-Host "Fixture commit: $expectedFixture"
 Write-Host "Private Grader commit: $expectedGrader"
 Write-Host "Model/reasoning: $Model / $ReasoningEffort"
 Write-Host "Campaign budget: USD $campaignBudget"
+Write-Host "Pricing valid from: $pricingStartText"
 Write-Host "Pricing valid until: $pricingDeadline"
 Write-Host "Current Evidence: $currentEvidence"
 Write-Host "Candidate Evidence: $candidateEvidence"
@@ -194,6 +208,7 @@ try {
         '--cached-input-usd-per-million', $cachedInputPrice,
         '--output-usd-per-million', $outputPrice,
         '--pricing-source', $PricingSource,
+        '--pricing-valid-from', $pricingStartText,
         '--pricing-valid-until', $pricingDeadline,
         '--max-total-cost-usd', $campaignBudget,
         '--limit', '0'

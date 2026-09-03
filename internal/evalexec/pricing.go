@@ -23,6 +23,7 @@ type UsagePricing struct {
 	CacheWriteUSDPerMillion   float64
 	OutputUSDPerMillionTokens float64
 	Source                    string
+	ValidFrom                 time.Time
 	ValidUntil                time.Time
 }
 
@@ -61,7 +62,10 @@ func (p UsagePricing) Validate(now time.Time) error {
 	if !strings.HasPrefix(strings.TrimSpace(p.Source), "https://") {
 		return fmt.Errorf("pricing source must be an HTTPS URL")
 	}
-	if p.ValidUntil.IsZero() || !p.ValidUntil.After(now) {
+	if p.ValidFrom.IsZero() || now.Before(p.ValidFrom) {
+		return fmt.Errorf("pricing validity start must be set and not be in the future")
+	}
+	if p.ValidUntil.IsZero() || !p.ValidUntil.After(p.ValidFrom) || !p.ValidUntil.After(now) {
 		return fmt.Errorf("pricing validity deadline must be in the future")
 	}
 	return nil

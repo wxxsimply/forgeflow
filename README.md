@@ -173,6 +173,7 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
   --model <固定模型> `
   --pricing-mode <cache_hit_miss-or-cache_read_write> `
   --pricing-source <官方HTTPS价格页> `
+  --pricing-valid-from <RFC3339价格生效时间> `
   --pricing-valid-until <RFC3339价格有效截止时间> `
   --input-usd-per-million <当前真实输入价格> `
   --cached-input-usd-per-million <当前真实缓存输入价格> `
@@ -183,7 +184,7 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
   --output .forgeflow\evals\evidence.json
 ```
 
-命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，额度不足或价格有效期不足时都不会联系 Provider。预算、此前费用和实际加载的 Developer Prompt 版本会写入 Evidence 配置，配置漂移时不能续写同一路径。候选对照必须分别使用 `--developer-prompt-version developer/v1` 与 `developer/v2`，并写入两个新的私有 Evidence 路径。`forgeflow eval compare` 会验证两份三模式报告除 Developer Prompt 和累计 campaign cost 外完全可比，输出各模式指标增量及自动 Gate 结果，但不会代替人工批准。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
+命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，价格窗口尚未开始、额度不足或有效期不足时都不会联系 Provider。预算、此前费用、价格起止时间和实际加载的 Developer Prompt 版本会写入 Evidence 配置，配置漂移时不能续写同一路径。候选对照必须分别使用 `--developer-prompt-version developer/v1` 与 `developer/v2`，并写入两个新的私有 Evidence 路径。`forgeflow eval compare` 会验证两份三模式报告除 Developer Prompt 和累计 campaign cost 外完全可比，输出各模式指标增量及自动 Gate 结果，但不会代替人工批准。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
 Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 

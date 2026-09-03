@@ -323,6 +323,7 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	outputPrice := set.Float64("output-usd-per-million", configuration.PlannerOutputUSDPerMTok, "real output token price in USD per million")
 	pricingMode := set.String("pricing-mode", "", "required pricing mode: cache_hit_miss or cache_read_write")
 	pricingSource := set.String("pricing-source", "", "HTTPS pricing source recorded in evidence")
+	pricingValidFrom := set.String("pricing-valid-from", "", "RFC3339 start when the selected prices become valid")
 	pricingValidUntil := set.String("pricing-valid-until", "", "RFC3339 deadline before the selected prices change")
 	maxTotalCostUSD := set.Float64("max-total-cost-usd", 0, "hard USD ceiling shared by this full eval campaign")
 	priorCostUSD := set.Float64("prior-cost-usd", 0, "authorized campaign cost already spent outside this evidence file")
@@ -342,6 +343,10 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	if !slices.Contains([]string{"openai", "deepseek"}, strings.TrimSpace(*providerName)) {
 		return apperror.New(apperror.CodeValidation, "--provider must be openai or deepseek")
 	}
+	validFrom, err := time.Parse(time.RFC3339, strings.TrimSpace(*pricingValidFrom))
+	if err != nil {
+		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.pricing_start", "--pricing-valid-from must be an RFC3339 timestamp")
+	}
 	validUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(*pricingValidUntil))
 	if err != nil {
 		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.pricing_deadline", "--pricing-valid-until must be an RFC3339 timestamp")
@@ -349,7 +354,8 @@ func runEvalExecute(ctx context.Context, args []string, configuration config.Con
 	pricing := evalexec.UsagePricing{
 		Mode: evalexec.PricingMode(strings.TrimSpace(*pricingMode)), InputUSDPerMillionTokens: *inputPrice,
 		CachedUSDPerMillionTokens: *cachedInputPrice, CacheWriteUSDPerMillion: *cacheWritePrice,
-		OutputUSDPerMillionTokens: *outputPrice, Source: strings.TrimSpace(*pricingSource), ValidUntil: validUntil.UTC(),
+		OutputUSDPerMillionTokens: *outputPrice, Source: strings.TrimSpace(*pricingSource),
+		ValidFrom: validFrom.UTC(), ValidUntil: validUntil.UTC(),
 	}
 	if err := pricing.Validate(time.Now().UTC()); err != nil {
 		return apperror.Wrap(err, apperror.CodeValidation, "eval.execute.pricing", "eval pricing configuration is invalid")
@@ -482,7 +488,7 @@ func evalConfiguration(mode fulleval.Mode, providerName, modelName, reasoningEff
 		GitCommit: gitSHA, FixtureRepositoryCommit: fixtureSHA, GraderCommit: graderSHA,
 		ExecutionEnvironment: runtime.GOOS + "/" + runtime.GOARCH + " " + runtime.Version(),
 		ModelProvider:        providerName, PricingMode: string(pricing.Mode), PricingSource: pricing.Source,
-		PricingValidUntil: pricing.ValidUntil.UTC().Format(time.RFC3339), PricingUSDPerMTok: prices,
+		PricingValidFrom: pricing.ValidFrom.UTC().Format(time.RFC3339), PricingValidUntil: pricing.ValidUntil.UTC().Format(time.RFC3339), PricingUSDPerMTok: prices,
 		MaxTotalCostUSD: maxTotalCostUSD, PriorCostUSD: priorCostUSD,
 	}
 }
