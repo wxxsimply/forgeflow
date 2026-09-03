@@ -10,6 +10,7 @@
 - HTTPS 是默认要求；只有显式传入 `-AllowInsecureLocalhost` 时才允许本机 HTTP 隔离环境。
 - 私有操作记录写入 `.forgeflow/governance-drills`，该目录已被 Git 忽略。
 - 记录只包含操作者 ID、Eval/Release ID、Prompt SHA、模型、时间和 Readiness 状态，不保存密码、CSRF、原始 Evidence、任务正文、源码、模型输出或隐藏测试。
+- API 和 Worker 必须返回构建时注入的 40 位 Git SHA；`unknown`、分支名和短 SHA 均不能用于治理变更。
 - 脚本不负责启动、停止或 drain Worker，不自动决定 Promotion，也不生成或代签人工结论。
 
 ## 2. 前置条件
@@ -24,10 +25,12 @@
 
 ```powershell
 $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
+$releaseCommit = '<40位已批准合并SHA>'
 ./scripts/stage-4-governance-drill.ps1 `
   -BaseUri https://<staging-domain> `
   -Email <admin-email> `
   -Password $adminPassword `
+  -ExpectedAPIGitCommit $releaseCommit `
   -Action Inspect
 ```
 
@@ -42,6 +45,7 @@ $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
   -BaseUri https://<staging-domain> `
   -Email <admin-email> `
   -Password $adminPassword `
+  -ExpectedAPIGitCommit $releaseCommit `
   -Action ImportEval `
   -EvidencePath .forgeflow/evals/<approved-v2-evidence>.json `
   -ConfirmEvalImport
@@ -60,6 +64,7 @@ $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
   -BaseUri https://<staging-domain> `
   -Email <admin-email> `
   -Password $adminPassword `
+  -ExpectedAPIGitCommit $releaseCommit `
   -Action Promote `
   -Agent developer `
   -PromptVersion developer/v2 `
@@ -77,8 +82,10 @@ $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
   -BaseUri https://<staging-domain> `
   -Email <admin-email> `
   -Password $adminPassword `
+  -ExpectedAPIGitCommit $releaseCommit `
   -Action Inspect `
   -WorkerReadinessUri https://<worker-readiness-endpoint>/readyz `
+  -ExpectedWorkerGitCommit $releaseCommit `
   -ExpectedReadinessStatus 200
 ```
 
@@ -95,6 +102,14 @@ $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
 
 检查 503 时可把本机或安全内网 Readiness URI 传给脚本，并使用 `-ExpectedReadinessStatus 503`。脚本只验证状态，不改变 Worker 配置。
 
+正式镜像必须通过 `scripts/staging-release.ps1` 从干净 Git worktree 构建；该脚本会把完整 HEAD 同时注入 Go 二进制和 OCI `org.opencontainers.image.revision` 标签。若在隔离环境直接构建二进制，必须显式使用：
+
+```powershell
+$releaseCommit = git rev-parse HEAD
+go build -trimpath -ldflags "-X forgeflow/internal/buildinfo.Commit=$releaseCommit" -o bin/forgeflow-api ./cmd/forgeflow-api
+go build -trimpath -ldflags "-X forgeflow/internal/buildinfo.Commit=$releaseCommit" -o bin/forgeflow-worker ./cmd/forgeflow-worker
+```
+
 ## 7. Rollback
 
 `TargetReleaseId` 必须是 Promotion 前保存的旧 Developer Release ID，而不是刚创建的 v2 Release ID。先 drain Worker，再执行：
@@ -104,6 +119,7 @@ $adminPassword = Read-Host 'ForgeFlow Admin password' -AsSecureString
   -BaseUri https://<staging-domain> `
   -Email <admin-email> `
   -Password $adminPassword `
+  -ExpectedAPIGitCommit $releaseCommit `
   -Action Rollback `
   -Agent developer `
   -TargetReleaseId <old-developer-v1-release-id> `

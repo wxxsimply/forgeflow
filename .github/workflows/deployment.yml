@@ -24,6 +24,7 @@ jobs:
           printf '%s' 'https://example.invalid/forgeflow-alert' > deploy/staging/secrets/alert_webhook_url
           cat > .cache/staging-ci.env <<EOF
           FORGEFLOW_RELEASE=0.0.0-ci
+          FORGEFLOW_GIT_COMMIT=${GITHUB_SHA}
           FORGEFLOW_DOMAIN=forgeflow-ci.example.invalid
           ACME_EMAIL=ci@example.invalid
           FORGEFLOW_REPOSITORY_PATH=${GITHUB_WORKSPACE}
@@ -52,8 +53,8 @@ jobs:
       - name: Build OCI images with attestations
         run: |
           mkdir -p .cache/oci
-          docker buildx build --provenance=true --sbom=true --target api -t forgeflow-api:ci --output=type=oci,dest=.cache/oci/forgeflow-api.tar .
-          docker buildx build --provenance=true --sbom=true --target worker -t forgeflow-worker:ci --output=type=oci,dest=.cache/oci/forgeflow-worker.tar .
+          docker buildx build --provenance=true --sbom=true --build-arg FORGEFLOW_GIT_COMMIT=${GITHUB_SHA} --target api -t forgeflow-api:ci --output=type=oci,dest=.cache/oci/forgeflow-api.tar .
+          docker buildx build --provenance=true --sbom=true --build-arg FORGEFLOW_GIT_COMMIT=${GITHUB_SHA} --target worker -t forgeflow-worker:ci --output=type=oci,dest=.cache/oci/forgeflow-worker.tar .
           docker buildx build --provenance=true --sbom=true --target web -f web/Dockerfile -t forgeflow-web:ci --output=type=oci,dest=.cache/oci/forgeflow-web.tar .
           docker buildx build --provenance=true --sbom=true -t forgeflow-caddy:ci --output=type=oci,dest=.cache/oci/forgeflow-caddy.tar deploy/staging/caddy
           docker buildx build --provenance=true --sbom=true -t forgeflow-sandbox:ci --output=type=oci,dest=.cache/oci/forgeflow-sandbox.tar deploy/sandbox

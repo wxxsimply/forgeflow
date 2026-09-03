@@ -7,11 +7,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $ConfirmDeploy) { throw "Staging release requires -ConfirmDeploy" }
 $workspace = Split-Path -Parent $PSScriptRoot
 $deployDirectory = Join-Path $workspace "deploy/staging"
 $compose = Join-Path $deployDirectory "compose.yaml"
 $resolvedEnv = [System.IO.Path]::GetFullPath((Join-Path $workspace $EnvFile))
-& (Join-Path $PSScriptRoot 'staging-preflight.ps1') -EnvFile $EnvFile -IncludeOpenAI:$IncludeOpenAI -IncludeBootstrap:$IncludeBootstrap
+$gitCommit = (& git -C $workspace rev-parse HEAD 2>$null)
+if ($LASTEXITCODE -ne 0 -or $gitCommit -notmatch '^[0-9a-f]{40}$') { throw "Release requires a committed 40-character Git HEAD" }
+$gitStatus = (& git -C $workspace status --porcelain)
+if ($LASTEXITCODE -ne 0 -or $gitStatus) { throw "Release requires a clean Git worktree" }
 
 $files = @('-f', $compose)
 if ($IncludeOpenAI) { $files += @('-f', (Join-Path $deployDirectory 'compose.openai.yaml')) }
@@ -23,8 +27,11 @@ $previousRelease = $null
 if (Test-Path -LiteralPath $currentPath) { $previousRelease = (Get-Content -Raw -LiteralPath $currentPath | ConvertFrom-Json).release }
 
 $previousEnvironmentRelease = $env:FORGEFLOW_RELEASE
+$previousEnvironmentGitCommit = $env:FORGEFLOW_GIT_COMMIT
 try {
     $env:FORGEFLOW_RELEASE = $Release
+    $env:FORGEFLOW_GIT_COMMIT = $gitCommit
+    & (Join-Path $PSScriptRoot 'staging-preflight.ps1') -EnvFile $EnvFile -IncludeOpenAI:$IncludeOpenAI -IncludeBootstrap:$IncludeBootstrap
     Push-Location $deployDirectory
     try {
         docker compose --env-file $resolvedEnv @files build api worker web migrate caddy
@@ -36,8 +43,6 @@ try {
     }
     finally { Pop-Location }
 
-    $gitCommit = (& git -C $workspace rev-parse HEAD 2>$null)
-    if (-not $gitCommit) { throw "Release manifest requires a committed Git HEAD" }
     $manifest = [ordered]@{
         schemaVersion = 'forgeflow.release/v1'
         release = $Release
@@ -53,4 +58,7 @@ try {
     Write-Host "Staging release $Release deployed. Manifest: $manifestPath"
     if ($IncludeBootstrap) { Write-Warning "Remove compose.bootstrap.yaml from subsequent starts and delete bootstrap_admin_password now." }
 }
-finally { $env:FORGEFLOW_RELEASE = $previousEnvironmentRelease }
+finally {
+    $env:FORGEFLOW_RELEASE = $previousEnvironmentRelease
+    $env:FORGEFLOW_GIT_COMMIT = $previousEnvironmentGitCommit
+}
