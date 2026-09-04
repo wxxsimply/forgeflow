@@ -150,6 +150,37 @@ func BuildReport(dataset Dataset, evidence Evidence, now time.Time) (Report, err
 	return report, nil
 }
 
+// BuildSmokeReport grades a non-empty, incomplete subset of the fixed dataset.
+// Its distinct schema is intentionally rejected by promotion inputs.
+func BuildSmokeReport(dataset Dataset, evidence Evidence, now time.Time) (Report, error) {
+	if len(evidence.Observations) == 0 || len(evidence.Observations) >= len(dataset.Cases) {
+		return Report{}, fmt.Errorf("smoke report requires between 1 and %d observations", len(dataset.Cases)-1)
+	}
+	selected := make(map[string]struct{}, len(evidence.Observations))
+	for _, observation := range evidence.Observations {
+		if _, duplicate := selected[observation.CaseID]; duplicate {
+			return Report{}, fmt.Errorf("duplicate observation for %q", observation.CaseID)
+		}
+		selected[observation.CaseID] = struct{}{}
+	}
+	subset := dataset
+	subset.Cases = make([]Case, 0, len(selected))
+	for _, evalCase := range dataset.Cases {
+		if _, ok := selected[evalCase.ID]; ok {
+			subset.Cases = append(subset.Cases, evalCase)
+		}
+	}
+	if len(subset.Cases) != len(selected) {
+		return Report{}, fmt.Errorf("smoke evidence contains an unknown case")
+	}
+	report, err := BuildReport(subset, evidence, now)
+	if err != nil {
+		return Report{}, err
+	}
+	report.SchemaVersion = "forgeflow.eval.smoke-report/v1"
+	return report, nil
+}
+
 func BuildComparison(dataset Dataset, evidenceFile EvidenceFile, now time.Time) (ComparisonReport, error) {
 	if len(evidenceFile.Runs) != 3 {
 		return ComparisonReport{}, fmt.Errorf("comparison requires exactly three baseline runs")

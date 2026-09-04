@@ -95,6 +95,17 @@ func TestEvalCompareAndPromotionEnforceComparableCampaigns(t *testing.T) {
 	}
 }
 
+func TestPromotionRejectsSmokeReport(t *testing.T) {
+	directory := t.TempDir()
+	smokePath := filepath.Join(directory, "smoke.json")
+	if err := os.WriteFile(smokePath, []byte(`{"schemaVersion":"forgeflow.eval.smoke-report/v1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := runPromotion(smokePath, smokePath, true); !apperror.IsCode(err, apperror.CodeValidation) {
+		t.Fatalf("promotion error=%v", err)
+	}
+}
+
 func comparisonForCLI(developerPrompt string, priorCost float64) fulleval.ComparisonReport {
 	reports := make([]fulleval.Report, 0, 3)
 	for _, mode := range []fulleval.Mode{fulleval.ModeSingleAgent, fulleval.ModePlannerDeveloper, fulleval.ModeForgeFlow} {
