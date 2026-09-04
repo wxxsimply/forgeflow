@@ -65,7 +65,25 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 - 模型和 Reasoning 显示为预期值。
 - 当前时间已经进入所声明的价格窗口，且有效期至少剩余 240 分钟。
 
-## 5. 正式运行与恢复
+## 5. 10 分钟内的候选快速筛查
+
+在正式 180 Observation 对照前，先运行快速 smoke。默认仅选择数据集顺序固定的第 1 个 Fixture，并分别用 `developer/v1` 与候选 Prompt 执行 `planner_developer`，合计 2 个 Observation。这个模式能实际覆盖 Developer Prompt；`single_agent` 不加载 Developer Prompt，因此不用于本轮快速筛查。
+
+在第 4 节命令中增加以下参数即可先做无费用预检：
+
+```powershell
+-SmokeOnly `
+-SmokeCaseLimit 1 `
+-PreflightOnly
+```
+
+人工核对输出后移除 `-PreflightOnly` 并增加 `-ConfirmPaidEval`。快速模式把模型调用超时限制为 45 秒、命令超时限制为 60 秒。每个 `planner_developer` Case 最多包含两次模型调用和一次验证命令，因此默认 2 个 Observation 的最坏超时预算约为 5 分钟，并为 Go 首次编译与本机开销预留余量，目标在 10 分钟内完成。Provider 排队或进程清理仍可能造成少量额外耗时，因此这不是绝对的墙钟保证。`-SmokeCaseLimit 2` 可扩大为 4 个 Observation，但不再承诺 10 分钟目标。
+
+快速结果写入 `.forgeflow/evals/<CampaignId>-smoke/`，汇总使用 `forgeflow.eval.smoke-campaign/v1`，单 Prompt 报告使用 `forgeflow.eval.smoke-report/v1`，并明确写入 `promotionEligible: false`。Promotion CLI 会拒绝该 schema。快速 smoke 只能用于尽早发现明显失败、超时或成本异常，不能替代正式对照、自动 Gate 或 Admin 人工签署；候选通过 smoke 后，仍必须完成 30 Case × 3 Mode × 2 Prompt 的 180 Observation 正式 Eval。
+
+快速模式不支持 `-Resume`，并拒绝覆盖已有 Campaign 目录；重试时使用新的 `CampaignId`，保留旧 Evidence 供私下诊断。
+
+## 6. 正式运行与恢复
 
 人工复核预检输出后，使用完全相同的参数移除 `-PreflightOnly`，增加：
 
@@ -83,7 +101,7 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 早期 Evidence 没有 `pricingValidFrom` 字段，仍可离线读取和审核，但不能续写为正式候选 Evidence；当前版和候选版必须使用包含该字段的新路径共同运行。
 
-## 6. 完成后的人工门禁
+## 7. 完成后的人工门禁
 
 脚本只有在 v1 和候选版都得到三种模式各 30 个完整 Observation 后，才生成两份私有三模式报告，以及 JSON/Markdown 两种格式的候选差异报告。差异报告会拒绝模型、Reasoning、代码、Fixture、Grader、Policy、Tool、执行环境、价格或预算漂移，只允许 Developer Prompt version 和累计 campaign cost 不同；它会列出三种模式的指标增量和现有 ForgeFlow Promotion Gate 结果，但不会代替人工批准。后续使用三模式报告调用 Promotion CLI 时会再次执行同一可比性校验，不能绕过。完成后：
 

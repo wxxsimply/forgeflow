@@ -158,7 +158,7 @@ go run ./cmd/forgeflow inspect --repository . --base HEAD
 go run ./cmd/forgeflow eval --suite planner/v1
 ```
 
-阶段 10 的完整 30 Case、真实 evidence 报告和 Promotion 命令见 [Observability 与 Eval 说明](./docs/phase-10-observability-eval.md)。Developer Prompt 候选的受控运行见[阶段 4 Eval 操作手册](./docs/stage-4-developer-v2-eval-runbook.md)。
+阶段 10 的完整 30 Case、真实 evidence 报告和 Promotion 命令见 [Observability 与 Eval 说明](./docs/phase-10-observability-eval.md)。Developer Prompt 候选的受控运行见[阶段 4 Eval 操作手册](./docs/stage-4-developer-v2-eval-runbook.md)；可先用 `-SmokeOnly -SmokeCaseLimit 1` 执行默认 2 Observation、目标 10 分钟内完成的候选筛查，正式 Promotion 仍要求完整 180 Observation 对照。
 
 三基线真实执行入口会拒绝脏工作区、缺失 Key、零价格和不干净 Grader，防止无法追溯或虚构成本的运行。原始 Evidence 默认写入已被 Git 忽略的 `.forgeflow/evals`：
 

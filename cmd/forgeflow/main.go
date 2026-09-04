@@ -163,6 +163,7 @@ func runEval(ctx context.Context, args []string, configuration config.Config) er
 	evidencePath := set.String("evidence", "", "software/v1 evidence JSON")
 	format := set.String("format", "json", "report format: json or markdown")
 	output := set.String("output", "", "optional report output path")
+	smokeReport := set.Bool("smoke-report", false, "grade one incomplete run as a non-promotable smoke report")
 	validateOnly := set.Bool("validate-only", false, "validate the fixed dataset without grading evidence")
 	fixtureRepository := set.String("fixture-repository", "", "verify every fixture commit in this Git repository")
 	limit := set.Int("limit", 0, "number of cases checked in validation mode (0 means all)")
@@ -209,6 +210,28 @@ func runEval(ctx context.Context, args []string, configuration config.Config) er
 		evidence, err := fulleval.DecodeEvidence(data)
 		if err != nil {
 			return apperror.Wrap(err, apperror.CodeValidation, "eval.evidence.decode", "eval evidence is invalid")
+		}
+		if *smokeReport {
+			if *format != "json" {
+				return apperror.New(apperror.CodeValidation, "--smoke-report supports only json format")
+			}
+			if len(evidence.Runs) != 1 {
+				return apperror.New(apperror.CodeValidation, "--smoke-report requires evidence with exactly one run")
+			}
+			report, err := fulleval.BuildSmokeReport(dataset, evidence.Runs[0], time.Now())
+			if err != nil {
+				return apperror.Wrap(err, apperror.CodeValidation, "eval.smoke-report", "smoke report could not be generated")
+			}
+			encoded, err := json.MarshalIndent(report, "", "  ")
+			if err != nil {
+				return err
+			}
+			encoded = append(encoded, '\n')
+			if *output != "" {
+				return os.WriteFile(*output, encoded, 0o600)
+			}
+			_, err = os.Stdout.Write(encoded)
+			return err
 		}
 		report, err := fulleval.BuildComparison(dataset, evidence, time.Now())
 		if err != nil {

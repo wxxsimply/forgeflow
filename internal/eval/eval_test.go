@@ -52,6 +52,25 @@ func TestReportDoesNotFabricateMissingCostOrLatency(t *testing.T) {
 	}
 }
 
+func TestBuildSmokeReportIsPartialAndNonPromotable(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence := evidenceFor(dataset, ModePlannerDeveloper, true)
+	evidence.Observations = evidence.Observations[:2]
+	report, err := BuildSmokeReport(dataset, evidence, time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.SchemaVersion != "forgeflow.eval.smoke-report/v1" || report.Total != 2 || len(report.Grades) != 2 {
+		t.Fatalf("report=%+v", report)
+	}
+	if _, err := BuildSmokeReport(dataset, Evidence{Dataset: dataset.Name}, time.Unix(1, 0)); err == nil {
+		t.Fatal("empty smoke evidence was accepted")
+	}
+}
+
 func TestComparisonRequiresAllThreeModes(t *testing.T) {
 	dataset, err := Load(SoftwareV1)
 	if err != nil {

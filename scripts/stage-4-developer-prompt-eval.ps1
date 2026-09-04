@@ -49,6 +49,9 @@ param(
     [decimal]$MaxCampaignUSD = 1.00,
     [ValidateRange(1, 1440)]
     [int]$MinimumWindowMinutes = 240,
+    [ValidateRange(1, 2)]
+    [int]$SmokeCaseLimit = 1,
+    [switch]$SmokeOnly,
     [switch]$PreflightOnly,
     [switch]$Resume,
     [switch]$ConfirmPaidEval
@@ -112,6 +115,9 @@ $expectedGrader = $ExpectedGraderCommit.ToLowerInvariant()
 if ($CandidatePromptVersion -eq 'developer/v1') {
     throw 'CandidatePromptVersion must differ from the current developer/v1 baseline.'
 }
+if ($SmokeOnly -and $Resume) {
+    throw 'SmokeOnly does not support Resume. Use a new CampaignId or remove the existing smoke artifacts.'
+}
 $candidatePromptSlug = $CandidatePromptVersion.Replace('/', '-')
 $candidatePromptDirectory = Join-Path $RepositoryRoot (Join-Path 'internal\developer\prompts' $CandidatePromptVersion)
 foreach ($promptFile in @('system.txt', 'user.tmpl')) {
@@ -150,8 +156,15 @@ $currentReport = Join-Path $evidenceDirectory "$CampaignId-developer-v1-report.j
 $candidateReport = Join-Path $evidenceDirectory "$CampaignId-$candidatePromptSlug-report.json"
 $candidateComparisonJSON = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.json"
 $candidateComparisonMarkdown = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.md"
+$smokeDirectory = Join-Path $evidenceDirectory "$CampaignId-smoke"
+$smokeSummaryJSON = Join-Path $smokeDirectory 'summary.json'
 
-if (-not $Resume) {
+if ($SmokeOnly) {
+    if (Test-Path -LiteralPath $smokeDirectory) {
+        throw "Refusing to overwrite an existing smoke campaign: $smokeDirectory. Use a new CampaignId."
+    }
+}
+elseif (-not $Resume) {
     foreach ($path in @($currentEvidence, $candidateEvidence, $currentReport, $candidateReport, $candidateComparisonJSON, $candidateComparisonMarkdown)) {
         if (Test-Path -LiteralPath $path) {
             throw "Refusing to overwrite an existing Eval artifact: $path. Use -Resume only for the same campaign."
@@ -178,8 +191,17 @@ Write-Host "Candidate Developer Prompt: $CandidatePromptVersion"
 Write-Host "Campaign budget: USD $campaignBudget"
 Write-Host "Pricing valid from: $pricingStartText"
 Write-Host "Pricing valid until: $pricingDeadline"
-Write-Host "Current Evidence: $currentEvidence"
-Write-Host "Candidate Evidence: $candidateEvidence"
+if ($SmokeOnly) {
+    Write-Host "Execution profile: fast smoke ($SmokeCaseLimit cases per prompt, planner_developer only)"
+    Write-Host "Smoke observations: $($SmokeCaseLimit * 2)"
+    Write-Host "Smoke output: $smokeDirectory"
+    Write-Host 'Smoke results are screening evidence only and cannot be used for Promotion.'
+}
+else {
+    Write-Host 'Execution profile: formal Eval (30 cases x 3 modes x 2 prompts)'
+    Write-Host "Current Evidence: $currentEvidence"
+    Write-Host "Candidate Evidence: $candidateEvidence"
+}
 
 if ($PreflightOnly) {
     Write-Host 'Preflight-only mode: no provider request was sent.'
@@ -202,19 +224,20 @@ try {
     }
     $env:OPENAI_API_KEY = $apiKey
     $env:FORGEFLOW_OPENAI_BASE_URL = 'https://api.deepseek.com'
+    $callTimeout = if ($SmokeOnly) { '45s' } else { '5m' }
+    $commandTimeout = if ($SmokeOnly) { '60s' } else { '5m' }
 
     $commonArguments = @(
         'run', './cmd/forgeflow', 'eval', 'execute',
         '--suite', 'software/v1',
         '--fixture-repository', $FixtureRepository,
         '--grader-repository', $GraderRepository,
-        '--modes', 'single_agent,planner_developer,forgeflow',
         '--provider', 'deepseek',
         '--model', $Model,
         '--reasoning-effort', $ReasoningEffort,
         '--max-output-tokens', '16000',
-        '--call-timeout', '5m',
-        '--command-timeout', '5m',
+        '--call-timeout', $callTimeout,
+        '--command-timeout', $commandTimeout,
         '--context-max-bytes', '131072',
         '--pricing-mode', 'cache_hit_miss',
         '--input-usd-per-million', $inputPrice,
@@ -223,18 +246,95 @@ try {
         '--pricing-source', $PricingSource,
         '--pricing-valid-from', $pricingStartText,
         '--pricing-valid-until', $pricingDeadline,
-        '--max-total-cost-usd', $campaignBudget,
-        '--limit', '0'
+        '--max-total-cost-usd', $campaignBudget
     )
 
     Push-Location $RepositoryRoot
     $locationPushed = $true
+    if ($SmokeOnly) {
+        New-Item -ItemType Directory -Force -Path $smokeDirectory | Out-Null
+        $priorCost = [decimal]0
+        $smokeRows = @()
+        foreach ($promptVersion in @('developer/v1', $CandidatePromptVersion)) {
+            $promptSlug = $promptVersion.Replace('/', '-')
+            $smokeEvidence = Join-Path $smokeDirectory "$promptSlug-planner-developer.json"
+            Write-Host "Running fast smoke for $promptVersion ($SmokeCaseLimit cases)..."
+            $smokeJSON = Invoke-ForgeFlow -Arguments ($commonArguments + @(
+                '--modes', 'planner_developer',
+                '--developer-prompt-version', $promptVersion,
+                '--output', $smokeEvidence,
+                '--workspace-root', (Join-Path $workspaceDirectory "$CampaignId-smoke-$promptSlug"),
+                '--prior-cost-usd', (ConvertTo-InvariantDecimal $priorCost),
+                '--limit', $SmokeCaseLimit.ToString($InvariantCulture)
+            ))
+            $smokeResult = $smokeJSON | ConvertFrom-Json
+            if ($null -eq $smokeResult.campaignCostUsd) {
+                throw "$promptVersion smoke result did not include campaignCostUsd."
+            }
+            if ([int]$smokeResult.observations -ne $SmokeCaseLimit) {
+                throw "$promptVersion smoke produced $($smokeResult.observations) observations; expected $SmokeCaseLimit."
+            }
+
+            $smokeReportJSON = Invoke-ForgeFlow -Arguments @(
+                'run', './cmd/forgeflow', 'eval',
+                '--suite', 'software/v1',
+                '--evidence', $smokeEvidence,
+                '--smoke-report',
+                '--format', 'json'
+            )
+            $smokeReport = $smokeReportJSON | ConvertFrom-Json
+            if ($smokeReport.schemaVersion -ne 'forgeflow.eval.smoke-report/v1') {
+                throw "$promptVersion produced an unexpected smoke report schema."
+            }
+            $smokeRows += [pscustomobject][ordered]@{
+                promptVersion = $promptVersion
+                mode = 'planner_developer'
+                cases = [int]$smokeReport.total
+                passed = [int]$smokeReport.passed
+                completionRate = $smokeReport.metrics.completionRate
+                hiddenTestPassRate = $smokeReport.metrics.hiddenTestPassRate
+                regressionRate = $smokeReport.metrics.regressionRate
+                humanInterventionRate = $smokeReport.metrics.humanInterventionRate
+                averageCostUsd = $smokeReport.metrics.averageCostUsd
+                p95LatencyMs = $smokeReport.metrics.p95LatencyMs
+            }
+            $priorCost = [decimal]$smokeResult.campaignCostUsd
+        }
+
+        $smokeSummary = [ordered]@{
+            schemaVersion = 'forgeflow.eval.smoke-campaign/v1'
+            promotionEligible = $false
+            campaignId = $CampaignId
+            currentPromptVersion = 'developer/v1'
+            candidatePromptVersion = $CandidatePromptVersion
+            casesPerPrompt = $SmokeCaseLimit
+            mode = 'planner_developer'
+            observations = $SmokeCaseLimit * 2
+            campaignCostUsd = $priorCost
+            results = $smokeRows
+        }
+        [System.IO.File]::WriteAllText(
+            $smokeSummaryJSON,
+            (($smokeSummary | ConvertTo-Json -Depth 8) + "`n"),
+            [System.Text.UTF8Encoding]::new($false)
+        )
+
+        Write-Host 'Fast smoke completed.'
+        Write-Host "Observations: $($SmokeCaseLimit * 2)"
+        Write-Host "Shared campaign cost: USD $(ConvertTo-InvariantDecimal $priorCost)"
+        Write-Host "Summary: $smokeSummaryJSON"
+        Write-Host 'Smoke reports are not Promotion evidence. A formal 180-observation Eval is still required before Promotion.'
+        return
+    }
+
     Write-Host 'Running the production current baseline with developer/v1...'
     $currentJSON = Invoke-ForgeFlow -Arguments ($commonArguments + @(
+        '--modes', 'single_agent,planner_developer,forgeflow',
         '--developer-prompt-version', 'developer/v1',
         '--output', $currentEvidence,
         '--workspace-root', (Join-Path $workspaceDirectory "$CampaignId-developer-v1"),
-        '--prior-cost-usd', '0'
+        '--prior-cost-usd', '0',
+        '--limit', '0'
     ))
     $currentResult = $currentJSON | ConvertFrom-Json
     if ($null -eq $currentResult.campaignCostUsd) {
@@ -256,10 +356,12 @@ try {
     Write-Host "Current baseline complete. Shared campaign cost so far: USD $currentCost"
     Write-Host "Running the candidate baseline with $CandidatePromptVersion..."
     $candidateJSON = Invoke-ForgeFlow -Arguments ($commonArguments + @(
+        '--modes', 'single_agent,planner_developer,forgeflow',
         '--developer-prompt-version', $CandidatePromptVersion,
         '--output', $candidateEvidence,
         '--workspace-root', (Join-Path $workspaceDirectory "$CampaignId-$candidatePromptSlug"),
-        '--prior-cost-usd', $currentCost
+        '--prior-cost-usd', $currentCost,
+        '--limit', '0'
     ))
     $candidateResult = $candidateJSON | ConvertFrom-Json
     if ($null -eq $candidateResult.campaignCostUsd) {

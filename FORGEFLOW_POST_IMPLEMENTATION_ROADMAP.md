@@ -426,7 +426,7 @@ go run ./cmd/forgeflow eval `
 
 ## 8. 阶段 4：完善 Prompt 和模型发布治理
 
-> 当前状态：进行中（2026-09-01 开始；截至 2026-09-04，治理和运行时身份已合并，v1/v2 正式 Eval 已完成但自动 Gate 阻断 v2，正在准备不可变 v3 候选）
+> 当前状态：进行中（2026-09-01 开始；截至 2026-09-05，治理和运行时身份已合并，v1/v2 正式 Eval 已完成但自动 Gate 阻断 v2，不可变 v3 候选已合并；v1/v3 正式对照前先使用不可晋级的快速 smoke 筛查）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
 > 本阶段目标：让数据库治理记录、镜像内版本和 Worker 实际运行版本保持一致。
 
@@ -915,11 +915,11 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #14/#15/#20/#21/#22/#23/#24/#25/#26 已合并且四项必需检查通过；v1/v2 正式 Eval 已完成 180 个终态 Observation，自动 Gate 阻断 v2；正在准备 `developer/v3`，随后执行 v1/v3 正式 Eval、Admin 人工批准和双版本 Promotion/rollback 演练 |
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #14/#15/#20/#21/#22/#23/#24/#25/#26/#27 已合并且四项必需检查通过；v1/v2 正式 Eval 已完成 180 个终态 Observation，自动 Gate 阻断 v2；`developer/v3` 已合并，先执行默认 2 Observation 的不可晋级 smoke，再执行 v1/v3 正式 Eval、Admin 人工批准和双版本 Promotion/rollback 演练 |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
 | 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，仓库所有者已签署 `APPROVED AS BASELINE`。PR #14/#15/#20/#21/#22/#23/#24/#25/#26 已完成 Active Release、Checkpoint 守卫、不可变 Promotion/rollback、版本化 Prompt、生产 Eval 绑定、候选比较、价格窗口、治理演练和运行时镜像 Git SHA 核验。随后在精确 SHA `63a311779bd20109a0e640367e9898d2e22cb683` 上完成 v1/v2 正式对照，共 180 个终态 Observation、共享实测成本 `$0.754819756`；自动 Gate 因完成率、隐藏测试、回归率和确定性失败阻断 `developer/v2`。v1 继续作为当前版本，v2 保留为不可变历史候选；下一步是合并精简的 `developer/v3`，从其合并 SHA 重新执行 v1/v3 对照。只有新候选通过自动 Gate 并由 Admin 人工批准后，才可按 `docs/stage-4-governance-drill-runbook.md` 完成双版本 Promotion/rollback 演练。
+当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，仓库所有者已签署 `APPROVED AS BASELINE`。PR #14/#15/#20/#21/#22/#23/#24/#25/#26 已完成 Active Release、Checkpoint 守卫、不可变 Promotion/rollback、版本化 Prompt、生产 Eval 绑定、候选比较、价格窗口、治理演练和运行时镜像 Git SHA 核验。随后在精确 SHA `63a311779bd20109a0e640367e9898d2e22cb683` 上完成 v1/v2 正式对照，共 180 个终态 Observation、共享实测成本 `$0.754819756`；自动 Gate 因完成率、隐藏测试、回归率和确定性失败阻断 `developer/v2`。v1 继续作为当前版本，v2 保留为不可变历史候选；PR #27 已合并不可变 `developer/v3`。下一步先使用默认 2 Observation 的 `planner_developer` 快速 smoke 筛查 v1/v3，再从包含该 smoke 工具的干净合并 SHA 运行完整 v1/v3 对照。smoke 使用独立 schema 且不能 Promotion；只有正式 180 Observation 对照通过自动 Gate 并由 Admin 人工批准后，才可按 `docs/stage-4-governance-drill-runbook.md` 完成双版本 Promotion/rollback 演练。
