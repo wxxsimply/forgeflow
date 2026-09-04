@@ -2,7 +2,7 @@
 
 ## 结论
 
-ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。项目目前仍不满足 `v1.0.0` 最终发布条件：阶段 4 的 Developer v2 候选对照、人工 Promotion/rollback 和双版本镜像演练尚未完成，后续还缺少 Registry、域名、服务器 Secret 和公网 Staging 验收环境。
+ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4 的 Developer v1/v2 正式对照也已完成，但自动 Gate 阻断 v2。项目目前仍不满足 `v1.0.0` 最终发布条件：新的不可变候选 Eval、人工 Promotion/rollback 和双版本镜像演练尚未完成，后续还缺少 Registry、域名、服务器 Secret 和公网 Staging 验收环境。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
@@ -16,7 +16,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 | 7 PostgreSQL/Queue | 完成 | Migration、Outbox、租约、恢复、暂停/取消与数据库集成测试；CI 新增 PostgreSQL service 验证 |
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
-| 10 Observability/Eval | 阶段 3 完成、阶段 4 进行中 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；Developer v2 候选对照与 Promotion/rollback 待完成 |
+| 10 Observability/Eval | 阶段 3 完成、阶段 4 进行中 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；Developer v1/v2 候选对照完成但 v2 被 Gate 阻断，v3 对照与 Promotion/rollback 待完成 |
 | 11 部署/安全 | 部分完成 | Compose、mTLS 沙箱引擎、HTTPS、备份/恢复/告警/回滚脚本与文档已完成；真实 Staging 验收未完成 |
 
 ## 本轮补齐的工程缺口

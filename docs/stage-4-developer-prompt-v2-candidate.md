@@ -1,6 +1,6 @@
 # ForgeFlow Developer Prompt v2 候选说明
 
-> 状态：候选 Prompt、生产 Eval 绑定、受控双运行、多模式候选差异报告和价格生效窗口门禁已分别由 PR #20、#21、#22、#23、#24 合并并通过四项必需检查。尚未完成正式候选 Eval、Promotion 或部署批准。
+> 状态：正式 v1/v2 对照已于 2026-09-03 UTC 完成，自动 Promotion Gate 返回 `false`；`developer/v2` 已阻断且不得 Promotion，保留为不可变历史候选。
 
 ## 1. 候选目的
 
@@ -35,12 +35,12 @@ PR #21 合并 commit 为 `76ede9b4e875adf7e9494d7c0c38eb5f767b8de6`；Eval 执�
 ## 4. 合并后门禁
 
 1. [x] Eval CLI 通过 `--developer-prompt-version` 加载生产 Prompt，并把同一版本写入 Evidence；不会只修改报告标签。
-2. 使用合并后的精确 Git SHA 构建候选 Eval。
-3. 以相同 Fixture、Private Grader、模型、Reasoning、Policy、Tool、预算和价格窗口运行当前版本与候选版本对照。
-4. 原始 Evidence 留在私有路径，只提交人工脱敏报告。
-5. 指标不完整、确定性失败或超过 Promotion Gate 时不得 Promotion。
-6. 通过门禁后仍需 Admin 人工批准，再执行 drain、双版本镜像部署、Readiness 校验和 rollback 演练。
+2. [x] 使用合并后的精确 Git SHA `63a311779bd20109a0e640367e9898d2e22cb683` 构建候选 Eval。
+3. [x] 以相同 Fixture、Private Grader、模型、Reasoning、Policy、Tool、预算和价格窗口运行当前版本与候选版本对照。
+4. [x] 原始 Evidence 留在私有路径，只生成脱敏聚合审核记录。
+5. [x] 自动 Gate 因完成率、隐藏测试、回归率和确定性失败阻断 v2，未执行 Promotion。
+6. [ ] 仓库所有者在 GitHub PR 中签署 `REJECTED / RERUN REQUIRED`。
 
-在上述步骤完成前，阶段 4 保持“进行中”，路线图中的双版本镜像和人工 Promotion/rollback 验收项不得勾选。
+详细结果见 `release-reports/stage-4-developer-v2-review.md`。阶段 4 保持“进行中”；v2 不进入双版本镜像和 Promotion/rollback，后续改进使用新的不可变 `developer/v3`。
 
 双运行的参数、预算和恢复步骤见 `docs/stage-4-developer-v2-eval-runbook.md`。受控脚本必须先经 PR 合并；正式 Evidence 必须记录该合并后的精确 SHA，不能在有未提交修改的工作区运行。

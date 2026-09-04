@@ -31,7 +31,7 @@ func TestDecodeImplementationResultIsStrictAndValidatesPaths(t *testing.T) {
 	}
 }
 
-func TestPromptLoaderKeepsV1AlongsideV2Candidate(t *testing.T) {
+func TestPromptLoaderKeepsImmutableDeveloperPromptVersions(t *testing.T) {
 	loader := NewPromptLoader(nil)
 	v1, err := loader.Load("developer/v1")
 	if err != nil {
@@ -41,18 +41,25 @@ func TestPromptLoaderKeepsV1AlongsideV2Candidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v1.SHA256 == "" || v2.SHA256 == "" || v1.SHA256 == v2.SHA256 {
-		t.Fatalf("prompt digests do not identify distinct immutable versions: v1=%q v2=%q", v1.SHA256, v2.SHA256)
+	v3, err := loader.Load("developer/v3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.SHA256 == "" || v2.SHA256 == "" || v3.SHA256 == "" || v1.SHA256 == v2.SHA256 || v1.SHA256 == v3.SHA256 || v2.SHA256 == v3.SHA256 {
+		t.Fatalf("prompt digests do not identify distinct immutable versions: v1=%q v2=%q v3=%q", v1.SHA256, v2.SHA256, v3.SHA256)
 	}
 	if !strings.Contains(v2.System, "exactly these six top-level keys") {
 		t.Fatal("v2 prompt is missing its strict output self-check")
 	}
-	rendered, err := v2.RenderUser(ContextBundle{})
+	if !strings.Contains(v3.System, "complete, applicable unified Git diff") {
+		t.Fatal("v3 prompt is missing its concise patch applicability guard")
+	}
+	rendered, err := v3.RenderUser(ContextBundle{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(rendered, "<developer_context>") {
-		t.Fatal("v2 user prompt did not render the bounded context envelope")
+		t.Fatal("v3 user prompt did not render the bounded context envelope")
 	}
 }
 

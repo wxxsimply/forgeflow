@@ -40,6 +40,8 @@ param(
     [string]$EvidenceRoot = '.forgeflow\evals',
     [string]$WorkspaceRoot = '.forgeflow\eval-worktrees',
     [string]$Model = 'deepseek-v4-flash',
+    [ValidatePattern('^developer/v[1-9][0-9]*$')]
+    [string]$CandidatePromptVersion = 'developer/v2',
     [ValidateSet('low', 'medium', 'high')]
     [string]$ReasoningEffort = 'low',
     [string]$PricingSource = 'https://api-docs.deepseek.com/quick_start/pricing/',
@@ -107,6 +109,16 @@ function Invoke-ForgeFlow {
 $expectedGit = $ExpectedGitCommit.ToLowerInvariant()
 $expectedFixture = $ExpectedFixtureCommit.ToLowerInvariant()
 $expectedGrader = $ExpectedGraderCommit.ToLowerInvariant()
+if ($CandidatePromptVersion -eq 'developer/v1') {
+    throw 'CandidatePromptVersion must differ from the current developer/v1 baseline.'
+}
+$candidatePromptSlug = $CandidatePromptVersion.Replace('/', '-')
+$candidatePromptDirectory = Join-Path $RepositoryRoot (Join-Path 'internal\developer\prompts' $CandidatePromptVersion)
+foreach ($promptFile in @('system.txt', 'user.tmpl')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $candidatePromptDirectory $promptFile) -PathType Leaf)) {
+        throw "Candidate Developer Prompt file does not exist: $CandidatePromptVersion/$promptFile"
+    }
+}
 
 $null = Get-CleanCommit -Repository $RepositoryRoot -ExpectedCommit $expectedGit -Label 'ForgeFlow'
 $null = Get-CleanCommit -Repository $FixtureRepository -ExpectedCommit $expectedFixture -Label 'Fixture'
@@ -133,9 +145,9 @@ if ($remainingWindow.TotalMinutes -lt $MinimumWindowMinutes) {
 $evidenceDirectory = [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $EvidenceRoot))
 $workspaceDirectory = [System.IO.Path]::GetFullPath((Join-Path $RepositoryRoot $WorkspaceRoot))
 $currentEvidence = Join-Path $evidenceDirectory "$CampaignId-developer-v1.json"
-$candidateEvidence = Join-Path $evidenceDirectory "$CampaignId-developer-v2.json"
+$candidateEvidence = Join-Path $evidenceDirectory "$CampaignId-$candidatePromptSlug.json"
 $currentReport = Join-Path $evidenceDirectory "$CampaignId-developer-v1-report.json"
-$candidateReport = Join-Path $evidenceDirectory "$CampaignId-developer-v2-report.json"
+$candidateReport = Join-Path $evidenceDirectory "$CampaignId-$candidatePromptSlug-report.json"
 $candidateComparisonJSON = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.json"
 $candidateComparisonMarkdown = Join-Path $evidenceDirectory "$CampaignId-candidate-comparison.md"
 
@@ -162,6 +174,7 @@ Write-Host "ForgeFlow commit: $expectedGit"
 Write-Host "Fixture commit: $expectedFixture"
 Write-Host "Private Grader commit: $expectedGrader"
 Write-Host "Model/reasoning: $Model / $ReasoningEffort"
+Write-Host "Candidate Developer Prompt: $CandidatePromptVersion"
 Write-Host "Campaign budget: USD $campaignBudget"
 Write-Host "Pricing valid from: $pricingStartText"
 Write-Host "Pricing valid until: $pricingDeadline"
@@ -241,11 +254,11 @@ try {
     ) | Out-Null
 
     Write-Host "Current baseline complete. Shared campaign cost so far: USD $currentCost"
-    Write-Host 'Running the candidate baseline with developer/v2...'
+    Write-Host "Running the candidate baseline with $CandidatePromptVersion..."
     $candidateJSON = Invoke-ForgeFlow -Arguments ($commonArguments + @(
-        '--developer-prompt-version', 'developer/v2',
+        '--developer-prompt-version', $CandidatePromptVersion,
         '--output', $candidateEvidence,
-        '--workspace-root', (Join-Path $workspaceDirectory "$CampaignId-developer-v2"),
+        '--workspace-root', (Join-Path $workspaceDirectory "$CampaignId-$candidatePromptSlug"),
         '--prior-cost-usd', $currentCost
     ))
     $candidateResult = $candidateJSON | ConvertFrom-Json
