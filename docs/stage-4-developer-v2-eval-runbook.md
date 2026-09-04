@@ -1,10 +1,10 @@
-# ForgeFlow 阶段 4：Developer v1/v2 Eval 操作手册
+# ForgeFlow 阶段 4：Developer Prompt 候选 Eval 操作手册
 
-> 状态：受控双运行脚本、多模式候选差异报告和价格生效时间硬门禁已分别由 PR #22、#23、#24 合并并通过四项必需检查。正式付费 Eval 尚未启动；必须使用包含全部门禁的干净、可追溯合并 SHA。
+> 状态：v1/v2 正式付费 Eval 已于 2026-09-03 UTC 完成，自动 Gate 阻断 v2。脚本现支持通过 `-CandidatePromptVersion` 运行后续不可变候选；正式运行必须使用包含对应候选和全部门禁的干净、可追溯合并 SHA。
 
 ## 1. 目的与边界
 
-本手册用于在完全相同的代码、Fixture、Private Grader、模型、Reasoning、价格窗口和总预算下，对照 `developer/v1` 与 `developer/v2`。每个版本运行 `single_agent`、`planner_developer`、`forgeflow` 三种模式和 `software/v1` 全部 30 个 Fixture。
+本手册用于在完全相同的代码、Fixture、Private Grader、模型、Reasoning、价格窗口和总预算下，对照当前 `developer/v1` 与指定的不可变候选。每个版本运行 `single_agent`、`planner_developer`、`forgeflow` 三种模式和 `software/v1` 全部 30 个 Fixture。默认候选仍为 `developer/v2`；后续运行必须显式传入实际候选，例如 `-CandidatePromptVersion developer/v3`。
 
 - 原始 Evidence、Private Grader、隐藏测试和凭据不得上传 GitHub。
 - 只允许把人工脱敏后的汇总结果提交到 `release-reports`。
@@ -44,6 +44,7 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
   -ExpectedFixtureCommit 6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f `
   -ExpectedGraderCommit 5942ec84d403e37385203b4c7851d1b92573548a `
   -CampaignId stage4-<UTC日期>-offpeak `
+  -CandidatePromptVersion developer/v3 `
   -InputUSDPerMillion <cache-miss价格> `
   -CachedInputUSDPerMillion <cache-hit价格> `
   -OutputUSDPerMillion <output价格> `
@@ -59,7 +60,8 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 - 三个仓库的实际 `HEAD` 与参数完全一致，且工作区干净。
 - Key 文件存在，但脚本不会显示 Key 内容。
-- v1/v2 Evidence 和报告路径不同，且不会意外覆盖旧文件。
+- `-CandidatePromptVersion` 不是当前 `developer/v1`，且对应的 `system.txt` 和 `user.tmpl` 均存在于该精确提交。
+- 当前版/候选版 Evidence 和报告路径不同，候选版本会进入文件名，且不会意外覆盖旧文件。
 - 模型和 Reasoning 显示为预期值。
 - 当前时间已经进入所声明的价格窗口，且有效期至少剩余 240 分钟。
 
@@ -79,15 +81,15 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 不要修改 Campaign ID、SHA、Prompt、模型、Reasoning、价格、预算或仓库路径。Eval 自身会再次校验现有 Evidence 配置，拒绝预算或版本漂移。不要手动拼接、复制或编辑原始 Evidence。
 
-早期 Evidence 没有 `pricingValidFrom` 字段，仍可离线读取和审核，但不能续写为本阶段正式候选 Evidence；v1/v2 必须使用包含该字段的新路径共同运行。
+早期 Evidence 没有 `pricingValidFrom` 字段，仍可离线读取和审核，但不能续写为正式候选 Evidence；当前版和候选版必须使用包含该字段的新路径共同运行。
 
 ## 6. 完成后的人工门禁
 
-脚本只有在 v1 和 v2 都得到三种模式各 30 个完整 Observation 后，才生成两份私有三模式报告，以及 JSON/Markdown 两种格式的候选差异报告。差异报告会拒绝模型、Reasoning、代码、Fixture、Grader、Policy、Tool、执行环境、价格或预算漂移，只允许 Developer Prompt version 和累计 campaign cost 不同；它会列出三种模式的指标增量和现有 ForgeFlow Promotion Gate 结果，但不会代替人工批准。后续使用三模式报告调用 Promotion CLI 时会再次执行同一可比性校验，不能绕过。完成后：
+脚本只有在 v1 和候选版都得到三种模式各 30 个完整 Observation 后，才生成两份私有三模式报告，以及 JSON/Markdown 两种格式的候选差异报告。差异报告会拒绝模型、Reasoning、代码、Fixture、Grader、Policy、Tool、执行环境、价格或预算漂移，只允许 Developer Prompt version 和累计 campaign cost 不同；它会列出三种模式的指标增量和现有 ForgeFlow Promotion Gate 结果，但不会代替人工批准。后续使用三模式报告调用 Promotion CLI 时会再次执行同一可比性校验，不能绕过。完成后：
 
 1. 人工核对两份报告的 Git、Fixture、Grader、模型、Reasoning、Prompt、Policy、Tool 和价格记录一致，只有 Developer Prompt version/SHA 不同。
 2. 核对完成率、隐藏测试通过率、回归率、人工介入率、成本和 P95 延迟；不得排除失败样本。
-3. 根据 `release-reports/stage-4-developer-v2-review-template.md` 生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。
+3. 参考 `release-reports/stage-4-developer-v2-review-template.md` 为实际候选生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。
 4. Admin 明确选择 `REJECTED`、`APPROVED AS CANDIDATE` 或 `APPROVED FOR PROMOTION`，记录原因和 Eval Run ID。
 5. 只有 `APPROVED FOR PROMOTION` 才进入 drain、双版本镜像、Readiness、Promotion 和 rollback 演练。
 

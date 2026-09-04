@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：治理代码、Developer v2 候选、生产 Eval 绑定、受控双运行、多模式候选差异报告、价格生效窗口门禁和受控治理演练工具已由 PR #14、#15、#20、#21、#22、#23、#24、#25 合并并通过四项必需检查；正式候选 Eval 和受控双版本 Promotion/rollback 人工演练尚未执行
+> 状态：治理代码、运行时构建身份和正式候选 Eval 基础设施已合并。v1/v2 正式对照于 2026-09-03 UTC 完成，自动 Gate 阻断 v2；受控双版本 Promotion/rollback 人工演练尚未执行，正在准备新的不可变 v3 候选。
 
 ## 1. 已实现的控制
 
@@ -46,6 +46,10 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 
 受控 Promotion/rollback 演练工具由 PR #25 合并，commit 为 `27a520cc7d95d28267d5f6aed9ddbfcc65a03f4a`。工具默认只读，Eval 导入、Promotion 与 rollback 使用互不复用的显式确认开关，私有记录不包含凭据或原始 Evidence；PR 四项必需检查全部成功。
 
+运行时构建身份核验由 PR #26 合并，commit 为 `63a311779bd20109a0e640367e9898d2e22cb683`。API/Worker 健康端点、镜像标签、Staging manifest 和治理演练均绑定同一 40 位 Git SHA；Go、PostgreSQL、Web 和 deployment `validate` 四项检查全部成功。
+
+在该合并 SHA 上完成了 v1/v2 正式对照：两个版本均覆盖三种模式各 30 个 Fixture，共 180 个终态 Observation，共享实测成本 `$0.754819756`。自动 Gate 返回 `false`，原因是 `completion_regression`、`hidden_test_regression`、`regression_rate_increase` 和 `deterministic_failure:bugfix-02`。脱敏聚合记录见 `release-reports/stage-4-developer-v2-review.md`；v2 不得 Promotion。
+
 ## 4. 合并后人工演练（不得由自动化代签）
 
 1. [x] 人工复核并合并阶段 4 代码与 PostgreSQL 集成测试 PR。
@@ -61,7 +65,7 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 ## 5. 当前未完成
 
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
-- `developer/v2` 已作为候选新增并保留 `developer/v1`，生产 Eval 绑定也已完成；下一门禁是按 `docs/stage-4-developer-v2-eval-runbook.md` 生成同条件 Eval 对照，再进行真实双版本镜像验收。
+- `developer/v2` 已完成正式 Eval 并被自动 Gate 阻断；`developer/v1` 继续作为当前版本，v1/v2 均保持不可变。
+- 下一门禁是合并 `developer/v3` 后，按 `docs/stage-4-developer-v2-eval-runbook.md` 从新的干净精确 SHA 生成 v1/v3 同条件 Eval 对照。只有自动 Gate 与 Admin 人工批准都通过，才进行真实双版本镜像验收。
 - 没有候选模型变更。
 - Promotion/rollback 的安全操作步骤见 `docs/stage-4-governance-drill-runbook.md`；该工具不会代替正式 Eval、Admin 批准、Worker drain 或人工签署。
-- 当前待合并改动为 API/Worker 健康端点增加构建 Git SHA，并要求治理演练在变更前核对运行镜像身份；合并和 CI 成功前不得将其记为验收通过。

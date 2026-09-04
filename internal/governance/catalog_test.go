@@ -11,7 +11,7 @@ func TestCatalogResolvesPreviousDeveloperPromptForRollback(t *testing.T) {
 		PlannerModel:           "model-v1",
 		PlannerPromptVersion:   "planner/v1",
 		DeveloperModel:         "model-v1",
-		DeveloperPromptVersion: "developer/v2",
+		DeveloperPromptVersion: "developer/v3",
 		ReviewerModel:          "model-v1",
 		ReviewerPromptVersion:  "reviewer/v1",
 		SecurityModel:          "model-v1",
@@ -20,18 +20,22 @@ func TestCatalogResolvesPreviousDeveloperPromptForRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	candidate, err := catalog.Prompt("developer", "developer/v2")
+	candidate, err := catalog.Prompt("developer", "developer/v3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	previous, err := catalog.Prompt("developer", "developer/v1")
+	previousV2, err := catalog.Prompt("developer", "developer/v2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !candidate.Configured || previous.Configured {
-		t.Fatalf("configured flags candidate=%t previous=%t", candidate.Configured, previous.Configured)
+	previousV1, err := catalog.Prompt("developer", "developer/v1")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if candidate.SHA256 == "" || previous.SHA256 == "" || candidate.SHA256 == previous.SHA256 {
-		t.Fatalf("prompt digests candidate=%q previous=%q", candidate.SHA256, previous.SHA256)
+	if !candidate.Configured || previousV2.Configured || previousV1.Configured {
+		t.Fatalf("configured flags candidate=%t previousV2=%t previousV1=%t", candidate.Configured, previousV2.Configured, previousV1.Configured)
+	}
+	if candidate.SHA256 == "" || previousV2.SHA256 == "" || previousV1.SHA256 == "" || candidate.SHA256 == previousV2.SHA256 || candidate.SHA256 == previousV1.SHA256 || previousV2.SHA256 == previousV1.SHA256 {
+		t.Fatalf("prompt digests candidate=%q previousV2=%q previousV1=%q", candidate.SHA256, previousV2.SHA256, previousV1.SHA256)
 	}
 }
