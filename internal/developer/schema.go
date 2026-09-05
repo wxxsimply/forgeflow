@@ -44,7 +44,11 @@ func DecodeImplementationResult(output string) (domain.ImplementationResult, err
 	if strings.TrimSpace(output) == "" || len(output) > maxImplementationOutputBytes {
 		return domain.ImplementationResult{}, apperror.New(apperror.CodeModelOutput, "developer returned empty or oversized output")
 	}
-	decoder := json.NewDecoder(bytes.NewBufferString(output))
+	normalized, err := normalizeImplementationJSON(output)
+	if err != nil {
+		return domain.ImplementationResult{}, apperror.Wrap(err, apperror.CodeModelOutput, "developer.decode", "developer output contains an invalid JSON fence")
+	}
+	decoder := json.NewDecoder(bytes.NewBufferString(normalized))
 	decoder.DisallowUnknownFields()
 	var decoded strictImplementation
 	if err := decoder.Decode(&decoded); err != nil {
@@ -65,6 +69,27 @@ func DecodeImplementationResult(output string) (domain.ImplementationResult, err
 		return domain.ImplementationResult{}, apperror.Wrap(err, apperror.CodeModelOutput, "developer.validate", "developer output failed domain validation")
 	}
 	return result, nil
+}
+
+func normalizeImplementationJSON(output string) (string, error) {
+	trimmed := strings.TrimSpace(output)
+	if !strings.HasPrefix(trimmed, "```") {
+		return trimmed, nil
+	}
+	firstNewline := strings.IndexByte(trimmed, '\n')
+	if firstNewline < 0 || !strings.EqualFold(strings.TrimSpace(trimmed[:firstNewline]), "```json") {
+		return "", fmt.Errorf("opening fence must be exactly ```json")
+	}
+	bodyAndFence := trimmed[firstNewline+1:]
+	lastNewline := strings.LastIndexByte(bodyAndFence, '\n')
+	if lastNewline < 0 || strings.TrimSpace(bodyAndFence[lastNewline+1:]) != "```" {
+		return "", fmt.Errorf("closing fence must be the final line")
+	}
+	body := strings.TrimSpace(bodyAndFence[:lastNewline])
+	if body == "" {
+		return "", fmt.Errorf("JSON fence is empty")
+	}
+	return body, nil
 }
 
 func requireJSONEOF(decoder *json.Decoder) error {

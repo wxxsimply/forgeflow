@@ -224,7 +224,7 @@ try {
     }
     $env:OPENAI_API_KEY = $apiKey
     $env:FORGEFLOW_OPENAI_BASE_URL = 'https://api.deepseek.com'
-    $callTimeout = if ($SmokeOnly) { '45s' } else { '5m' }
+    $callTimeout = if ($SmokeOnly) { '60s' } else { '5m' }
     $commandTimeout = if ($SmokeOnly) { '60s' } else { '5m' }
 
     $commonArguments = @(

@@ -31,6 +31,24 @@ func TestDecodeImplementationResultIsStrictAndValidatesPaths(t *testing.T) {
 	}
 }
 
+func TestDecodeImplementationResultAllowsOnlyAnExactJSONFence(t *testing.T) {
+	valid := implementationJSON(t, validImplementation())
+	result, err := DecodeImplementationResult("```json\n" + valid + "\n```")
+	if err != nil || result.Summary == "" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	for _, invalid := range []string{
+		"```\n" + valid + "\n```",
+		"prefix\n```json\n" + valid + "\n```",
+		"```json\n" + valid + "\n```\nsuffix",
+		"```json\n```",
+	} {
+		if _, err := DecodeImplementationResult(invalid); !apperror.IsCode(err, apperror.CodeModelOutput) {
+			t.Fatalf("fenced output was accepted: %q error=%v", invalid, err)
+		}
+	}
+}
+
 func TestPromptLoaderKeepsImmutableDeveloperPromptVersions(t *testing.T) {
 	loader := NewPromptLoader(nil)
 	v1, err := loader.Load("developer/v1")
