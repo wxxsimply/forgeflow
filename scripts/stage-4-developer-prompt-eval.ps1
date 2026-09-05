@@ -41,7 +41,7 @@ param(
     [string]$WorkspaceRoot = '.forgeflow\eval-worktrees',
     [string]$Model = 'deepseek-v4-flash',
     [ValidatePattern('^developer/v[1-9][0-9]*$')]
-    [string]$CandidatePromptVersion = 'developer/v2',
+    [string]$CandidatePromptVersion = 'developer/v4',
     [ValidateSet('low', 'medium', 'high')]
     [string]$ReasoningEffort = 'low',
     [string]$PricingSource = 'https://api-docs.deepseek.com/quick_start/pricing/',

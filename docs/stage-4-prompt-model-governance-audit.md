@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：治理代码、运行时构建身份、不可变 v3 和快速 smoke 已合并。v1/v2 正式对照自动 Gate 阻断 v2；首次 v1/v3 smoke 暴露超时和 Provider JSON 围栏兼容问题，正式 v1/v3 对照与 Promotion/rollback 演练尚未执行。
+> 状态：治理代码、运行时构建身份、不可变 v3、快速 smoke 和严格围栏兼容已合并。v1/v2 正式对照阻断 v2，v1/v3 两次 smoke 均未形成有效质量比较；正在准备不可变 v4。
 
 ## 1. 已实现的控制
 
@@ -66,7 +66,7 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 
 - 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
 - `developer/v2` 已完成正式 Eval 并被自动 Gate 阻断；`developer/v1` 继续作为当前版本，v1/v2 均保持不可变。
-- PR #27 已合并不可变 `developer/v3`，PR #28 已合并默认 2 Observation 的快速 smoke。首次运行的脱敏结论见 `release-reports/stage-4-developer-v3-smoke-review.md`；在超时和严格 JSON 围栏兼容修复完成并重跑通过前，不启动正式 v1/v3 对照。
-- v1/v3 正式对照前可先运行默认 2 Observation 的快速 smoke；其独立 schema 会被 Promotion 拒绝，只用于候选筛查，不能缩减正式 180 Observation 门禁。
+- PR #27/#28/#29 已分别合并不可变 `developer/v3`、默认 2 Observation 的快速 smoke 和严格 JSON 围栏兼容。两次运行的脱敏结论见 `release-reports/stage-4-developer-v3-smoke-review.md`；v3 不进入正式 Eval。
+- 下一候选为独立 `developer/v4`。合并后先运行默认 2 Observation smoke；其 schema 会被 Promotion 拒绝，只用于候选筛查，不能缩减正式 180 Observation 门禁。
 - 没有候选模型变更。
 - Promotion/rollback 的安全操作步骤见 `docs/stage-4-governance-drill-runbook.md`；该工具不会代替正式 Eval、Admin 批准、Worker drain 或人工签署。

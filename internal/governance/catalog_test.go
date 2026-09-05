@@ -11,7 +11,7 @@ func TestCatalogResolvesPreviousDeveloperPromptForRollback(t *testing.T) {
 		PlannerModel:           "model-v1",
 		PlannerPromptVersion:   "planner/v1",
 		DeveloperModel:         "model-v1",
-		DeveloperPromptVersion: "developer/v3",
+		DeveloperPromptVersion: "developer/v4",
 		ReviewerModel:          "model-v1",
 		ReviewerPromptVersion:  "reviewer/v1",
 		SecurityModel:          "model-v1",
@@ -20,7 +20,7 @@ func TestCatalogResolvesPreviousDeveloperPromptForRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	candidate, err := catalog.Prompt("developer", "developer/v3")
+	candidate, err := catalog.Prompt("developer", "developer/v4")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,10 +32,22 @@ func TestCatalogResolvesPreviousDeveloperPromptForRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !candidate.Configured || previousV2.Configured || previousV1.Configured {
-		t.Fatalf("configured flags candidate=%t previousV2=%t previousV1=%t", candidate.Configured, previousV2.Configured, previousV1.Configured)
+	previousV3, err := catalog.Prompt("developer", "developer/v3")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if candidate.SHA256 == "" || previousV2.SHA256 == "" || previousV1.SHA256 == "" || candidate.SHA256 == previousV2.SHA256 || candidate.SHA256 == previousV1.SHA256 || previousV2.SHA256 == previousV1.SHA256 {
-		t.Fatalf("prompt digests candidate=%q previousV2=%q previousV1=%q", candidate.SHA256, previousV2.SHA256, previousV1.SHA256)
+	if !candidate.Configured || previousV3.Configured || previousV2.Configured || previousV1.Configured {
+		t.Fatalf("configured flags candidate=%t previousV3=%t previousV2=%t previousV1=%t", candidate.Configured, previousV3.Configured, previousV2.Configured, previousV1.Configured)
+	}
+	digests := map[string]string{"candidate": candidate.SHA256, "previousV3": previousV3.SHA256, "previousV2": previousV2.SHA256, "previousV1": previousV1.SHA256}
+	seen := map[string]struct{}{}
+	for label, digest := range digests {
+		if digest == "" {
+			t.Fatalf("%s digest is empty", label)
+		}
+		if _, duplicate := seen[digest]; duplicate {
+			t.Fatalf("prompt digests are not distinct: %v", digests)
+		}
+		seen[digest] = struct{}{}
 	}
 }

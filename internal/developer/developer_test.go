@@ -63,8 +63,20 @@ func TestPromptLoaderKeepsImmutableDeveloperPromptVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v1.SHA256 == "" || v2.SHA256 == "" || v3.SHA256 == "" || v1.SHA256 == v2.SHA256 || v1.SHA256 == v3.SHA256 || v2.SHA256 == v3.SHA256 {
-		t.Fatalf("prompt digests do not identify distinct immutable versions: v1=%q v2=%q v3=%q", v1.SHA256, v2.SHA256, v3.SHA256)
+	v4, err := loader.Load("developer/v4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digests := []string{v1.SHA256, v2.SHA256, v3.SHA256, v4.SHA256}
+	seen := map[string]struct{}{}
+	for _, digest := range digests {
+		if digest == "" {
+			t.Fatalf("prompt digest is empty: %v", digests)
+		}
+		if _, duplicate := seen[digest]; duplicate {
+			t.Fatalf("prompt digests do not identify distinct immutable versions: %v", digests)
+		}
+		seen[digest] = struct{}{}
 	}
 	if !strings.Contains(v2.System, "exactly these six top-level keys") {
 		t.Fatal("v2 prompt is missing its strict output self-check")
@@ -72,12 +84,18 @@ func TestPromptLoaderKeepsImmutableDeveloperPromptVersions(t *testing.T) {
 	if !strings.Contains(v3.System, "complete, applicable unified Git diff") {
 		t.Fatal("v3 prompt is missing its concise patch applicability guard")
 	}
-	rendered, err := v3.RenderUser(ContextBundle{})
+	if !strings.Contains(v4.System, "first non-whitespace character must be {") || !strings.Contains(v4.System, "JSON shape example") {
+		t.Fatal("v4 prompt is missing its provider JSON conformance guards")
+	}
+	if v4.SHA256 != "16fad8192c43891b8c7e10a7b22a936cd641c288db18144e10523e8a01336d81" {
+		t.Fatalf("v4 prompt digest=%q", v4.SHA256)
+	}
+	rendered, err := v4.RenderUser(ContextBundle{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(rendered, "<developer_context>") {
-		t.Fatal("v3 user prompt did not render the bounded context envelope")
+		t.Fatal("v4 user prompt did not render the bounded context envelope")
 	}
 }
 

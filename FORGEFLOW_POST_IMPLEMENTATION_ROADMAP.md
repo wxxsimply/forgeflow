@@ -426,7 +426,7 @@ go run ./cmd/forgeflow eval `
 
 ## 8. 阶段 4：完善 Prompt 和模型发布治理
 
-> 当前状态：进行中（2026-09-01 开始；截至 2026-09-05，PR #28 已合并快速 smoke；首次 v1/v3 smoke 暴露 45 秒超时假阴性和 Provider JSON 围栏兼容问题，正在修复后重跑）
+> 当前状态：进行中（2026-09-01 开始；截至 2026-09-05，PR #29 已合并严格 JSON 围栏兼容；v1/v3 两次 smoke 均未形成有效质量比较，正在准备不可变 v4 候选）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
 > 本阶段目标：让数据库治理记录、镜像内版本和 Worker 实际运行版本保持一致。
 
@@ -915,11 +915,11 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #14/#15/#20/#21/#22/#23/#24/#25/#26/#27/#28 已合并且四项必需检查通过；首次 v1/v3 smoke 共 2 个 Observation、成本 `$0.006510816`，暴露超时和 JSON 围栏兼容问题；修复并重跑 smoke 后再决定是否执行正式 Eval |
+| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #14/#15/#20/#21/#22/#23/#24/#25/#26/#27/#28/#29 已合并且四项必需检查通过；两次 v1/v3 smoke 合计成本 `$0.012804996`，均未形成有效质量比较；v3 不进入正式 Eval，正在准备不可变 v4 |
 | 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
 | 6 真实 Staging | 未开始 | 待填写 |  |  |  |
 | 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
 | 8 Production 准备 | 未开始 | 待填写 |  |  |  |
 | 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
 
-当前处于**阶段 4：Prompt/模型治理**。阶段 3 的正式运行固定在 `e18bfa9c5e73435634644c7c44c629d7cca07dab`，仓库所有者已签署 `APPROVED AS BASELINE`。v1/v2 正式对照已完成 180 个终态 Observation，但自动 Gate 阻断 `developer/v2`；PR #27 随后合并不可变 `developer/v3`，PR #28 合并默认 2 Observation 的不可晋级 smoke。首次 v1/v3 smoke 固定在 `8aa1675ae0320e8726b7204e256d1e294ae495c3`，总成本 `$0.006510816`：v1 在 45 秒调用限制下超时，v3 因 Provider 外层 JSON 围栏被严格解码器拒绝，因此不得启动正式 Eval。下一步是合并只接受单一纯 JSON 围栏并保持完整 Schema 校验的兼容修复，把调用限制调整为 60 秒，再从新合并 SHA 使用新 Campaign 重跑 smoke。只有 smoke 排除基础设施错误、正式 180 Observation 对照通过自动 Gate 并由 Admin 人工批准后，才可完成双版本 Promotion/rollback 演练。
+当前处于**阶段 4：Prompt/模型治理**。v1/v2 正式对照已完成 180 个终态 Observation，但自动 Gate 阻断 `developer/v2`。PR #27 合并不可变 `developer/v3`，PR #28 合并不可晋级快速 smoke，PR #29 合并严格 JSON 围栏兼容并把调用限制提高到 60 秒。两次 v1/v3 smoke 分别固定在 `8aa1675ae0320e8726b7204e256d1e294ae495c3` 与 `698520cea5c0ca441f3b9d1eb628db7c411147cf`，合计成本 `$0.012804996`；因超时和非 JSON 前缀，两次均未进入有效质量比较，v3 不启动正式 Eval。下一步是人工审核并合并不可变 `developer/v4`，再从新合并 SHA 运行 2 Observation smoke。只有 smoke 排除基础设施错误、正式 180 Observation 对照通过自动 Gate 并由 Admin 人工批准后，才可完成双版本 Promotion/rollback 演练。

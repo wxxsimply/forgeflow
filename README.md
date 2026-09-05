@@ -193,7 +193,7 @@ Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `de
 ./scripts/staging-release.ps1 -Release 0.11.0 -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4 的 Developer v2 正式对照已完成但被自动 Gate 阻断，v3 对照、Promotion/rollback 和公网 Staging 尚未验收，因此仍不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4 的 Developer v2 正式对照已被自动 Gate 阻断，v3 两次 smoke 未通过，当前正在审核 v4 候选。v4 正式对照、Promotion/rollback 和公网 Staging 尚未验收，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
