@@ -1,6 +1,6 @@
 # Stage 4 Developer v3 快速 Smoke 审核
 
-> 结论：`NOT READY FOR FORMAL EVAL`。本记录只包含脱敏聚合信息，不是 Promotion Evidence。
+> 结论：`NOT READY FOR FORMAL EVAL`。两次 v1/v3 smoke 均未形成有效质量比较；v3 保留为不可变历史候选。本记录只包含脱敏聚合信息，不是 Promotion Evidence。
 
 ## 运行身份
 
@@ -36,3 +36,16 @@ v1 在原 45 秒单次模型调用限制下超时，可能属于 smoke 配置假
 5. 只有重跑没有基础设施错误且候选结果可接受，才进入正式 v1/v3 对照。
 
 本次 smoke schema 为 `forgeflow.eval.smoke-campaign/v1`，`promotionEligible=false`；它不能作为 Promotion 输入。
+
+## 修复后重跑
+
+PR #29 将单次模型调用上限提高到 60 秒，并加入严格外层 JSON 围栏兼容。重跑固定在 ForgeFlow `698520cea5c0ca441f3b9d1eb628db7c411147cf`，Fixture、Private Grader、模型、Reasoning 和价格保持一致。
+
+| Prompt | Passed | Completion | Cost USD | P95 latency | 终态 |
+|---|---:|---:|---:|---:|---|
+| `developer/v1` | 0/1 | 0% | 0.003360192 | 36,035 ms | `model_output_invalid` |
+| `developer/v3` | 0/1 | 0% | 0.002933988 | 96,120 ms | `timeout` |
+
+重跑成本为 `$0.00629418`，两次 smoke 合计 `$0.012804996`。v1 返回了普通文本前缀，不能在不放松严格协议的前提下自动截取；v3 在 60 秒限制下超时。两侧均未进入有效补丁和隐藏测试比较。
+
+最终处置：不运行正式 v1/v3 Eval，不 Promotion v3。创建独立 `developer/v4`，按 DeepSeek 官方 JSON Output 建议增加最小 JSON 形状示例和首尾字符约束，再从其干净合并 SHA 重新执行 2 Observation smoke。

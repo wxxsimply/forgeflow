@@ -1,10 +1,10 @@
 # ForgeFlow 阶段 4：Developer Prompt 候选 Eval 操作手册
 
-> 状态：v1/v2 正式付费 Eval 已于 2026-09-03 UTC 完成，自动 Gate 阻断 v2。脚本现支持通过 `-CandidatePromptVersion` 运行后续不可变候选；正式运行必须使用包含对应候选和全部门禁的干净、可追溯合并 SHA。
+> 状态：v1/v2 正式 Eval 自动 Gate 阻断 v2；v3 两次快速 smoke 均未形成有效质量比较。当前待审核候选为不可变 `developer/v4`，正式运行必须使用包含对应候选和全部门禁的干净、可追溯合并 SHA。
 
 ## 1. 目的与边界
 
-本手册用于在完全相同的代码、Fixture、Private Grader、模型、Reasoning、价格窗口和总预算下，对照当前 `developer/v1` 与指定的不可变候选。每个版本运行 `single_agent`、`planner_developer`、`forgeflow` 三种模式和 `software/v1` 全部 30 个 Fixture。默认候选仍为 `developer/v2`；后续运行必须显式传入实际候选，例如 `-CandidatePromptVersion developer/v3`。
+本手册用于在完全相同的代码、Fixture、Private Grader、模型、Reasoning、价格窗口和总预算下，对照当前 `developer/v1` 与指定的不可变候选。每个版本运行 `single_agent`、`planner_developer`、`forgeflow` 三种模式和 `software/v1` 全部 30 个 Fixture。脚本默认候选为当前待审核的 `developer/v4`；执行记录仍应显式传入 `-CandidatePromptVersion developer/v4`。
 
 - 原始 Evidence、Private Grader、隐藏测试和凭据不得上传 GitHub。
 - 只允许把人工脱敏后的汇总结果提交到 `release-reports`。
@@ -44,7 +44,7 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
   -ExpectedFixtureCommit 6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f `
   -ExpectedGraderCommit 5942ec84d403e37385203b4c7851d1b92573548a `
   -CampaignId stage4-<UTC日期>-offpeak `
-  -CandidatePromptVersion developer/v3 `
+  -CandidatePromptVersion developer/v4 `
   -InputUSDPerMillion <cache-miss价格> `
   -CachedInputUSDPerMillion <cache-hit价格> `
   -OutputUSDPerMillion <output价格> `
