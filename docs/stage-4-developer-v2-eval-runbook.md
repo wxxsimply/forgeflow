@@ -77,7 +77,9 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 -PreflightOnly
 ```
 
-人工核对输出后移除 `-PreflightOnly` 并增加 `-ConfirmPaidEval`。快速模式把模型调用超时限制为 45 秒、命令超时限制为 60 秒。每个 `planner_developer` Case 最多包含两次模型调用和一次验证命令，因此默认 2 个 Observation 的最坏超时预算约为 5 分钟，并为 Go 首次编译与本机开销预留余量，目标在 10 分钟内完成。Provider 排队或进程清理仍可能造成少量额外耗时，因此这不是绝对的墙钟保证。`-SmokeCaseLimit 2` 可扩大为 4 个 Observation，但不再承诺 10 分钟目标。
+人工核对输出后移除 `-PreflightOnly` 并增加 `-ConfirmPaidEval`。快速模式把模型调用和命令超时都限制为 60 秒。默认 2 个 Observation 的保守超时预算仍低于 10 分钟，并为 Go 首次编译与本机开销预留余量；Provider 排队或进程清理仍可能造成少量额外耗时，因此这不是绝对的墙钟保证。`-SmokeCaseLimit 2` 可扩大为 4 个 Observation，但不再承诺 10 分钟目标。
+
+若 Provider 在严格 JSON Schema 请求下仍返回恰好一个 `json` Markdown 围栏，ForgeFlow 只剥离该外层围栏，随后继续执行未知字段、必需字段、路径和领域约束校验。带前后解释、多个 JSON 值、非 `json` 围栏或缺少最终围栏的输出仍会被拒绝；该兼容行为不得用于放宽 Schema。
 
 快速结果写入 `.forgeflow/evals/<CampaignId>-smoke/`，汇总使用 `forgeflow.eval.smoke-campaign/v1`，单 Prompt 报告使用 `forgeflow.eval.smoke-report/v1`，并明确写入 `promotionEligible: false`。Promotion CLI 会拒绝该 schema。快速 smoke 只能用于尽早发现明显失败、超时或成本异常，不能替代正式对照、自动 Gate 或 Admin 人工签署；候选通过 smoke 后，仍必须完成 30 Case × 3 Mode × 2 Prompt 的 180 Observation 正式 Eval。
 
