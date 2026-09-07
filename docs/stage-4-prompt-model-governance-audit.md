@@ -1,6 +1,6 @@
 # ForgeFlow 阶段 4：Prompt 与模型发布治理审计
 
-> 状态：PR #30 已合并 v4；首次 v1/v4 smoke 通过 JSON 解码但补丁预检失败。补丁失败阶段和汇总诊断已在本地补充，等待人工提交。正式候选对照和 Promotion/rollback 演练尚未完成。
+> 状态：阶段 4 工程准备已本地核对，待集中验收；本批交接文档等待人工提交。PR #31 已合并补丁诊断。v4 smoke 补丁预检失败仍未解除，正式候选对照和 Promotion/rollback 尚未完成。
 
 ## 1. 已实现的控制
 
@@ -50,7 +50,9 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 
 在该合并 SHA 上完成了 v1/v2 正式对照：两个版本均覆盖三种模式各 30 个 Fixture，共 180 个终态 Observation，共享实测成本 `$0.754819756`。自动 Gate 返回 `false`，原因是 `completion_regression`、`hidden_test_regression`、`regression_rate_increase` 和 `deterministic_failure:bugfix-02`。脱敏聚合记录见 `release-reports/stage-4-developer-v2-review.md`；v2 不得 Promotion。
 
-## 4. 合并后人工演练（不得由自动化代签）
+## 4. 阶段 9 人工演练（不得由自动化代签）
+
+先完成正式 Eval 的人工审批、镜像构建/扫描/人工上传，再启动隔离 Staging API 并保持 Worker drained。操作顺序见 `docs/stage-4-governance-drill-runbook.md`。
 
 1. [x] 人工复核并合并阶段 4 代码与 PostgreSQL 集成测试 PR。
 2. 在隔离数据库执行 Migration 5，只启动 API，保持 Worker drained。
@@ -64,9 +66,13 @@ Developer v2 候选由 PR #20 合并，commit 为 `3302aeb7aa3725761bf614695ba8f
 
 ## 5. 当前未完成
 
-- 真实 Promotion/rollback 演练尚未执行，因此阶段 4 仍保持“进行中”。
+- 真实 Promotion/rollback 演练尚未执行；按调整后的路线图，阶段 4 工程准备通过后为“待集中验收”，实际完成仍需阶段 9 证据。
 - `developer/v2` 已完成正式 Eval 并被自动 Gate 阻断；`developer/v1` 继续作为当前版本，v1/v2 均保持不可变。
 - PR #27/#28/#29 已分别合并不可变 `developer/v3`、默认 2 Observation 的快速 smoke 和严格 JSON 围栏兼容。两次运行的脱敏结论见 `release-reports/stage-4-developer-v3-smoke-review.md`；v3 不进入正式 Eval。
 - `developer/v4` 已合并并完成首次 2 Observation smoke；两侧补丁预检均失败，暂不进入正式 Eval。结果和后续诊断见 `release-reports/stage-4-developer-v4-smoke-review.md`；独立 smoke schema 仍不能用于 Promotion。
 - 没有候选模型变更。
 - Promotion/rollback 的安全操作步骤见 `docs/stage-4-governance-drill-runbook.md`；该工具不会代替正式 Eval、Admin 批准、Worker drain 或人工签署。
+
+## 6. 工程准备核对（2026-09-07）
+
+PR #31 合并 commit 为 `d9f5cbc7c315aedd49ab913d3c1e96f9eef90cf5`。本次核对 Dockerfile、嵌入资源和治理目录，离线针对性测试约 4.3 秒通过；没有执行模型调用、镜像构建或真实治理变更。完整依据、执行参数及未解除的候选阻断见 `docs/stage-4-engineering-readiness.md`。通用审批模板已准备，未代填成绩或签署。

@@ -462,7 +462,7 @@ go run ./cmd/forgeflow eval `
 
 ## 8. 阶段 4：完成 Prompt 和模型治理工程准备
 
-> 当前状态：进行中（截至 2026-09-07，PR #30 已合并 v4；v1/v4 smoke 已完成，两侧均在补丁预检失败。本地已补充失败阶段和脱敏汇总，等待人工提交 GitHub）
+> 当前状态：待集中验收（2026-09-07；PR #31 已合并补丁失败诊断，候选/回滚 Prompt 嵌入配置、正式执行参数、快速检查和通用审批模板已完成工程核对；v4 smoke 阻断仍待阶段 9 前解除）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
 > 本阶段目标：完成治理代码、候选版本、补丁诊断和快速检查；正式候选对照、Promotion 和 rollback 演练后置到阶段 9。
 
@@ -514,9 +514,9 @@ go run ./cmd/forgeflow eval `
 
 - [x] Worker 版本与 Active Release 不一致时 Readiness 失败。
 - [x] Promotion 不会修改正在执行的 Run 所绑定版本。
-- [ ] 候选镜像构建配置同时引用当前 Prompt 和回滚 Prompt。
+- [x] 候选镜像构建配置通过 `go:embed prompts/*/*` 同时包含当前 Prompt 和回滚 Prompt，并有不可变摘要测试。
 - [x] Checkpoint 恢复校验 Prompt、模型、Policy 和 Tool 版本。
-- [ ] 正式候选对照、Promotion 和 rollback 的命令、预算、审批表与证据目录已固定。
+- [x] 正式候选对照、Promotion 和 rollback 的命令、预算、审批表与证据目录已固定，见 `docs/stage-4-engineering-readiness.md`。
 
 通过以上门槛后，阶段 4 状态改为 `待集中验收` 并继续阶段 5；正式 Eval、Promotion 和 rollback 未在阶段 9 通过前，不得把阶段 4 标记为 `已完成`。
 
@@ -1034,11 +1034,11 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理准备 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #30 已合并；v1/v4 smoke 固定在 `108c57ff0740e4c4fccfa27522297177602b0476`，2 个结果均因补丁预检失败，记录费用 `$0.00640506`；见 `release-reports/stage-4-developer-v4-smoke-review.md`。等待提交补丁失败诊断改动 |
+| 4 Prompt/模型治理准备 | 待集中验收 | 仓库所有者 | 2026-09-01 |  | PR #31 已合并补丁诊断；Prompt 嵌入/回滚配置、最终执行参数、快速检查和通用审批模板已核对，见 `docs/stage-4-engineering-readiness.md`；v4 smoke 补丁阻断保留到最终验收前处理 |
 | 5 发布镜像资产准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 6 Staging 部署准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 7 运维与安全演练准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-当前处于**阶段 4：Prompt/模型治理准备**。v2 已被正式 Gate 阻断，v3 两次 smoke 未通过。PR #30 已合并不可变 v4；2026-09-05 的 v1/v4 smoke 已完整结束：两侧均通过 JSON 解码，v1 补丁与源文件不匹配，v4 补丁格式损坏，均未进入显式测试或隐藏测试。记录费用为 `$0.00640506`。2026-09-07 读取已有结果完成诊断，没有新增付费调用。本地改动为 Evidence 增加补丁失败阶段、为 smoke 汇总增加固定分类计数，并修复 Git 超时错误链丢失的问题；合法、损坏、不匹配和超时情形使用合成数据离线验证。下一步人工提交并合并诊断改动，再定位补丁生成问题；不因单次格式错误自动创建新的 Prompt 版本，不将 smoke 记为正式 Eval 或 Promotion 批准。之后依次完成阶段 4～8 的工程准备，每项只运行不超过 10 分钟的快速检查；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。
+阶段 4 的工程准备门槛已通过，当前状态为**待集中验收**。PR #31 已合并补丁失败阶段、脱敏分类和超时错误链修复；候选/回滚 Prompt 的嵌入资源、不可变摘要、正式执行参数、审批模板及离线快速检查均已核对。v2 的正式 Gate 阻断、v3 两次 smoke 失败和 v4 首次 smoke 的补丁预检失败均保留为历史证据；v4 阻断必须在阶段 9 正式对照前解除，不得把 smoke 记为正式成绩或 Promotion 批准。下一步进入阶段 5 的发布镜像资产准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。

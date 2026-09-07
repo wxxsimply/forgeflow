@@ -193,7 +193,7 @@ Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `de
 ./scripts/staging-release.ps1 -Release 0.11.0 -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4 的 Developer v2 被正式 Gate 阻断，v3 两次 smoke 未通过，v4 首次 smoke 在补丁预检失败，正在补充补丁诊断。正式候选对照、Promotion/rollback 和公网 Staging 尚未验收，因此仍不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4 的补丁诊断、候选/回滚嵌入配置、正式参数和审批模板已完成工程核对，目前为待集中验收。Developer v2 被正式 Gate 阻断，v3 两次 smoke 未通过，v4 首次 smoke 在补丁预检失败。正式候选对照、Promotion/rollback 和公网 Staging 尚未验收，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
@@ -245,4 +245,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4 正在完成 Developer Prompt 候选对照和治理演练，后续还需不可变镜像、公网 Staging、运维安全、Production 准备和 `v1.0.0` 发布验收。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4 工程准备已通过并等待最终集中验收；当前进入不可变镜像资产准备，之后依次准备公网 Staging、运维安全、Production 和 `v1.0.0` 发布资料。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
