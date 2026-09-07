@@ -1,6 +1,6 @@
 # ForgeFlow 实施手册完成后的分阶段任务路线图
 
-> 文档版本：2026-08-30
+> 文档版本：2026-09-07
 > 前置文档：`FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md`  
 > 当前审计：`docs/completion-audit.md`
 
@@ -39,7 +39,12 @@
 
 ## 3. 阶段划分与推进规则
 
-后续工作拆分为 10 个阶段。阶段必须按顺序完成；上一阶段的退出门槛没有全部通过时，不得开始下一阶段的发布性操作。
+后续工作仍拆分为 10 个阶段。阶段 0～3 保留为已完成的历史基线；从阶段 4 开始采用“先完成工程准备，最后集中验收”的两遍推进方式：
+
+1. **工程准备遍（阶段 4～8）**：完成代码、接口、配置、脚本、清单、Runbook 和发布文档，只执行单次可在 10 分钟内结束的快速检查。
+2. **集中验收遍（阶段 9）**：统一执行正式数据 Eval、完整镜像构建与扫描、真实 Staging 部署、全链路测试、恢复/回滚/安全/负载演练，最后决定是否发布。
+
+阶段 4～8 的工程准备门槛通过后，可以继续准备下一阶段，但不能因此标记为“已完成”或解除 Production 发布门禁。所有被后置的真实验收项必须在阶段 9 按依赖顺序补齐。
 
 | 阶段 | 名称 | 核心结果 | 主要执行位置 |
 |---|---|---|---|
@@ -47,12 +52,12 @@
 | 1 | Git 与 GitHub 基线 | 首个 commit、远端仓库、分支保护和 CI 可用 | 本地 + GitHub，必须手动 |
 | 2 | 真实 Eval Fixture | 30 个真实 commit 和隔离隐藏测试可重复运行 | 独立 Fixture 环境 |
 | 3 | 三基线 Eval | 90 次受控执行和真实对比报告 | Eval 执行环境 |
-| 4 | Prompt/模型治理闭环 | Promotion、Worker 一致性校验和回滚通过 | ForgeFlow + 数据库 |
-| 5 | 不可变发布镜像 | 五类镜像、SBOM、扫描结果和 digest | 本地/CI + Registry，上传必须手动 |
-| 6 | 真实 Staging 部署 | HTTPS Staging 全链路可运行 | Staging 服务器 |
-| 7 | 运维与安全验收 | 告警、恢复、安全、回滚和 Demo 全部签署 | Staging 服务器 |
-| 8 | Production 准备 | 架构、安全、SLO、值班和数据制度获批 | Production 准备环境 |
-| 9 | v1.0.0 发布 | 签名 Tag、GitHub Release 和发布证据 | GitHub，必须手动 |
+| 4 | Prompt/模型治理准备 | 治理代码、候选版本、诊断和快速 smoke 就绪 | ForgeFlow + 数据库 |
+| 5 | 发布镜像资产准备 | Dockerfile、构建脚本、扫描策略和 manifest 模板就绪 | 本地/CI |
+| 6 | Staging 部署准备 | 基础设施清单、Secret 边界、部署与验收脚本就绪 | 本地 + Staging 规划 |
+| 7 | 运维与安全演练准备 | 告警、恢复、安全、回滚和 Demo 脚本/Runbook 就绪 | 本地 + Staging 规划 |
+| 8 | Production 与发布准备 | 架构、安全、SLO、值班、数据制度和发布资料就绪 | Production 准备环境 |
+| 9 | 集中验收与 v1.0.0 发布 | 高耗时任务全部通过后创建签名 Tag 和 Release | Eval/Registry/Staging/GitHub，人工操作 |
 
 每个阶段统一包含五类信息：
 
@@ -60,9 +65,40 @@
 2. **阶段任务**：该阶段要完成的实现或操作。
 3. **人工操作**：必须由仓库所有者、发布负责人或运维人员手动执行的动作。
 4. **阶段交付物**：完成后必须留下的代码、报告、配置或审计证据。
-5. **退出门槛**：全部勾选后才允许进入下一阶段。
+5. **退出门槛**：阶段 4～8 使用“工程准备门槛”；阶段 9 使用最终验收和发布门槛。
 
-状态只允许使用：`未开始`、`进行中`、`阻塞`、`已完成`。不得因为代码已经写好，就把需要真实环境验证的阶段标记为已完成。
+状态只允许使用：`未开始`、`进行中`、`待集中验收`、`阻塞`、`已完成`。阶段 4～8 的工程准备完成、但真实验收尚未执行时，必须标记为 `待集中验收`，不得标记为 `已完成`。
+
+### 3.1 快速检查与高耗时任务边界
+
+工程准备遍允许执行：
+
+- 单元测试、静态检查和针对性集成测试。
+- 使用合成数据、Mock Provider 或单个 Case 的 smoke。
+- 配置解析、模板渲染、Compose/manifest 静态校验。
+- 单次预计不超过 10 分钟、不会产生大额模型或基础设施费用的检查。
+
+以下任务统一后置到阶段 9：
+
+- 30 个或更多 Fixture 的正式数据 Eval、三基线/候选全量对照和重复统计。
+- 全部镜像的完整构建、SBOM、provenance、签名、漏洞扫描、上传和干净主机拉取。
+- 真实公网 Staging 部署及登录到报告下载的完整 E2E。
+- 告警投递、备份恢复、Sandbox 边界、版本回滚和 Promotion/rollback 演练。
+- 负载、容量、并发、P95、长时间稳定性和任何预计超过 10 分钟的测试。
+
+不得为了满足 10 分钟限制而缩短正式样本、跳过失败样本或降低最终门禁。前期只准备好可重复运行的脚本和验收清单，完整证据在最终窗口一次性生成。
+
+### 3.2 最终集中验收顺序
+
+阶段 9 必须按以下顺序串行推进；任一步失败都停止后续发布动作：
+
+1. 冻结候选 Git SHA、Prompt、模型、Policy、Tool、Fixture 和 Grader 版本。
+2. 执行正式数据 Eval 和候选对照，完成人工 Promotion 决策。
+3. 从批准 commit 构建、扫描、签名并手动上传不可变镜像。
+4. 按 digest 部署真实 Staging，完成全链路功能和安全验收。
+5. 执行告警、备份恢复、回滚、负载/容量和 Demo 演练。
+6. 汇总证据，完成人工发布审批。
+7. 手动创建签名 Tag、上传 Tag 并发布 GitHub Release。
 
 ---
 
@@ -424,11 +460,11 @@ go run ./cmd/forgeflow eval `
 
 ---
 
-## 8. 阶段 4：完善 Prompt 和模型发布治理
+## 8. 阶段 4：完成 Prompt 和模型治理工程准备
 
-> 当前状态：进行中（2026-09-01 开始；截至 2026-09-05，PR #29 已合并严格 JSON 围栏兼容；v1/v3 两次 smoke 均未形成有效质量比较，正在准备不可变 v4 候选）
+> 当前状态：进行中（截至 2026-09-07，PR #30 已合并 v4；v1/v4 smoke 已完成，两侧均在补丁预检失败。本地已补充失败阶段和脱敏汇总，等待人工提交 GitHub）
 > 进入条件：阶段 3 已生成并人工签署真实基线报告。  
-> 本阶段目标：让数据库治理记录、镜像内版本和 Worker 实际运行版本保持一致。
+> 本阶段目标：完成治理代码、候选版本、补丁诊断和快速检查；正式候选对照、Promotion 和 rollback 演练后置到阶段 9。
 
 当前 Promotion/rollback API 会保存治理记录，但还需要保证运行中的 Worker 与 Active Release 一致。
 
@@ -442,18 +478,23 @@ go run ./cmd/forgeflow eval `
 - 模型升级与 Prompt 升级使用同样的 Eval 门禁。
 - Promotion 和 rollback 写入审计日志、操作者、原因和 Eval Run ID。
 
-### 8.2 发布顺序
+### 8.2 工程准备顺序
 
 1. 新增版本化 Prompt 文件，禁止原地修改 production 版本。
 2. 提交候选代码并通过 PR CI。
-3. 在受控 Eval 环境运行三基线或候选对照。
-4. Admin 人工批准 Promotion。
-5. Drain Worker。
-6. 部署包含候选和回滚版本的镜像。
-7. 校验 Worker Readiness 与 Active Release 一致。
-8. 恢复流量。
+3. 使用合成数据、单个 Case 或 Mock Provider 完成不超过 10 分钟的快速 smoke。
+4. 固化正式候选对照命令、费用上限、断点恢复参数和人工审批模板。
+5. 确认候选和回滚 Prompt 都会嵌入同一发布镜像。
 
-### 8.3 回滚验收
+以下动作不在本阶段执行，统一进入阶段 9：
+
+1. 正式三基线或候选全量对照。
+2. Admin 人工批准 Promotion。
+3. Drain Worker 并部署候选镜像。
+4. 校验 Worker Readiness 与 Active Release 一致。
+5. 恢复流量并执行 rollback 演练。
+
+### 8.3 阶段 9 执行的回滚验收
 
 - [ ] 回滚目标仍嵌入当前或回滚镜像。
 - [ ] 回滚产生新的不可变 release 记录，不覆盖历史。
@@ -465,28 +506,41 @@ go run ./cmd/forgeflow eval `
 
 - Worker Active Release Readiness 校验。
 - Prompt 和模型 Promotion/rollback 审计记录。
-- 候选版本与当前版本的 Eval 对照报告。
-- 一次完整的 Promotion 和 rollback 演练记录。
+- 可直接在阶段 9 运行的候选对照脚本、预算配置和审核模板。
+- 阶段 9 生成的候选版本与当前版本正式 Eval 对照报告。
+- 阶段 9 生成的一次完整 Promotion 和 rollback 演练记录。
 
-### 8.5 阶段 4 退出门槛
+### 8.5 阶段 4 工程准备门槛
 
 - [x] Worker 版本与 Active Release 不一致时 Readiness 失败。
 - [x] Promotion 不会修改正在执行的 Run 所绑定版本。
-- [ ] 旧 Prompt 仍嵌入可回滚镜像。
+- [ ] 候选镜像构建配置同时引用当前 Prompt 和回滚 Prompt。
 - [x] Checkpoint 恢复校验 Prompt、模型、Policy 和 Tool 版本。
-- [ ] Promotion 和 rollback 都经过人工批准并可审计。
+- [ ] 正式候选对照、Promotion 和 rollback 的命令、预算、审批表与证据目录已固定。
+
+通过以上门槛后，阶段 4 状态改为 `待集中验收` 并继续阶段 5；正式 Eval、Promotion 和 rollback 未在阶段 9 通过前，不得把阶段 4 标记为 `已完成`。
 
 ---
 
-## 9. 阶段 5：手动构建并上传不可变发布镜像
+## 9. 阶段 5：准备不可变发布镜像资产
 
 > 当前状态：未开始  
-> 进入条件：阶段 4 治理闭环和回滚演练通过。  
-> 人工操作：Registry 登录、镜像上传和 digest 确认必须由发布负责人手动执行。
+> 进入条件：阶段 4 工程准备门槛通过，状态为 `待集中验收`。
+> 本阶段只准备 Dockerfile、构建脚本、扫描策略和 Release manifest 模板；完整构建、扫描、上传和拉取验证后置到阶段 9。
+> 人工操作：阶段 9 的 Registry 登录、镜像上传和 digest 确认必须由发布负责人手动执行。
 
 建议使用 GHCR 或独立 Registry。发布时必须使用不可变版本和 digest，不得只依赖 `latest`。
 
-### 9.1 手动登录 Registry
+### 9.1 当前阶段需要完成的准备
+
+- 固定 API、Worker、Web、Caddy 和 Sandbox 的 Dockerfile 与构建上下文。
+- 固定版本号、Git SHA 和 digest 的 manifest 字段。
+- 准备 SBOM、provenance、签名和漏洞扫描命令。
+- 定义高危/严重漏洞阻断规则和风险接受模板。
+- 确认 Registry Token 只通过人工登录或受保护 Secret 注入。
+- 只运行 Dockerfile、Compose 和 manifest 的快速静态校验，不执行五镜像完整构建。
+
+### 9.2 阶段 9 手动登录 Registry
 
 > **必须手动操作：Registry 登录和镜像上传由发布负责人执行。不要把 Token 写入脚本或仓库。**
 
@@ -500,7 +554,7 @@ $registryToken = Read-Host "GHCR token" -AsSecureString
 
 Token 只授予需要的包权限，不要使用个人主密码。
 
-### 9.2 手动构建和上传
+### 9.3 阶段 9 手动构建和上传
 
 > **必须手动上传到 Registry。首次正式发布前不要启用无人值守自动发布。**
 
@@ -523,32 +577,34 @@ Token 只授予需要的包权限，不要使用个人主密码。
 
 镜像上传完成后，把 digest 写入 Release manifest；不要把 Registry Token 写入 manifest。
 
-### 9.3 阶段交付物
+### 9.4 阶段交付物
 
-- API、Worker、Web、Caddy、Sandbox 五类镜像。
-- 每个镜像的版本标签、Git SHA 标签和 digest。
-- SBOM、provenance、签名及漏洞扫描结果。
-- 不含凭据的 Release manifest。
+- 已通过快速静态校验的五类 Dockerfile 和构建入口。
+- SBOM、provenance、签名、漏洞扫描与上传脚本或操作清单。
+- 不含凭据的 Release manifest 模板。
+- 阶段 9 生成的五类镜像、digest、SBOM、provenance、签名和扫描结果。
 
-### 9.4 阶段 5 退出门槛
+### 9.5 阶段 5 工程准备门槛
 
-- [ ] 五类镜像均由同一个批准 commit 构建。
-- [ ] 所有 Staging 镜像引用均固定到 digest。
-- [ ] 可达高危/严重漏洞数量为 0，或有正式风险接受记录。
-- [ ] Registry 凭据没有写入仓库、镜像层、日志和 manifest。
-- [ ] 在干净主机上可以按 digest 拉取全部镜像。
+- [ ] 五类 Dockerfile、构建上下文和版本参数已经固定。
+- [ ] Release manifest 模板要求所有 Staging 镜像使用 digest。
+- [ ] SBOM、签名、扫描和风险接受流程可重复执行。
+- [ ] Registry 凭据没有写入仓库、脚本默认值和 manifest。
+- [ ] 完整构建、扫描、上传和干净主机拉取命令已列入阶段 9 清单。
+
+通过以上门槛后，阶段 5 状态改为 `待集中验收`；镜像未在阶段 9 实际构建并验证前，不得标记为 `已完成`。
 
 ---
 
-## 10. 阶段 6：部署真实 Staging
+## 10. 阶段 6：准备真实 Staging 部署
 
 > 当前状态：未开始  
-> 进入条件：阶段 5 的镜像、扫描和 digest 全部通过。  
-> 本阶段目标：建立真实 HTTPS 环境并完成产品全链路 smoke test。
+> 进入条件：阶段 5 工程准备门槛通过，状态为 `待集中验收`。
+> 本阶段目标：完成基础设施清单、Secret 边界、部署脚本、Preflight 和验收清单；真实部署和产品全链路测试后置到阶段 9。
 
-### 10.1 基础设施准备
+### 10.1 基础设施与配置准备
 
-准备：
+准备并评审以下清单；本阶段不要求启动长期运行的付费资源：
 
 - 一台专用 Staging 主机。
 - Docker Engine 和 Compose v2。
@@ -559,7 +615,7 @@ Token 只授予需要的包权限，不要使用个人主密码。
 - OpenAI Key、数据库密码和 Alert webhook 的安全存储。
 - 备份目标和异地副本。
 
-### 10.2 手动获取代码
+### 10.2 阶段 9 手动获取代码
 
 > **必须手动操作：服务器上的代码由运维人员从已审核的 GitHub commit/tag 获取。**
 
@@ -572,7 +628,7 @@ git checkout <approved-tag-or-commit>
 git status --short
 ```
 
-### 10.3 配置 Secret
+### 10.3 阶段 9 配置 Secret
 
 根据 `deploy/staging/secrets/README.md` 创建 Secret 文件，并设置最小权限。禁止：
 
@@ -582,6 +638,8 @@ git status --short
 - 让 Worker 读取不需要的数据库管理密码。
 
 ### 10.4 Preflight 与发布
+
+工程准备阶段只运行不连接真实服务器、不拉取全部镜像的静态检查或 dry-run，并保证单次在 10 分钟内结束。以下正式发布命令在阶段 9 执行：
 
 ```powershell
 Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
@@ -595,7 +653,7 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 ./scripts/staging-release.ps1 -Release 0.12.0-rc.2 -IncludeOpenAI -ConfirmDeploy
 ```
 
-### 10.5 Staging 验收
+### 10.5 阶段 9 执行的 Staging 验收
 
 - [ ] HTTPS 证书可信，HTTP 自动跳转 HTTPS。
 - [ ] API、Worker、PostgreSQL、Prometheus、Alertmanager 和 OTLP 不暴露公网端口。
@@ -609,34 +667,36 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 
 ### 10.6 阶段交付物
 
-- Staging 域名、批准版本和部署时间记录。
-- Release manifest 和健康检查结果。
-- 登录到报告下载的全链路证据。
-- 网络端口、Secret 边界和 Sandbox mTLS 验证记录。
+- 基础设施、DNS、端口、存储、Secret 和访问控制清单。
+- 可重复执行的 Preflight、部署、健康检查和 E2E 脚本。
+- 不含 Secret 的 Staging 配置模板和验收表。
+- 阶段 9 生成的部署时间、Release manifest、健康检查和全链路证据。
 
-### 10.7 阶段 6 退出门槛
+### 10.7 阶段 6 工程准备门槛
 
-- [ ] 本节 Staging 验收项全部通过。
-- [ ] API、Worker、Web 和数据库 Migration 版本一致。
-- [ ] 至少一个完整 Development Run 在真实 Sandbox 内完成。
-- [ ] 原 Fixture 仓库在运行前后保持不变。
-- [ ] Bootstrap Secret 已删除，普通运行不再依赖 Bootstrap。
+- [ ] Staging 基础设施、DNS、端口和访问控制清单已评审。
+- [ ] 配置模板不含 Secret，Secret 创建和删除步骤明确。
+- [ ] Preflight、部署、健康检查、E2E 和清理脚本已完成快速校验。
+- [ ] API、Worker、Web、Migration 和 Prompt 版本一致性检查已写入验收脚本。
+- [ ] 真实部署、Sandbox Run、Fixture 不变性和 Bootstrap 删除验证已列入阶段 9。
+
+通过以上门槛后，阶段 6 状态改为 `待集中验收`；公网 Staging 尚未完成时仍不得标记为 `已完成` 或 Production Ready。
 
 ---
 
-## 11. 阶段 7：运维和安全演练
+## 11. 阶段 7：准备运维和安全演练
 
 > 当前状态：未开始  
-> 进入条件：阶段 6 的真实 Staging 全链路通过。  
-> 本阶段目标：证明故障、安全事件和版本失败时可以发现、恢复和回滚。
+> 进入条件：阶段 6 工程准备门槛通过，状态为 `待集中验收`。
+> 本阶段目标：完成告警、恢复、安全、回滚和 Demo 脚本与 Runbook；真实投递、恢复和攻击面演练后置到阶段 9。
 
-### 11.1 告警
+### 11.1 告警准备
 
 ```powershell
 ./scripts/staging-alert-test.ps1
 ```
 
-验证：
+本阶段使用合成输入或 dry-run 快速验证规则和消息脱敏；阶段 9 再验证真实投递：
 
 - API/Worker Down。
 - 高错误率。
@@ -647,14 +707,14 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 
 每条告警必须到达真实值班渠道并包含 Runbook 链接，但不得包含 Secret 和任务正文。
 
-### 11.2 备份恢复
+### 11.2 备份恢复准备
 
 ```powershell
 ./scripts/staging-backup.ps1
 ./scripts/staging-restore-drill.ps1 -BackupFile <backup.dump> -ConfirmRestore
 ```
 
-验收：
+本阶段检查参数、防误操作保护和隔离目标；以下验收在阶段 9 执行：
 
 - checksum 正确。
 - 恢复目标是隔离数据库。
@@ -662,13 +722,13 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 - 恢复后的登录、Run、审批和报告链路通过。
 - 已记录 RPO、RTO 和恢复耗时。
 
-### 11.3 安全演练
+### 11.3 安全演练准备
 
 ```powershell
 ./scripts/staging-security-drill.ps1
 ```
 
-至少验证：
+本阶段先完成脚本和合成用例；阶段 9 至少真实验证：
 
 - 路径穿越和符号链接逃逸被拒绝。
 - Shell 元字符和未知命令被拒绝。
@@ -677,15 +737,15 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 - Sandbox 无公网网络。
 - Secret 不进入模型上下文和日志。
 
-### 11.4 版本回滚
+### 11.4 版本回滚准备
 
 ```powershell
 ./scripts/staging-rollback.ps1 -Manifest <previous-release.json> -ConfirmRollback
 ```
 
-验证旧镜像、Schema 兼容性、Prompt Active Release 和 Worker Readiness。应用回滚不能自动执行 Down Migration。
+本阶段验证 manifest 解析、参数保护和 dry-run；阶段 9 使用真实旧镜像验证 Schema 兼容性、Prompt Active Release 和 Worker Readiness。应用回滚不能自动执行 Down Migration。
 
-### 11.5 Demo
+### 11.5 Demo 准备
 
 ```powershell
 ./scripts/demo-staging.ps1 `
@@ -695,32 +755,32 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
   -RepositoryPath /repositories/demo
 ```
 
-按照 `docs/demo.md` 在 3～5 分钟内完成一次可重复演示，并保存脱敏结果。
+本阶段固定 `docs/demo.md` 的 3～5 分钟流程和脱敏规则；真实 Staging 演示在阶段 9 执行并保存结果。
 
 ### 11.6 阶段交付物
 
-- 告警投递截图或事件记录。
-- 备份 checksum、隔离恢复记录和 RPO/RTO 实测值。
-- 安全边界测试结果。
-- 回滚前后 Release manifest 与健康检查结果。
-- 3～5 分钟 Demo 脱敏记录。
+- 已通过快速检查的告警、备份、恢复、安全、回滚和 Demo 脚本。
+- 告警路由、隔离恢复、风险场景、回滚和 Demo Runbook。
+- 阶段 9 生成的投递记录、RPO/RTO 实测值、安全结果、回滚证据和 Demo 脱敏记录。
 
-### 11.7 阶段 7 退出门槛
+### 11.7 阶段 7 工程准备门槛
 
-- [ ] 告警实际到达值班渠道。
-- [ ] 备份能够恢复到隔离数据库并通过业务 E2E。
-- [ ] Sandbox、路径、命令、Secret 和治理边界演练全部通过。
-- [ ] 应用版本可以回滚，且没有自动执行 Down Migration。
-- [ ] Demo 可由另一名人员按文档重复完成。
-- [ ] 未通过项已经阻止 Production 推进，而不是以备注代替门禁。
+- [ ] 告警规则、模板、脱敏和路由 dry-run 通过。
+- [ ] 备份/恢复脚本具备 checksum、隔离目标和显式确认保护。
+- [ ] Sandbox、路径、命令、Secret 和治理边界用例已固化。
+- [ ] 回滚脚本禁止自动 Down Migration，并可校验旧 manifest。
+- [ ] Demo 文档可由另一名人员按步骤执行。
+- [ ] 所有真实演练项已进入阶段 9 阻断清单。
+
+通过以上门槛后，阶段 7 状态改为 `待集中验收`；未取得真实演练证据前不得标记为 `已完成`。
 
 ---
 
-## 12. 阶段 8：Production 前必须补充的能力
+## 12. 阶段 8：准备 Production 方案和发布资料
 
 > 当前状态：未开始  
-> 进入条件：阶段 7 的运维与安全证据全部签署。  
-> 本阶段目标：把单机 Staging 工程提升为可持续运营的 Production 方案。
+> 进入条件：阶段 7 工程准备门槛通过，状态为 `待集中验收`。
+> 本阶段目标：完成 Production 架构、安全、SLO、值班、数据制度和发布资料；依赖真实环境的数据、容量和恢复结论在阶段 9 回填。
 
 当前 Compose 定位为单机 Staging。Production 不应直接照搬。
 
@@ -775,21 +835,26 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 - 值班表、事件升级路径和变更审批流程。
 - 隐私、保留、删除、导出、许可证和第三方清单。
 
-### 12.6 阶段 8 退出门槛
+### 12.6 阶段 8 工程准备门槛
 
 - [ ] 控制面、执行面、数据库、对象存储和 Secret 边界已获批准。
 - [ ] Production 不直接复用单机 Staging 的信任模型。
-- [ ] 独立安全评审无未处置的阻断问题。
-- [ ] SLO、容量、值班、RPO/RTO 和数据政策有明确负责人。
-- [ ] Production 发布和回滚方案已经过评审。
+- [ ] 独立安全评审范围、负责人和阻断问题处理流程已确定。
+- [ ] SLO、容量、值班、RPO/RTO 和数据政策有明确负责人；需要实测的数值标记为阶段 9 回填。
+- [ ] Production 发布、回滚和最终人工审批方案已经过文档评审。
+
+通过以上门槛后，阶段 8 状态改为 `待集中验收`。只有阶段 9 回填真实 Eval、镜像、Staging、安全、恢复和容量证据后，阶段 4～8 才能一起转为 `已完成`。
 
 ---
 
-## 13. 阶段 9：手动发布 v1.0.0
+## 13. 阶段 9：集中执行高耗时验收并手动发布 v1.0.0
 
 > 当前状态：未开始  
-> 进入条件：阶段 0～8 全部标记为已完成且证据可追溯。  
-> 人工操作：版本提交、签名 Tag、Tag 上传和 GitHub Release 必须由发布负责人手动执行。
+> 进入条件：阶段 0～3 已完成，阶段 4～8 均达到工程准备门槛并标记为 `待集中验收`。
+> 本阶段目标：在一个预先安排的验收窗口内完成所有高耗时、付费或依赖真实环境的任务，证据全部通过后再发布。
+> 人工操作：模型费用与数据发送授权、Registry 登录与上传、服务器部署确认、Promotion 审批、版本 Tag 和 GitHub Release 必须由相应负责人手动执行。
+
+开始前必须冻结候选范围，不得在验收过程中边测边加入新功能。任何代码、Prompt、Policy、Tool、Fixture、Grader、镜像配置或 Migration 发生变化，都要使受影响证据失效并从对应步骤重新执行。
 
 只有以下条件全部满足，才允许发布：
 
@@ -797,15 +862,64 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 - [ ] GitHub 分支保护和必需 CI 已启用。
 - [ ] 30 个真实 fixture commit 已验证。
 - [x] 三基线报告已生成并人工签署。
-- [ ] Prompt/模型 Promotion 与 rollback 演练通过。
+- [ ] 阶段 4 的正式候选对照、Prompt/模型 Promotion 与 rollback 演练通过。
+- [ ] 五类镜像完成构建、SBOM、签名、扫描、上传和 digest 拉取验证。
 - [ ] Staging HTTPS 全链路通过。
 - [ ] Sandbox 安全边界通过真实 smoke test。
 - [ ] 告警、备份恢复和版本回滚通过。
+- [ ] 负载、容量、并发、P95 和稳定性测试达到批准的 SLO。
 - [ ] Demo 可重复执行。
 - [ ] govulncheck、Staticcheck、Race CI、前端和数据库检查全部通过。
 - [ ] Production 架构、安全、值班、RPO/RTO 和数据政策已批准。
 
-### 13.1 手动创建版本提交和 Tag
+### 13.1 集中验收窗口准备
+
+- 记录候选 Git SHA 以及 Prompt、模型、Policy、Tool、Fixture、Grader 和 Migration 版本。
+- 确认正式 Eval 的样本数、重复次数、总费用硬上限、断点恢复位置和允许发送的数据范围。
+- 确认 Registry、Staging、备份目标、值班渠道和回滚版本可用。
+- 为每个长任务设置超时、日志位置、失败终止条件和负责人。
+- 预留连续执行时间；不得把未完成的长任务拆成无法追溯的手工片段。
+- 再次确认原始 Evidence、隐藏测试、Private Grader、凭据和用户数据不会进入 GitHub Release。
+
+### 13.2 正式数据 Eval 与 Promotion
+
+1. 执行阶段 4 固定的正式候选对照，不使用 smoke 结果替代正式成绩。
+2. 覆盖约定的全部 Fixture、模式和重复次数；失败、拒绝、超时和人工介入必须保留。
+3. 生成完成率、隐藏测试通过率、回归率、人工介入率、成本和 P95 延迟报告。
+4. 人工审核报告并决定批准、拒绝或要求新候选。
+5. 仅在批准后执行 Promotion；随后完成 Worker Readiness 和 rollback 演练。
+
+若本节失败，停止镜像发布和 Staging 部署，返回阶段 4 修复候选。
+
+### 13.3 完整镜像构建、扫描和人工上传
+
+按阶段 5 的构建清单从同一个批准 commit 构建五类镜像，并完成：
+
+- SBOM、provenance、签名和漏洞扫描。
+- 高危/严重可达漏洞阻断或正式风险接受。
+- 发布负责人手动登录 Registry 并上传镜像。
+- 记录 digest，在干净主机按 digest 拉取验证。
+- 生成不含凭据且全部固定到 digest 的 Release manifest。
+
+若任一镜像失败，停止 Staging 部署，修复后重新生成受影响镜像及证据。
+
+### 13.4 真实 Staging 与运维安全验收
+
+1. 按阶段 6 的步骤手动获取批准代码、配置 Secret、执行 Preflight 并按 digest 部署。
+2. 完成 HTTPS、端口、Secret、mTLS、Sandbox、RBAC、Migration 和登录到报告下载的完整 E2E。
+3. 按阶段 7 执行真实告警投递、隔离备份恢复、安全边界、版本回滚和 Demo。
+4. 执行负载、容量、并发、P95 和稳定性测试，并回填阶段 8 的 SLO、RPO/RTO 与容量结论。
+5. 确认 Bootstrap Secret 已删除，原 Fixture 仓库在运行前后保持不变。
+
+若任一项失败，停止 Production 和 GitHub Release；不得以“已知问题”备注替代阻断门禁。
+
+### 13.5 最终证据汇总与人工批准
+
+- 汇总脱敏 Eval 报告、镜像 digest、SBOM、扫描、Staging E2E、告警、恢复、安全、回滚、容量和 Demo 证据。
+- 人工确认阶段 4～8 的后置验收项全部完成，并将其状态从 `待集中验收` 改为 `已完成`。
+- 由发布负责人签署最终 Go/No-Go 结论；No-Go 时不得创建 Tag 或 Release。
+
+### 13.6 手动创建版本提交和 Tag
 
 > **必须手动操作：版本提交和 Tag 由发布负责人执行。**
 
@@ -820,7 +934,7 @@ git push origin v1.0.0
 
 如果没有配置签名 Tag，应先建立组织认可的签名方案，不要直接降低发布要求。
 
-### 13.2 手动发布 GitHub Release
+### 13.7 手动发布 GitHub Release
 
 > **必须手动上传和发布：在 GitHub Releases 页面由发布负责人操作。**
 
@@ -841,15 +955,17 @@ Release 应包含：
 - Secret、Cookie、数据库 dump 和私钥。
 - 未经审核的运行日志。
 
-### 13.3 阶段交付物
+### 13.8 阶段交付物
 
 - 签名的 `v1.0.0` Tag。
 - GitHub Release、Release Notes 和升级/回滚说明。
 - 镜像 digest、签名、SBOM 和脱敏 Eval 报告。
+- Staging E2E、告警、恢复、安全、回滚、容量和 Demo 的脱敏验收包。
 - 最终验收签署记录。
 
-### 13.4 阶段 9 退出门槛
+### 13.9 阶段 9 退出门槛
 
+- [ ] 阶段 4～8 的后置验收项均有真实证据，状态全部为 `已完成`。
 - [ ] GitHub Tag 与批准 commit 完全一致。
 - [ ] Release 资产不包含 Secret、原始 Evidence、数据库 dump 和私有源码。
 - [ ] 发布镜像 digest 与 Staging 验收镜像一致。
@@ -880,19 +996,22 @@ Release 应包含：
 1. `governance: enforce active prompt release at worker readiness`
 2. `governance: add model release and rollback records`
 
-### 阶段 5～7 Milestone：Staging 验收
+### 阶段 5～8 Milestone：发布与环境准备
 
-1. `security: run real sandbox boundary smoke test`
-2. `ops: deploy first public HTTPS staging release`
-3. `ops: verify alert delivery and on-call runbooks`
-4. `ops: complete isolated backup restore drill`
-5. `ops: complete immutable image rollback drill`
+1. `release: prepare immutable image build and scan pipeline`
+2. `ops: prepare public HTTPS staging deployment assets`
+3. `ops: prepare alert, backup restore and rollback runbooks`
+4. `security: prepare sandbox boundary validation suite`
+5. `ops: approve production architecture, SLO and data policies`
 
-### 阶段 8～9 Milestone：Production 与发布
+### 阶段 9 Milestone：集中验收与发布
 
-1. `ops: approve production architecture and SLO`
-2. `security: complete independent production review`
-3. `docs: record signed v1.0.0 acceptance evidence`
+1. `eval: run final full candidate comparison`
+2. `release: build scan sign and upload immutable images`
+3. `ops: deploy and validate public HTTPS staging release`
+4. `security: run sandbox boundary and production security validation`
+5. `ops: complete alert, restore, rollback, load and demo drills`
+6. `docs: record signed v1.0.0 acceptance evidence`
 
 每个 Issue 必须包含：
 
@@ -907,7 +1026,7 @@ Release 应包含：
 
 ## 15. 阶段状态跟踪表
 
-执行过程中只维护下表，不跨阶段并行执行发布操作：
+执行过程中只维护下表。阶段 4～8 可以依次推进工程准备，但不得提前执行阶段 9 的付费全量 Eval、完整镜像发布、真实 Staging 和长时间演练：
 
 | 阶段 | 状态 | 负责人 | 开始日期 | 完成日期 | 证据位置 |
 |---|---|---|---|---|---|
@@ -915,11 +1034,11 @@ Release 应包含：
 | 1 Git 与 GitHub 基线 | 已完成 | 仓库所有者 | 2026-08-18 | 2026-08-30 | `docs/stage-1-github-baseline-audit.md` |
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
-| 4 Prompt/模型治理 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #14/#15/#20/#21/#22/#23/#24/#25/#26/#27/#28/#29 已合并且四项必需检查通过；两次 v1/v3 smoke 合计成本 `$0.012804996`，均未形成有效质量比较；v3 不进入正式 Eval，正在准备不可变 v4 |
-| 5 不可变发布镜像 | 未开始 | 待填写 |  |  |  |
-| 6 真实 Staging | 未开始 | 待填写 |  |  |  |
-| 7 运维与安全验收 | 未开始 | 待填写 |  |  |  |
-| 8 Production 准备 | 未开始 | 待填写 |  |  |  |
-| 9 v1.0.0 发布 | 未开始 | 待填写 |  |  |  |
+| 4 Prompt/模型治理准备 | 进行中 | 仓库所有者 | 2026-09-01 |  | PR #30 已合并；v1/v4 smoke 固定在 `108c57ff0740e4c4fccfa27522297177602b0476`，2 个结果均因补丁预检失败，记录费用 `$0.00640506`；见 `release-reports/stage-4-developer-v4-smoke-review.md`。等待提交补丁失败诊断改动 |
+| 5 发布镜像资产准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 6 Staging 部署准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 7 运维与安全演练准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-当前处于**阶段 4：Prompt/模型治理**。v1/v2 正式对照已完成 180 个终态 Observation，但自动 Gate 阻断 `developer/v2`。PR #27 合并不可变 `developer/v3`，PR #28 合并不可晋级快速 smoke，PR #29 合并严格 JSON 围栏兼容并把调用限制提高到 60 秒。两次 v1/v3 smoke 分别固定在 `8aa1675ae0320e8726b7204e256d1e294ae495c3` 与 `698520cea5c0ca441f3b9d1eb628db7c411147cf`，合计成本 `$0.012804996`；因超时和非 JSON 前缀，两次均未进入有效质量比较，v3 不启动正式 Eval。下一步是人工审核并合并不可变 `developer/v4`，再从新合并 SHA 运行 2 Observation smoke。只有 smoke 排除基础设施错误、正式 180 Observation 对照通过自动 Gate 并由 Admin 人工批准后，才可完成双版本 Promotion/rollback 演练。
+当前处于**阶段 4：Prompt/模型治理准备**。v2 已被正式 Gate 阻断，v3 两次 smoke 未通过。PR #30 已合并不可变 v4；2026-09-05 的 v1/v4 smoke 已完整结束：两侧均通过 JSON 解码，v1 补丁与源文件不匹配，v4 补丁格式损坏，均未进入显式测试或隐藏测试。记录费用为 `$0.00640506`。2026-09-07 读取已有结果完成诊断，没有新增付费调用。本地改动为 Evidence 增加补丁失败阶段、为 smoke 汇总增加固定分类计数，并修复 Git 超时错误链丢失的问题；合法、损坏、不匹配和超时情形使用合成数据离线验证。下一步人工提交并合并诊断改动，再定位补丁生成问题；不因单次格式错误自动创建新的 Prompt 版本，不将 smoke 记为正式 Eval 或 Promotion 批准。之后依次完成阶段 4～8 的工程准备，每项只运行不超过 10 分钟的快速检查；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。

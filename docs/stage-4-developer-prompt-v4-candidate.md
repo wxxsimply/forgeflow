@@ -1,6 +1,6 @@
 # ForgeFlow Developer Prompt v4 候选说明
 
-> 状态：本地不可变候选，尚未提交、合并、执行付费 smoke、正式 Eval 或批准 Promotion。
+> 状态：PR #30 已合并；2026-09-05 的首次 v1/v4 smoke 已完成，两侧均在补丁预检失败。v4 保持不可变，尚未通过正式 Eval 或批准 Promotion。详见 `release-reports/stage-4-developer-v4-smoke-review.md`。
 
 ## 1. 候选原因
 

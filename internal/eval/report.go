@@ -55,16 +55,17 @@ type Metrics struct {
 }
 
 type Report struct {
-	SchemaVersion  string        `json:"schemaVersion"`
-	Dataset        string        `json:"dataset"`
-	DatasetVersion string        `json:"datasetVersion"`
-	GeneratedAt    time.Time     `json:"generatedAt"`
-	Configuration  Configuration `json:"configuration"`
-	Total          int           `json:"total"`
-	Passed         int           `json:"passed"`
-	Grades         []Grade       `json:"grades"`
-	Metrics        Metrics       `json:"metrics"`
-	Unavailable    []string      `json:"unavailableMetrics"`
+	SchemaVersion  string         `json:"schemaVersion"`
+	Dataset        string         `json:"dataset"`
+	DatasetVersion string         `json:"datasetVersion"`
+	GeneratedAt    time.Time      `json:"generatedAt"`
+	Configuration  Configuration  `json:"configuration"`
+	Total          int            `json:"total"`
+	Passed         int            `json:"passed"`
+	Grades         []Grade        `json:"grades"`
+	Metrics        Metrics        `json:"metrics"`
+	Unavailable    []string       `json:"unavailableMetrics"`
+	SmokeFailures  map[string]int `json:"smokeFailures,omitempty"`
 }
 
 type EvidenceFile struct {
@@ -178,6 +179,29 @@ func BuildSmokeReport(dataset Dataset, evidence Evidence, now time.Time) (Report
 		return Report{}, err
 	}
 	report.SchemaVersion = "forgeflow.eval.smoke-report/v1"
+	report.SmokeFailures = make(map[string]int)
+	passed := make(map[string]bool, len(report.Grades))
+	for _, grade := range report.Grades {
+		passed[grade.CaseID] = grade.Passed
+	}
+	for _, observation := range evidence.Observations {
+		if passed[observation.CaseID] {
+			continue
+		}
+		// Only fixed labels enter the summary; never copy provider/Grader text.
+		category := "other"
+		switch {
+		case observation.FailureCode == "timeout":
+			category = "timeout"
+		case observation.FailureStage == "patch_check":
+			category = "patch_check"
+		case observation.FailureStage == "patch_apply":
+			category = "patch_apply"
+		case observation.FailureCode == "model_output_invalid":
+			category = "model_output_invalid"
+		}
+		report.SmokeFailures[category]++
+	}
 	return report, nil
 }
 

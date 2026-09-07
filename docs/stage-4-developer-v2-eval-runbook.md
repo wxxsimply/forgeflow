@@ -85,6 +85,14 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 快速模式不支持 `-Resume`，并拒绝覆盖已有 Campaign 目录；重试时使用新的 `CampaignId`，保留旧 Evidence 供私下诊断。
 
+### Smoke 失败诊断
+
+若 smoke 未通过，先阅读 `results[].failures` 的固定分类：`patch_check` 为 Git 预检失败，`patch_apply` 为预检通过后应用失败，`timeout` 为超时，`model_output_invalid` 为其余模型输出错误，`other` 为其他失败。计数不含错误正文、文件内容或隐藏测试名称；它不能代替正式评分。
+
+新增 Evidence 的可选 `failureStage` 字段标识补丁失败发生位置。旧 Evidence 保持可读，但没有该字段时不会从错误字符串猜测阶段，因此旧补丁错误可能仍汇总为 `model_output_invalid`。不要改写历史 Evidence。需要离线诊断时，使用 `forgeflow eval --suite software/v1 --evidence <已有路径> --smoke-report`；此命令只评分已有数据，不联系 Provider。
+
+诊断时先检查本地合成补丁测试和 Provider 输出契约。补丁预检失败不等于 JSON 解码失败，也不证明隐藏测试失败；测试尚未运行的情况应在审核记录中注明。候选代码调整必须重新提交，再使用新 Campaign 和干净 SHA 获取新证据。
+
 ## 6. 正式运行与恢复
 
 人工复核预检输出后，使用完全相同的参数移除 `-PreflightOnly`，增加：

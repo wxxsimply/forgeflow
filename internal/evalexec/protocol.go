@@ -236,14 +236,34 @@ func validateChangeSet(value solution, evalCase fulleval.Case) error {
 	return nil
 }
 
+type patchExecutionError struct {
+	stage string
+	err   error
+}
+
+func (e *patchExecutionError) Error() string { return e.err.Error() }
+func (e *patchExecutionError) Unwrap() error { return e.err }
+
 func applyPatch(ctx context.Context, workspace, patch string) error {
-	for _, args := range [][]string{{"apply", "--check", "--whitespace=nowarn", "-"}, {"apply", "--whitespace=nowarn", "-"}} {
+	for index, args := range [][]string{{"apply", "--check", "--whitespace=nowarn", "-"}, {"apply", "--whitespace=nowarn", "-"}} {
 		command := exec.CommandContext(ctx, "git", args...)
 		command.Dir = workspace
 		command.Stdin = strings.NewReader(patch)
 		output, err := command.CombinedOutput()
 		if err != nil {
-			return apperror.New(apperror.CodeModelOutput, "patch could not be applied: "+truncate(string(output), 1000))
+			stage := "patch_check"
+			if index == 1 {
+				stage = "patch_apply"
+			}
+			if ctx.Err() != nil {
+				return &patchExecutionError{stage: stage, err: ctx.Err()}
+			}
+			code := apperror.CodeInternal
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				code = apperror.CodeModelOutput
+			}
+			return &patchExecutionError{stage: stage, err: apperror.Wrap(err, code, "eval."+stage+": "+truncate(string(output), 1000), "patch could not be applied")}
 		}
 	}
 	return nil
@@ -354,6 +374,10 @@ func detectSecret(value string) bool { return secretPattern.MatchString(value) }
 func terminalFailure(observation *fulleval.Observation, err error, workspace string, options Options) {
 	observation.Outcome = "failed"
 	observation.FailureCode = string(apperror.CodeOf(err))
+	var patchError *patchExecutionError
+	if errors.As(err, &patchError) {
+		observation.FailureStage = patchError.stage
+	}
 	if errors.Is(err, context.DeadlineExceeded) || apperror.IsCode(err, apperror.CodeTimeout) {
 		observation.Outcome = "timed_out"
 		observation.FailureCode = string(apperror.CodeTimeout)

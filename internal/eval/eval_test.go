@@ -88,6 +88,35 @@ func TestComparisonRequiresAllThreeModes(t *testing.T) {
 	}
 }
 
+func TestSmokeFailureCountsUseFixedLabelsAndPreserveGrading(t *testing.T) {
+	dataset, err := Load(SoftwareV1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct{ code, stage, category string }{
+		{"model_output_invalid", "patch_check", "patch_check"},
+		{"model_output_invalid", "patch_apply", "patch_apply"},
+		{"timeout", "patch_check", "timeout"},
+		{"model_output_invalid", "", "model_output_invalid"},
+		{"private-error-text", "private-stage-text", "other"},
+	} {
+		t.Run(test.category, func(t *testing.T) {
+			evidence := evidenceFor(dataset, ModePlannerDeveloper, true)
+			evidence.Observations = evidence.Observations[:1]
+			evidence.Observations[0].PatchApplicable = false
+			evidence.Observations[0].FailureCode = test.code
+			evidence.Observations[0].FailureStage = test.stage
+			report, err := BuildSmokeReport(dataset, evidence, time.Unix(1, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Passed != 0 || len(report.SmokeFailures) != 1 || report.SmokeFailures[test.category] != 1 {
+				t.Fatalf("unexpected grading/diagnostics: %+v", report)
+			}
+		})
+	}
+}
+
 func TestCandidateComparisonRequiresOnlyDeveloperPromptAndPriorCostToDiffer(t *testing.T) {
 	dataset, err := Load(SoftwareV1)
 	if err != nil {

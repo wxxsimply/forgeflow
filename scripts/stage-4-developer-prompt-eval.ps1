@@ -291,6 +291,7 @@ try {
                 mode = 'planner_developer'
                 cases = [int]$smokeReport.total
                 passed = [int]$smokeReport.passed
+                failures = $smokeReport.smokeFailures
                 completionRate = $smokeReport.metrics.completionRate
                 hiddenTestPassRate = $smokeReport.metrics.hiddenTestPassRate
                 regressionRate = $smokeReport.metrics.regressionRate
