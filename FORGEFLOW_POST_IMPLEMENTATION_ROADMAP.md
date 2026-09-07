@@ -524,7 +524,7 @@ go run ./cmd/forgeflow eval `
 
 ## 9. 阶段 5：准备不可变发布镜像资产
 
-> 当前状态：未开始  
+> 当前状态：待集中验收（2026-09-08，五镜像构建计划、digest 清单契约、供应链验证 Runbook 和快速静态门禁已建立）
 > 进入条件：阶段 4 工程准备门槛通过，状态为 `待集中验收`。
 > 本阶段只准备 Dockerfile、构建脚本、扫描策略和 Release manifest 模板；完整构建、扫描、上传和拉取验证后置到阶段 9。
 > 人工操作：阶段 9 的 Registry 登录、镜像上传和 digest 确认必须由发布负责人手动执行。
@@ -586,11 +586,11 @@ Token 只授予需要的包权限，不要使用个人主密码。
 
 ### 9.5 阶段 5 工程准备门槛
 
-- [ ] 五类 Dockerfile、构建上下文和版本参数已经固定。
-- [ ] Release manifest 模板要求所有 Staging 镜像使用 digest。
-- [ ] SBOM、签名、扫描和风险接受流程可重复执行。
-- [ ] Registry 凭据没有写入仓库、脚本默认值和 manifest。
-- [ ] 完整构建、扫描、上传和干净主机拉取命令已列入阶段 9 清单。
+- [x] 五类 Dockerfile、构建上下文和版本参数已经固定。
+- [x] Release manifest 模板要求所有 Staging 镜像使用 digest。
+- [x] SBOM、签名、扫描和风险接受流程可重复执行。
+- [x] Registry 凭据没有写入仓库、脚本默认值和 manifest。
+- [x] 完整构建、扫描、上传和干净主机拉取命令已列入阶段 9 清单。
 
 通过以上门槛后，阶段 5 状态改为 `待集中验收`；镜像未在阶段 9 实际构建并验证前，不得标记为 `已完成`。
 
@@ -1035,10 +1035,10 @@ Release 应包含：
 | 2 真实 Eval Fixture | 已完成 | 仓库所有者 | 2026-08-30 | 2026-08-30 | `docs/stage-2-eval-fixture-audit.md`、`evals/software-v1-fixtures.lock.json`；Private + Archived 等效控制 |
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
 | 4 Prompt/模型治理准备 | 待集中验收 | 仓库所有者 | 2026-09-01 |  | PR #31 已合并补丁诊断；Prompt 嵌入/回滚配置、最终执行参数、快速检查和通用审批模板已核对，见 `docs/stage-4-engineering-readiness.md`；v4 smoke 补丁阻断保留到最终验收前处理 |
-| 5 发布镜像资产准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 5 发布镜像资产准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docker-bake.hcl`、`deploy/release/release-manifest.template.json`、`scripts/validate-release-assets.ps1`、`docs/stage-5-release-image-audit.md` |
 | 6 Staging 部署准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 7 运维与安全演练准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-阶段 4 的工程准备门槛已通过，当前状态为**待集中验收**。PR #31 已合并补丁失败阶段、脱敏分类和超时错误链修复；候选/回滚 Prompt 的嵌入资源、不可变摘要、正式执行参数、审批模板及离线快速检查均已核对。v2 的正式 Gate 阻断、v3 两次 smoke 失败和 v4 首次 smoke 的补丁预检失败均保留为历史证据；v4 阻断必须在阶段 9 正式对照前解除，不得把 smoke 记为正式成绩或 Promotion 批准。下一步进入阶段 5 的发布镜像资产准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。
+阶段 4 和阶段 5 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 5 已固定五镜像 Bake 构建计划、OCI 版本元数据、digest Release manifest、SBOM/provenance/签名/扫描流程与风险接受模板；PR 门禁只执行快速 Dockerfile check，不在工程准备遍完整构建镜像。下一步进入阶段 6 的真实 Staging 部署准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。

@@ -52,13 +52,15 @@ services:
       - no-new-privileges:true
 
   migrate:
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-cli:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     build:
       context: ../..
       dockerfile: Dockerfile
-      target: cli
+      target: api
       args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    entrypoint: ["/usr/local/bin/forgeflow"]
     command: ["db", "migrate"]
     read_only: true
     security_opt:
@@ -85,6 +87,7 @@ services:
       dockerfile: Dockerfile
       target: api
       args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     environment:
       <<: *app-environment
@@ -129,6 +132,7 @@ services:
       dockerfile: Dockerfile
       target: worker
       args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     environment:
       <<: *app-environment
@@ -169,6 +173,9 @@ services:
       context: ../..
       dockerfile: web/Dockerfile
       target: web
+      args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     networks:
       - app
     healthcheck:
@@ -184,6 +191,8 @@ services:
       dockerfile: Dockerfile
       args:
         CADDY_BASE_IMAGE: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
     restart: unless-stopped
     environment:
       FORGEFLOW_DOMAIN: ${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}

@@ -1,8 +1,8 @@
-# ForgeFlow 完成度审计（2026-09-03 更新）
+# ForgeFlow 完成度审计（2026-09-08 更新）
 
 ## 结论
 
-ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4 的工程准备门槛已通过并进入待集中验收，Developer v1/v2 正式对照已完成且自动 Gate 阻断 v2，v4 的补丁失败仍需在最终窗口前解除。项目目前仍不满足 `v1.0.0` 最终发布条件：候选正式 Eval、人工 Promotion/rollback 和双版本镜像演练尚未完成，后续还缺少 Registry、域名、服务器 Secret 和公网 Staging 验收环境。
+ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4 与阶段 5 的工程准备门槛已通过并进入待集中验收，五类不可变发布镜像的构建、manifest、供应链证据和风险接受契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：候选正式 Eval、人工 Promotion/rollback、完整镜像构建上传及公网 Staging 验收仍未执行。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
@@ -17,7 +17,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
 | 10 Observability/Eval | 阶段 3 完成、阶段 4 待集中验收 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；PR #31 已合并补丁失败诊断，候选/回滚嵌入配置、正式参数和审批模板已核对；v4 补丁阻断、正式候选对照与 Promotion/rollback 留待最终验收 |
-| 11 部署/安全 | 部分完成 | Compose、mTLS 沙箱引擎、HTTPS、备份/恢复/告警/回滚脚本与文档已完成；真实 Staging 验收未完成 |
+| 11 部署/安全 | 阶段 5 待集中验收 | 五镜像 Bake、OCI 版本元数据、digest manifest、供应链验证与风险接受契约已完成；真实镜像和 Staging 验收未执行 |
 
 ## 本轮补齐的工程缺口
 
@@ -29,6 +29,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 6. CI 新增 Staticcheck、govulncheck、OpenAPI 生成差异、Migration 合约及真实 PostgreSQL 集成任务。
 7. Eval CLI 新增 `--fixture-repository`，明确区分“数据结构合法”和“30 个真实 commit 均存在”。
 8. govulncheck 初次发现 12 个可达漏洞后，项目升级 pgx 5.9.2、OpenTelemetry 1.44.0 及安全修复后的传递依赖；2026-08-18 GitHub CI 又识别出 Go 1.26.5 标准库的新公告，因此工具链基线继续升级到 Go 1.26.6，复扫结果为 0 个可达漏洞。
+9. 阶段 5 固定 API、Worker、Web、Caddy、Sandbox 五镜像 Bake 计划；Migration 复用 API 镜像内 CLI，避免独立第六镜像，并建立 digest manifest、SBOM/provenance/签名/扫描和风险接受门禁。
 
 ## 本轮验证结果
 
@@ -45,7 +46,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 
 1. 使用同一精确 Git SHA、Fixture、Private Grader、模型、Reasoning、价格窗口和共享预算运行 Developer v1/v2 候选对照，并由 Admin 签署结论。
 2. 对获批候选完成 Worker drain、双版本镜像、Active Release Readiness、Promotion 和 rollback 演练；未获批则保留 `developer/v1`。
-3. 构建、扫描、签名并由发布负责人手动上传不可变镜像，记录 digest、SBOM 和漏洞门禁。
+3. 按 `docs/release-images.md` 构建、扫描、签名并由发布负责人手动上传五类不可变镜像，记录 digest、SBOM、provenance 和漏洞门禁。
 4. 准备域名、DNS、TLS 邮箱、Registry、OpenAI/PostgreSQL/Alert Secret 和专用 Staging 主机，执行 Preflight 与 Release。
 5. 在 Staging 签署 HTTPS 全链路、Sandbox、告警投递、备份恢复、版本回滚和 3～5 分钟 Demo 证据。
 6. 只有上述结果及 Production 准备全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传候选改进结论。
