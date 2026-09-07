@@ -1,6 +1,8 @@
 # ForgeFlow 阶段 4：Developer Prompt 候选 Eval 操作手册
 
-> 状态：v1/v2 正式 Eval 自动 Gate 阻断 v2；v3 两次快速 smoke 均未形成有效质量比较。当前待审核候选为不可变 `developer/v4`，正式运行必须使用包含对应候选和全部门禁的干净、可追溯合并 SHA。
+> 状态：v1/v2 正式 Eval 阻断 v2；v3 两次 smoke 未形成有效比较；v4 首次 smoke 补丁预检失败。PR #31 已合并诊断代码。正式候选对照后置至路线图阶段 9，当前只进行工程准备及快速诊断。
+
+工程准备清单和离线检查入口见 `docs/stage-4-engineering-readiness.md`。文件名保留 v2 以兼容既有链接，以下命令面向实际候选，不代表 v2 或 v4 已获准正式运行。
 
 ## 1. 目的与边界
 
@@ -93,7 +95,9 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 诊断时先检查本地合成补丁测试和 Provider 输出契约。补丁预检失败不等于 JSON 解码失败，也不证明隐藏测试失败；测试尚未运行的情况应在审核记录中注明。候选代码调整必须重新提交，再使用新 Campaign 和干净 SHA 获取新证据。
 
-## 6. 正式运行与恢复
+## 6. 阶段 9 正式运行与恢复
+
+只有最终窗口已开始、候选 smoke 阻断已解除，才执行本节。工程准备完成不解除当前 v4 补丁失败门禁。
 
 人工复核预检输出后，使用完全相同的参数移除 `-PreflightOnly`，增加：
 
@@ -117,8 +121,8 @@ Eval CLI 会拒绝脏工作区，并把 ForgeFlow、Fixture 和 Private Grader �
 
 1. 人工核对两份报告的 Git、Fixture、Grader、模型、Reasoning、Prompt、Policy、Tool 和价格记录一致，只有 Developer Prompt version/SHA 不同。
 2. 核对完成率、隐藏测试通过率、回归率、人工介入率、成本和 P95 延迟；不得排除失败样本。
-3. 参考 `release-reports/stage-4-developer-v2-review-template.md` 为实际候选生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。
-4. Admin 明确选择 `REJECTED`、`APPROVED AS CANDIDATE` 或 `APPROVED FOR PROMOTION`，记录原因和 Eval Run ID。
+3. 参考 `release-reports/stage-4-candidate-review-template.md` 为实际候选生成新的人工脱敏审核记录，不复制任务正文、源码、模型原始输出、隐藏测试或原始 Evidence。历史 v2 审核表保持原样。
+4. Admin 明确选择 `REJECTED / RERUN REQUIRED`、`APPROVED AS CANDIDATE ONLY` 或 `APPROVED FOR PROMOTION`，记录原因和 Eval Run ID。
 5. 只有 `APPROVED FOR PROMOTION` 才进入 drain、双版本镜像、Readiness、Promotion 和 rollback 演练。
 
-脚本完成不等于阶段 4 完成；阶段 4 退出门槛仍以人工 Promotion/rollback 审计记录和真实双版本镜像验收为准。
+工程准备通过后阶段 4 可以标记为“待集中验收”，继续阶段 5～8 的准备。只有阶段 9 正式对照、双版本镜像及人工 Promotion/rollback 审计均通过后，阶段 4 才能标记为“已完成”。

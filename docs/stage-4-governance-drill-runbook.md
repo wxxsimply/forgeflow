@@ -2,6 +2,8 @@
 
 > 状态：操作工具已就绪，尚未执行真实 Promotion/rollback，也未代替 Admin 人工批准或签署。
 
+本手册在路线图阶段 9 的镜像构建、扫描、上传和隔离 Staging API 就绪后执行。阶段 4 只准备命令和检查，见 `docs/stage-4-engineering-readiness.md`。
+
 ## 1. 安全边界
 
 `scripts/stage-4-governance-drill.ps1` 默认执行只读的 `Inspect`。导入 Eval、Promotion 和 rollback 分别要求 `-ConfirmEvalImport`、`-ConfirmPromotion` 和 `-ConfirmRollback`，确认开关不能跨动作复用。
@@ -15,7 +17,7 @@
 
 ## 2. 前置条件
 
-1. Developer v1/v2 正式 Eval 已完成，候选差异报告通过自动 Gate，并由 Admin 明确选择 `APPROVED FOR PROMOTION`。
+1. 当前版与实际候选的正式 Eval 已完成，候选差异报告通过自动 Gate，并由 Admin 在 `release-reports/stage-4-candidate-review-template.md` 的审核记录中明确选择 `APPROVED FOR PROMOTION`。历史 v2 已被阻断，当前 v4 smoke 也尚未通过，均不得凭本手册直接晋级。
 2. 只使用已经合并、通过必需 CI 且同时嵌入当前 Prompt 与回滚 Prompt 的精确镜像 Git SHA。
 3. 隔离数据库已执行 Migration 5，API 已启动，Worker 保持 drained。
 4. API 的 Bootstrap Admin 凭据已从部署配置中移除；本次使用现有 Admin 登录。
@@ -47,7 +49,7 @@ $releaseCommit = '<40位已批准合并SHA>'
   -Password $adminPassword `
   -ExpectedAPIGitCommit $releaseCommit `
   -Action ImportEval `
-  -EvidencePath .forgeflow/evals/<approved-v2-evidence>.json `
+  -EvidencePath .forgeflow/evals/<approved-candidate-evidence>.json `
   -ConfirmEvalImport
 ```
 
@@ -67,15 +69,15 @@ $releaseCommit = '<40位已批准合并SHA>'
   -ExpectedAPIGitCommit $releaseCommit `
   -Action Promote `
   -Agent developer `
-  -PromptVersion developer/v2 `
-  -EvalRunId <approved-v2-eval-run-id> `
-  -Comment 'Admin-approved Developer v2 controlled promotion; see signed review record.' `
+  -PromptVersion <approved-candidate-prompt-version> `
+  -EvalRunId <approved-candidate-eval-run-id> `
+  -Comment '<实际审批记录及本次变更原因>' `
   -ConfirmPromotion
 ```
 
 脚本会在变更前确认候选 Prompt 已嵌入运行中的 API 镜像，并在变更后确认 Release 历史恰好增加一条、该 Agent 只有一个 Active Release。它不会启动 Worker。
 
-随后部署或启动配置为 `developer/v2`、且仍嵌入 `developer/v1` 的 Worker，并验证：
+随后部署或启动配置为已批准候选版本、且仍嵌入回滚版本的 Worker，并验证：
 
 ```powershell
 ./scripts/stage-4-governance-drill.ps1 `
@@ -112,7 +114,7 @@ go build -trimpath -ldflags "-X forgeflow/internal/buildinfo.Commit=$releaseComm
 
 ## 7. Rollback
 
-`TargetReleaseId` 必须是 Promotion 前保存的旧 Developer Release ID，而不是刚创建的 v2 Release ID。先 drain Worker，再执行：
+`TargetReleaseId` 必须是 Promotion 前保存的旧 Developer Release ID，而不是刚创建的候选 Release ID。先 drain Worker，再执行：
 
 ```powershell
 ./scripts/stage-4-governance-drill.ps1 `

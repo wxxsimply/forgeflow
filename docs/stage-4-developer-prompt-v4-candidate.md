@@ -35,5 +35,5 @@ JSON Schema、权限、工具、预算、模型、Reasoning、生产默认版本
 2. 从包含 v4 的干净合并 SHA 运行 `-CandidatePromptVersion developer/v4 -SmokeOnly -SmokeCaseLimit 1` 预检。
 3. 在有效价格窗口内运行 2 Observation 付费 smoke；只读取脱敏聚合结果。
 4. smoke 存在超时、结构错误或确定性失败时停止，不启动正式 Eval。
-5. 只有 smoke 排除基础设施错误且候选结果可接受，才运行完整 v1/v4 对照。
+5. 只有 smoke 排除基础设施错误且候选结果可接受，才在路线图阶段 9 的集中验收窗口运行完整 v1/v4 对照。阶段 4～8 先完成工程准备。
 6. 正式自动 Gate 通过后仍须由 Admin 人工批准，才可进入 Promotion/rollback 演练。
