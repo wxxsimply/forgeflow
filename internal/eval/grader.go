@@ -11,6 +11,7 @@ type Observation struct {
 	CaseID                   string          `json:"caseId"`
 	Outcome                  string          `json:"outcome"`
 	FailureCode              string          `json:"failureCode,omitempty"`
+	FailureStage             string          `json:"failureStage,omitempty"`
 	FailureMessage           string          `json:"failureMessage,omitempty"`
 	Decision                 Decision        `json:"decision"`
 	PatchApplicable          bool            `json:"patchApplicable"`
