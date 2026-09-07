@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "forgeflow.release/v2",
+  "release": "${RELEASE}",
+  "gitCommit": "${GIT_COMMIT}",
+  "createdAt": "${CREATED_AT}",
+  "platform": "linux/amd64",
+  "images": [
+    {
+      "name": "forgeflow-api",
+      "tags": ["${REGISTRY}/forgeflow-api:${RELEASE}", "${REGISTRY}/forgeflow-api:sha-${GIT_COMMIT}"],
+      "digest": "${FORGEFLOW_API_DIGEST}",
+      "reference": "${REGISTRY}/forgeflow-api@${FORGEFLOW_API_DIGEST}",
+      "sbom": {"status": "pending", "format": "CycloneDX JSON", "path": ".forgeflow/release/${RELEASE}/forgeflow-api.sbom.cdx.json"},
+      "provenance": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-api.provenance.json"},
+      "signature": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-api.signature.txt"},
+      "vulnerabilityScan": {"scanner": "trivy", "status": "pending", "critical": "${FORGEFLOW_API_CRITICAL_COUNT}", "high": "${FORGEFLOW_API_HIGH_COUNT}", "path": ".forgeflow/release/${RELEASE}/forgeflow-api.trivy.json"}
+    },
+    {
+      "name": "forgeflow-worker",
+      "tags": ["${REGISTRY}/forgeflow-worker:${RELEASE}", "${REGISTRY}/forgeflow-worker:sha-${GIT_COMMIT}"],
+      "digest": "${FORGEFLOW_WORKER_DIGEST}",
+      "reference": "${REGISTRY}/forgeflow-worker@${FORGEFLOW_WORKER_DIGEST}",
+      "sbom": {"status": "pending", "format": "CycloneDX JSON", "path": ".forgeflow/release/${RELEASE}/forgeflow-worker.sbom.cdx.json"},
+      "provenance": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-worker.provenance.json"},
+      "signature": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-worker.signature.txt"},
+      "vulnerabilityScan": {"scanner": "trivy", "status": "pending", "critical": "${FORGEFLOW_WORKER_CRITICAL_COUNT}", "high": "${FORGEFLOW_WORKER_HIGH_COUNT}", "path": ".forgeflow/release/${RELEASE}/forgeflow-worker.trivy.json"}
+    },
+    {
+      "name": "forgeflow-web",
+      "tags": ["${REGISTRY}/forgeflow-web:${RELEASE}", "${REGISTRY}/forgeflow-web:sha-${GIT_COMMIT}"],
+      "digest": "${FORGEFLOW_WEB_DIGEST}",
+      "reference": "${REGISTRY}/forgeflow-web@${FORGEFLOW_WEB_DIGEST}",
+      "sbom": {"status": "pending", "format": "CycloneDX JSON", "path": ".forgeflow/release/${RELEASE}/forgeflow-web.sbom.cdx.json"},
+      "provenance": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-web.provenance.json"},
+      "signature": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-web.signature.txt"},
+      "vulnerabilityScan": {"scanner": "trivy", "status": "pending", "critical": "${FORGEFLOW_WEB_CRITICAL_COUNT}", "high": "${FORGEFLOW_WEB_HIGH_COUNT}", "path": ".forgeflow/release/${RELEASE}/forgeflow-web.trivy.json"}
+    },
+    {
+      "name": "forgeflow-caddy",
+      "tags": ["${REGISTRY}/forgeflow-caddy:${RELEASE}", "${REGISTRY}/forgeflow-caddy:sha-${GIT_COMMIT}"],
+      "digest": "${FORGEFLOW_CADDY_DIGEST}",
+      "reference": "${REGISTRY}/forgeflow-caddy@${FORGEFLOW_CADDY_DIGEST}",
+      "sbom": {"status": "pending", "format": "CycloneDX JSON", "path": ".forgeflow/release/${RELEASE}/forgeflow-caddy.sbom.cdx.json"},
+      "provenance": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-caddy.provenance.json"},
+      "signature": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-caddy.signature.txt"},
+      "vulnerabilityScan": {"scanner": "trivy", "status": "pending", "critical": "${FORGEFLOW_CADDY_CRITICAL_COUNT}", "high": "${FORGEFLOW_CADDY_HIGH_COUNT}", "path": ".forgeflow/release/${RELEASE}/forgeflow-caddy.trivy.json"}
+    },
+    {
+      "name": "forgeflow-sandbox",
+      "tags": ["${REGISTRY}/forgeflow-sandbox:${RELEASE}", "${REGISTRY}/forgeflow-sandbox:sha-${GIT_COMMIT}"],
+      "digest": "${FORGEFLOW_SANDBOX_DIGEST}",
+      "reference": "${REGISTRY}/forgeflow-sandbox@${FORGEFLOW_SANDBOX_DIGEST}",
+      "sbom": {"status": "pending", "format": "CycloneDX JSON", "path": ".forgeflow/release/${RELEASE}/forgeflow-sandbox.sbom.cdx.json"},
+      "provenance": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-sandbox.provenance.json"},
+      "signature": {"status": "pending", "path": ".forgeflow/release/${RELEASE}/forgeflow-sandbox.signature.txt"},
+      "vulnerabilityScan": {"scanner": "trivy", "status": "pending", "critical": "${FORGEFLOW_SANDBOX_CRITICAL_COUNT}", "high": "${FORGEFLOW_SANDBOX_HIGH_COUNT}", "path": ".forgeflow/release/${RELEASE}/forgeflow-sandbox.trivy.json"}
+    }
+  ],
+  "riskAcceptances": []
+}

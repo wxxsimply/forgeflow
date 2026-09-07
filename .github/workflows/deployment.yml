@@ -50,11 +50,15 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Build OCI images with attestations
+      - name: Validate release asset contract
+        shell: pwsh
+        run: ./scripts/validate-release-assets.ps1
+
+      - name: Validate Dockerfiles without building images
+        env:
+          REGISTRY: ghcr.io/wxxsimply
+          RELEASE: 0.0.0-ci
+          GIT_COMMIT: ${{ github.sha }}
         run: |
-          mkdir -p .cache/oci
-          docker buildx build --provenance=true --sbom=true --build-arg FORGEFLOW_GIT_COMMIT=${GITHUB_SHA} --target api -t forgeflow-api:ci --output=type=oci,dest=.cache/oci/forgeflow-api.tar .
-          docker buildx build --provenance=true --sbom=true --build-arg FORGEFLOW_GIT_COMMIT=${GITHUB_SHA} --target worker -t forgeflow-worker:ci --output=type=oci,dest=.cache/oci/forgeflow-worker.tar .
-          docker buildx build --provenance=true --sbom=true --target web -f web/Dockerfile -t forgeflow-web:ci --output=type=oci,dest=.cache/oci/forgeflow-web.tar .
-          docker buildx build --provenance=true --sbom=true -t forgeflow-caddy:ci --output=type=oci,dest=.cache/oci/forgeflow-caddy.tar deploy/staging/caddy
-          docker buildx build --provenance=true --sbom=true -t forgeflow-sandbox:ci --output=type=oci,dest=.cache/oci/forgeflow-sandbox.tar deploy/sandbox
+          docker buildx bake release --print
+          docker buildx bake release --call=check

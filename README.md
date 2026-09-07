@@ -186,7 +186,7 @@ go run ./cmd/forgeflow eval execute --suite software/v1 `
 
 命令按 Case 原子保存，意外中断后原样重跑即可跳过已完成项。恢复时，现有 Evidence 的实测费用会和 `--prior-cost-usd` 一起计入同一个上限；每次模型调用前会按请求字节数、最大输出 Token 和最高适用输入费率预留保守最大费用，价格窗口尚未开始、额度不足或有效期不足时都不会联系 Provider。预算、此前费用、价格起止时间和实际加载的 Developer Prompt 版本会写入 Evidence 配置，配置漂移时不能续写同一路径。候选对照必须分别使用 `developer/v1` 与 `-CandidatePromptVersion` 指定的不可变候选，并写入两个新的私有 Evidence 路径。`forgeflow eval compare` 会验证两份三模式报告除 Developer Prompt 和累计 campaign cost 外完全可比，输出各模式指标增量及自动 Gate 结果，但不会代替人工批准。不要把 Key、私有 Grader 或原始 Evidence 提交到 GitHub。
 
-Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
+Staging 部署从 [Operations Runbook](./docs/operations.md) 开始。不可变镜像的 Bake、SBOM、provenance、签名、扫描、digest 清单和人工上传步骤见[镜像发布手册](./docs/release-images.md)。复制 `deploy/staging/staging.env.example`，创建本机 Secret 后先运行：
 
 ```powershell
 ./scripts/staging-preflight.ps1
@@ -245,4 +245,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4 工程准备已通过并等待最终集中验收；当前进入不可变镜像资产准备，之后依次准备公网 Staging、运维安全、Production 和 `v1.0.0` 发布资料。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4 与阶段 5 工程准备已通过并等待最终集中验收；当前进入公网 Staging 部署准备，之后依次准备运维安全、Production 和 `v1.0.0` 发布资料。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
