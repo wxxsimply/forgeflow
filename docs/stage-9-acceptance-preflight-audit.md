@@ -10,6 +10,8 @@
 - 新增默认只读的阶段 9 预检，统一调用阶段 5～8 工程契约校验，并能校验填充计划必须位于 Git 忽略目录、无占位符、绑定当前干净 HEAD。
 - 新增集中验收窗口手册和公开脱敏摘要模板。
 - 静态预检已通过；未读取 Key，未联系模型 Provider、Registry 或 Staging，未执行付费 Eval、Promotion、部署、Tag 或 Release。
+- 2026-09-09 在已授权范围内完成一次 2 Observation `developer/v1`/`developer/v4` smoke，实际记录费用 `$0.008919152`；两侧均在 `patch_check` 被损坏补丁阻断，正式 Eval 未启动。
+- 已为该共同故障准备严格统一 diff 规范化和离线回归测试；修复仍待 PR 合并后的新 SHA smoke 验证。
 
 ## 本地验证
 
@@ -22,10 +24,10 @@
 ## 当前阻断
 
 1. 本批阶段 9 预检资产尚待人工提交和 PR 合并；最终候选 SHA 尚未形成。
-2. `developer/v4` 旧 smoke 的补丁预检失败尚未由新 SHA smoke 解除。
+2. `developer/v1` 与 `developer/v4` 在 PR #37 合并 SHA 的新 smoke 中均出现 `patch_check` 损坏；规范化修复尚未进入主分支并由新 smoke 验证。
 3. 费用/数据授权记录、独立评审人、值班、Registry、Staging 和 Production 私有配置尚未填入本地验收计划。
 4. `P8-001`～`P8-007` 仍全部是 Production Go 阻断项。
 
 ## 下一人工节点
 
-仓库所有者审核并合并本批 PR。四项必需检查成功后，从新的 `main` 合并 SHA 建立 `.forgeflow/acceptance/1.0.0/plan.json` 并运行填充计划预检。只有预检通过且当次付费/数据范围授权有效时，才能运行候选 smoke。
+仓库所有者审核并合并统一 diff 规范化与本次脱敏报告 PR。四项必需检查成功后，从新的 `main` 合并 SHA 建立或更新 `.forgeflow/acceptance/1.0.0/plan.json` 并运行填充计划预检。只有预检通过且当次付费/数据范围授权仍有效时，才能使用新 Campaign 重跑候选 smoke。

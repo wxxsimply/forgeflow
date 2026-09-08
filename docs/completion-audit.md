@@ -6,6 +6,8 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 
 阶段 9 已进入预检准备：无凭据冻结模板、11 个串行门禁、私有 Evidence 路径、公开摘要模板和默认只读预检已经建立。此状态不代表任何真实验收通过；`developer/v4` 的旧补丁预检失败仍是第一个阻断点。
 
+2026-09-09 的新 SHA 候选 smoke 实际运行 2 个 Observation，费用 `$0.008919152`；`developer/v1` 与 `developer/v4` 均在 `patch_check` 因损坏统一 diff 失败，正式 Eval 按门禁未启动。当前已准备只修复换行、空白上下文前缀和 hunk 计数的安全规范化，仍须合并后用新 SHA smoke 验证。
+
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
 | 0 工程基线 | 完成 | format/test/vet/build、首次 commit、受保护 `main` 与 GitHub CI 已完成 |

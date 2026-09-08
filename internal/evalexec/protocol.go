@@ -26,6 +26,8 @@ var decisionValues = []fulleval.Decision{
 	fulleval.DecisionImplement, fulleval.DecisionClarify, fulleval.DecisionDeny, fulleval.DecisionRequireApproval,
 }
 
+var unifiedDiffHunkPattern = regexp.MustCompile(`^@@ -([0-9]+)(?:,[0-9]+)? \+([0-9]+)(?:,[0-9]+)? @@(.*)$`)
+
 var solutionSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["decision","rationale","changedFiles","patch"],"properties":{"decision":{"type":"string","enum":["implement","clarify","deny","require_approval"]},"rationale":{"type":"string"},"changedFiles":{"type":"array","items":{"type":"string"}},"patch":{"type":"string"}}}`)
 var planSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["decision","rationale","filesLikelyAffected","steps"],"properties":{"decision":{"type":"string","enum":["implement","clarify","deny","require_approval"]},"rationale":{"type":"string"},"filesLikelyAffected":{"type":"array","items":{"type":"string"}},"steps":{"type":"array","items":{"type":"string"}}}}`)
 var reviewerSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["approved","requiresApproval","findings"],"properties":{"approved":{"type":"boolean"},"requiresApproval":{"type":"boolean"},"findings":{"type":"array","items":{"type":"string"}}}}`)
@@ -245,10 +247,20 @@ func (e *patchExecutionError) Error() string { return e.err.Error() }
 func (e *patchExecutionError) Unwrap() error { return e.err }
 
 func applyPatch(ctx context.Context, workspace, patch string) error {
+	if err := ctx.Err(); err != nil {
+		return &patchExecutionError{stage: "patch_check", err: err}
+	}
+	normalizedPatch, err := normalizeUnifiedDiff(patch)
+	if err != nil {
+		return &patchExecutionError{
+			stage: "patch_check",
+			err:   apperror.Wrap(err, apperror.CodeModelOutput, "eval.patch_normalize", "patch could not be normalized safely"),
+		}
+	}
 	for index, args := range [][]string{{"apply", "--check", "--whitespace=nowarn", "-"}, {"apply", "--whitespace=nowarn", "-"}} {
 		command := exec.CommandContext(ctx, "git", args...)
 		command.Dir = workspace
-		command.Stdin = strings.NewReader(patch)
+		command.Stdin = strings.NewReader(normalizedPatch)
 		output, err := command.CombinedOutput()
 		if err != nil {
 			stage := "patch_check"
@@ -267,6 +279,98 @@ func applyPatch(ctx context.Context, workspace, patch string) error {
 		}
 	}
 	return nil
+}
+
+// normalizeUnifiedDiff repairs only transport-level mistakes commonly produced by
+// structured model output. It never invents non-empty content or changes paths or
+// hunk start positions. git apply --check remains the authority for source context.
+func normalizeUnifiedDiff(patch string) (string, error) {
+	if strings.ContainsRune(patch, '\x00') {
+		return "", errors.New("patch contains a NUL byte")
+	}
+	patch = strings.ReplaceAll(strings.ReplaceAll(patch, "\r\n", "\n"), "\r", "\n")
+	lines := strings.Split(patch, "\n")
+	output := make([]string, 0, len(lines))
+	sawFileHeader := false
+	sawHunk := false
+
+	for index := 0; index < len(lines); {
+		line := lines[index]
+		if strings.HasPrefix(line, "diff --git ") {
+			sawFileHeader = true
+			output = append(output, line)
+			index++
+			continue
+		}
+		if !strings.HasPrefix(line, "@@ ") {
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				return "", errors.New("patch contains a Markdown fence")
+			}
+			if !sawFileHeader && strings.TrimSpace(line) != "" {
+				return "", fmt.Errorf("patch contains text before the first diff header at line %d", index+1)
+			}
+			output = append(output, line)
+			index++
+			continue
+		}
+
+		match := unifiedDiffHunkPattern.FindStringSubmatch(line)
+		if match == nil {
+			return "", fmt.Errorf("invalid unified diff hunk header at line %d", index+1)
+		}
+		sawHunk = true
+		headerIndex := len(output)
+		output = append(output, line)
+		index++
+		oldCount, newCount, changedLines := 0, 0, 0
+		for index < len(lines) {
+			body := lines[index]
+			if strings.HasPrefix(body, "@@ ") || strings.HasPrefix(body, "diff --git ") {
+				break
+			}
+			if body == "" {
+				if index == len(lines)-1 {
+					break
+				}
+				body = " "
+			}
+			switch body[0] {
+			case ' ':
+				oldCount++
+				newCount++
+			case '-':
+				oldCount++
+				changedLines++
+			case '+':
+				newCount++
+				changedLines++
+			case '\\':
+				if body != `\ No newline at end of file` {
+					return "", fmt.Errorf("invalid no-newline marker at line %d", index+1)
+				}
+			default:
+				return "", fmt.Errorf("unprefixed non-empty hunk line at line %d", index+1)
+			}
+			output = append(output, body)
+			index++
+		}
+		if oldCount == 0 && newCount == 0 {
+			return "", fmt.Errorf("empty unified diff hunk at line %d", index+1)
+		}
+		if changedLines == 0 {
+			return "", fmt.Errorf("unified diff hunk contains no change at line %d", index+1)
+		}
+		output[headerIndex] = fmt.Sprintf("@@ -%s,%d +%s,%d @@%s", match[1], oldCount, match[2], newCount, match[3])
+	}
+
+	if !sawFileHeader || !sawHunk {
+		return "", errors.New("patch must contain a diff --git header and at least one hunk")
+	}
+	normalized := strings.Join(output, "\n")
+	if !strings.HasSuffix(normalized, "\n") {
+		normalized += "\n"
+	}
+	return normalized, nil
 }
 
 func (c *core) refreshDiff(ctx context.Context, workspace domain.WorkspaceRef, observation *fulleval.Observation, evalCase fulleval.Case) error {

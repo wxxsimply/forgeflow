@@ -855,7 +855,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 
 ## 13. 阶段 9：集中执行高耗时验收并手动发布 v1.0.0
 
-> 当前状态：进行中（2026-09-08；已建立冻结计划、串行门禁、私有 Evidence 路径和公开摘要模板；真实验收尚未启动）
+> 当前状态：进行中（2026-09-09；冻结计划与串行门禁已建立；首轮 v1/v4 候选 smoke 均在 `patch_check` 阻断，安全统一 diff 规范化待 PR 合并及新 SHA smoke 验证）
 > 进入条件：阶段 0～3 已完成，阶段 4～8 均达到工程准备门槛并标记为 `待集中验收`。
 > 本阶段目标：在一个预先安排的验收窗口内完成所有高耗时、付费或依赖真实环境的任务，证据全部通过后再发布。
 > 人工操作：模型费用与数据发送授权、Registry 登录与上传、服务器部署确认、Promotion 审批、版本 Tag 和 GitHub Release 必须由相应负责人手动执行。
@@ -1053,6 +1053,6 @@ Release 应包含：
 | 6 Staging 部署准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-6-staging-infrastructure.md`、`docs/stage-6-staging-deployment-audit.md`、digest-only Compose、Preflight/Release/Acceptance/Bootstrap cleanup |
 | 7 运维与安全演练准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-7-operations-security-audit.md`、运维 dry-run、隔离恢复、v2 回滚、安全与 Demo Runbook |
 | 8 Production 与发布准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-8-production-release-audit.md`、Production 架构图、安全/SLO/数据/运维治理与 `v1.0.0` 发布模板；P8-001～P8-007 保留为阶段 9 发布阻断项 |
-| 9 集中验收与 v1.0.0 发布 | 进行中 | 仓库所有者 / Release Approver | 2026-09-08 |  | `docs/stage-9-acceptance-preflight-audit.md`、冻结计划模板、串行门禁和公开摘要模板已准备；真实 Eval、镜像、Staging、恢复、安全、负载和发布均未执行 |
+| 9 集中验收与 v1.0.0 发布 | 进行中 | 仓库所有者 / Release Approver | 2026-09-08 |  | `docs/stage-9-acceptance-preflight-audit.md`、`release-reports/stage-9-v4-smoke-review.md`；冻结计划和门禁已准备，首轮候选 smoke 被 `patch_check` 阻断；正式 Eval、镜像、Staging、恢复、安全、负载和发布均未执行 |
 
 阶段 4～8 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 8 已固定 Production 逻辑边界、安全风险登记、SLO/容量/RPO/RTO 目标、数据治理、值班与变更流程，以及 Go/No-Go 和 Release Notes 模板；对象存储适配器、真实隔离部署、管理员 MFA、不可篡改审计、Provider/Region 审批、容量/恢复实测和独立人员排班仍是阶段 9 阻断项。下一步只进入阶段 9 的集中验收窗口；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全、Demo、负载测试和 GitHub Release 均不得提前执行。
