@@ -1,11 +1,20 @@
 # Staging Security Review Checklist
 
-每次 Staging Promotion 记录审核人、UTC 时间、Release manifest 和证据链接。
+每次 Staging Promotion 记录审核人、UTC 时间、Release manifest 和证据链接。阶段 7 只执行本地合成检查；下列真实环境项目仍须在阶段 9 逐项签署。
+
+阶段 7 快速检查：
+
+```powershell
+./scripts/validate-operations-assets.ps1
+./scripts/staging-security-drill.ps1 -DryRun
+```
+
+`-DryRun` 会运行 Staging 静态契约，以及 Repository 路径/符号链接、Tool Patch、命令 Policy、Sandbox、Secret 扫描、Governance 和 Config 测试，不连接 Staging。阶段 9 的真实边界检查必须显式使用 `-IncludeOpenAI -ConfirmLiveDrill`，并另行保留真实 task container 和日志脱敏证据。
 
 - [ ] `staging-preflight.ps1` 通过；只有 Caddy 发布端口。
 - [ ] API 未挂载 OpenAI Key、Docker Socket 或可写仓库。
 - [ ] Worker Secret 最小化；Bootstrap Secret 已删除。
-- [ ] 第三方与 Sandbox 镜像在 Production 前固定 SHA-256 digest。
+- [ ] ForgeFlow、第三方与 Sandbox 的所有受控环境镜像均固定 SHA-256 digest。
 - [ ] `go test ./...`、race CI、`go vet`、前端检查、E2E 和最小 Eval 通过。
 - [ ] 依赖漏洞扫描和 SBOM 无未接受的 Critical/High。
 - [ ] 路径穿越、命令注入、CSRF、IDOR 和 Prompt Injection 回归通过。

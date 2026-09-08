@@ -19,6 +19,16 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-staging-assets.ps1
 
+      - name: Validate operations and security asset contract
+        shell: pwsh
+        run: ./scripts/validate-operations-assets.ps1
+
+      - name: Validate backup and restore shell syntax
+        shell: bash
+        run: |
+          bash -n deploy/staging/ops/backup.sh
+          bash -n deploy/staging/ops/restore-drill.sh
+
       - name: Prepare non-sensitive validation inputs
         shell: bash
         run: |
@@ -54,6 +64,13 @@ jobs:
           ./scripts/staging-preflight.ps1 -EnvFile .cache/staging-ci.env -RequireDigests -AllowPlaceholderDigests
           ./scripts/staging-preflight.ps1 -EnvFile .cache/staging-ci.env -IncludeOpenAI -RequireDigests -AllowPlaceholderDigests
           ./scripts/staging-preflight.ps1 -EnvFile .cache/staging-ci.env -IncludeBootstrap -RequireDigests -AllowPlaceholderDigests
+
+      - name: Validate non-delivery operations dry-runs
+        shell: pwsh
+        run: |
+          ./scripts/staging-alert-test.ps1 -DryRun
+          ./scripts/staging-backup.ps1 -EnvFile .cache/staging-ci.env -DryRun
+          ./scripts/staging-restore-drill.ps1 -EnvFile .cache/staging-ci.env -BackupFile /backups/forgeflow-20260908T000000Z.dump -ConfirmRestore -DryRun
 
       - name: Validate Caddy configuration
         run: docker run --rm -e FORGEFLOW_DOMAIN=forgeflow-ci.example.invalid -e ACME_EMAIL=ci@example.invalid -v "$PWD/deploy/staging/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
