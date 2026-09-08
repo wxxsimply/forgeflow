@@ -2,7 +2,7 @@
 
 ## 结论
 
-ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4～6 的工程准备门槛已通过并进入待集中验收；Prompt/模型治理、五类不可变发布镜像，以及 digest-only Staging 部署/验收契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：候选正式 Eval、人工 Promotion/rollback、完整镜像构建上传及公网 Staging 验收仍未执行。
+ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4～8 的工程准备门槛已通过并进入待集中验收；Prompt/模型治理、不可变发布镜像、digest-only Staging、运维/安全演练，以及 Production 架构与发布治理契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：阶段 9 的候选正式 Eval、人工 Promotion/rollback、完整镜像供应链、公网 Staging、恢复/安全/负载验收和最终 Go/No-Go 均未执行。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
@@ -17,7 +17,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
 | 10 Observability/Eval | 阶段 3 完成、阶段 4 待集中验收 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；PR #31 已合并补丁失败诊断，候选/回滚嵌入配置、正式参数和审批模板已核对；v4 补丁阻断、正式候选对照与 Promotion/rollback 留待最终验收 |
-| 11 部署/安全 | 阶段 6 待集中验收 | 五镜像 Bake/供应链契约、digest-only Compose、源码/manifest/Secret Preflight、无服务端构建的发布、Bootstrap 清理和公网 E2E 脚本已完成；真实镜像和 Staging 验收未执行 |
+| 11 部署/安全 | 阶段 5～8 待集中验收 | 五镜像 Bake/供应链契约、digest-only Compose、Staging Preflight/E2E、运维安全 dry-run、Production 逻辑架构、安全/SLO/数据/值班治理和发布模板已完成；真实镜像、Staging、演练与 Production 验收未执行 |
 
 ## 本轮补齐的工程缺口
 
@@ -31,6 +31,8 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 8. govulncheck 初次发现 12 个可达漏洞后，项目升级 pgx 5.9.2、OpenTelemetry 1.44.0 及安全修复后的传递依赖；2026-08-18 GitHub CI 又识别出 Go 1.26.5 标准库的新公告，因此工具链基线继续升级到 Go 1.26.6，复扫结果为 0 个可达漏洞。
 9. 阶段 5 固定 API、Worker、Web、Caddy、Sandbox 五镜像 Bake 计划；Migration 复用 API 镜像内 CLI，避免独立第六镜像，并建立 digest manifest、SBOM/provenance/签名/扫描和风险接受门禁。
 10. 阶段 6 删除 Staging 的服务端构建路径，要求 ForgeFlow 与第三方镜像全部按 digest 固定，并建立源码/manifest/版本一致性、Secret 生命周期、Bootstrap 清理、公网浏览器 E2E 和 Fixture 不变性门禁。
+11. 阶段 7 固定 9 条告警、隔离备份恢复、安全边界、禁止 Down Migration 的 v2 回滚和脱敏 Demo 契约，真实演练集中到阶段 9。
+12. 阶段 8 建立控制/执行/数据面逻辑架构、安全风险登记、SLO/容量/RPO/RTO、数据治理、值班/变更和 `v1.0.0` Go/No-Go 资料；未实现或未实测能力以 `P8-001`～`P8-007` 保留为发布阻断项。
 
 ## 本轮验证结果
 
@@ -41,6 +43,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 - `npm run check`：TypeScript、11 个 Vitest 测试和生产构建通过。
 - OpenAI/Staging Compose 合并配置：通过。
 - `scripts/validate-staging-assets.ps1` 与占位 digest Preflight：通过；临时 CI 输入已删除。
+- `scripts/validate-operations-assets.ps1` 与 `scripts/validate-production-readiness.ps1`：通过；Production 架构图结构校验为 0 错误、0 警告。
 - PostgreSQL 17 CI 上的 Migration 1～5、`internal/postgres` 和 `internal/httpapi` 集成测试：通过。
 - Windows 本机 `go test -race` 无法启动，所有测试进程统一返回系统错误 `0xc0000139`；这不是数据竞争报告。Linux CI 保留 `go test -race ./...` 作为强制门禁。
 
@@ -51,4 +54,5 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 3. 按 `docs/release-images.md` 构建、扫描、签名并由发布负责人手动上传五类不可变镜像，记录 digest、SBOM、provenance 和漏洞门禁。
 4. 准备域名、DNS、TLS 邮箱、Registry、OpenAI/PostgreSQL/Alert Secret 和专用 Staging 主机，执行 Preflight 与 Release。
 5. 在 Staging 签署 HTTPS 全链路、Sandbox、告警投递、备份恢复、版本回滚和 3～5 分钟 Demo 证据。
-6. 只有上述结果及 Production 准备全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传候选改进结论。
+6. 实现 Production 对象存储适配器、完整用户导出/级联删除，并验证管理员 MFA、不可篡改审计、Provider/Region/子处理者审批及独立值班/安全评审人员。
+7. 只有上述结果及 Production Go/No-Go 全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传候选改进结论。
