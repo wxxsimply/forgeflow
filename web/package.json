@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:real": "playwright test --config playwright.real.config.ts",
+    "test:e2e:staging": "playwright test --config playwright.staging.config.ts",
     "build": "npm run generate:api && tsc --noEmit && vite build",
     "check": "npm run generate:api && npm run typecheck && npm run test && vite build"
   },

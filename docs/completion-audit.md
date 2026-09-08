@@ -2,7 +2,7 @@
 
 ## 结论
 
-ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4 与阶段 5 的工程准备门槛已通过并进入待集中验收，五类不可变发布镜像的构建、manifest、供应链证据和风险接受契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：候选正式 Eval、人工 Promotion/rollback、完整镜像构建上传及公网 Staging 验收仍未执行。
+ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4～6 的工程准备门槛已通过并进入待集中验收；Prompt/模型治理、五类不可变发布镜像，以及 digest-only Staging 部署/验收契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：候选正式 Eval、人工 Promotion/rollback、完整镜像构建上传及公网 Staging 验收仍未执行。
 
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
@@ -17,7 +17,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 | 8 API/Auth/RBAC | 完成 | REST/SSE、Session/CSRF、RBAC、资源隔离与审计 |
 | 9 Web | 完成 | Run/Approval/Diff/Trace/Report/Eval 页面、OpenAPI 类型和浏览器测试 |
 | 10 Observability/Eval | 阶段 3 完成、阶段 4 待集中验收 | 指标、Trace、远端隔离 Grader、30 个真实 Fixture、三基线 Evidence 和初始报告签署已完成；PR #31 已合并补丁失败诊断，候选/回滚嵌入配置、正式参数和审批模板已核对；v4 补丁阻断、正式候选对照与 Promotion/rollback 留待最终验收 |
-| 11 部署/安全 | 阶段 5 待集中验收 | 五镜像 Bake、OCI 版本元数据、digest manifest、供应链验证与风险接受契约已完成；真实镜像和 Staging 验收未执行 |
+| 11 部署/安全 | 阶段 6 待集中验收 | 五镜像 Bake/供应链契约、digest-only Compose、源码/manifest/Secret Preflight、无服务端构建的发布、Bootstrap 清理和公网 E2E 脚本已完成；真实镜像和 Staging 验收未执行 |
 
 ## 本轮补齐的工程缺口
 
@@ -30,6 +30,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 7. Eval CLI 新增 `--fixture-repository`，明确区分“数据结构合法”和“30 个真实 commit 均存在”。
 8. govulncheck 初次发现 12 个可达漏洞后，项目升级 pgx 5.9.2、OpenTelemetry 1.44.0 及安全修复后的传递依赖；2026-08-18 GitHub CI 又识别出 Go 1.26.5 标准库的新公告，因此工具链基线继续升级到 Go 1.26.6，复扫结果为 0 个可达漏洞。
 9. 阶段 5 固定 API、Worker、Web、Caddy、Sandbox 五镜像 Bake 计划；Migration 复用 API 镜像内 CLI，避免独立第六镜像，并建立 digest manifest、SBOM/provenance/签名/扫描和风险接受门禁。
+10. 阶段 6 删除 Staging 的服务端构建路径，要求 ForgeFlow 与第三方镜像全部按 digest 固定，并建立源码/manifest/版本一致性、Secret 生命周期、Bootstrap 清理、公网浏览器 E2E 和 Fixture 不变性门禁。
 
 ## 本轮验证结果
 
@@ -39,6 +40,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 - `govulncheck v1.6.0 ./...`：0 个可达漏洞。
 - `npm run check`：TypeScript、11 个 Vitest 测试和生产构建通过。
 - OpenAI/Staging Compose 合并配置：通过。
+- `scripts/validate-staging-assets.ps1` 与占位 digest Preflight：通过；临时 CI 输入已删除。
 - PostgreSQL 17 CI 上的 Migration 1～5、`internal/postgres` 和 `internal/httpapi` 集成测试：通过。
 - Windows 本机 `go test -race` 无法启动，所有测试进程统一返回系统错误 `0xc0000139`；这不是数据竞争报告。Linux CI 保留 `go test -race ./...` 作为强制门禁。
 

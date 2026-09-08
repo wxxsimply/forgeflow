@@ -2,6 +2,8 @@ ARG NODE_VERSION=24
 ARG FORGEFLOW_VERSION=development
 ARG FORGEFLOW_GIT_COMMIT=unknown
 FROM node:${NODE_VERSION}-alpine AS build
+ARG FORGEFLOW_VERSION=development
+ARG FORGEFLOW_GIT_COMMIT=unknown
 WORKDIR /src
 COPY web/package.json web/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
@@ -10,7 +12,8 @@ COPY internal/httpapi/openapi.yaml /openapi/openapi.yaml
 RUN npx openapi-typescript /openapi/openapi.yaml -o src/api/schema.d.ts \
     && npm run typecheck \
     && npm test \
-    && npx vite build
+    && npx vite build \
+    && printf '{"serviceVersion":"%s","gitCommit":"%s"}\n' "${FORGEFLOW_VERSION}" "${FORGEFLOW_GIT_COMMIT}" > dist/release.json
 
 FROM nginx:1.29-alpine AS web
 ARG FORGEFLOW_VERSION=development
