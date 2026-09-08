@@ -105,29 +105,36 @@ Prometheus/Alertmanager 不公开。使用 SSH 本地端口转发或临时 `dock
 
 ## 6. 备份与恢复
 
-每日执行并将 `.dump`、`.sha256`、manifest 加密复制到异地介质：
+阶段 7 先渲染 Compose，不创建备份：
 
 ```powershell
-./scripts/staging-backup.ps1
+./scripts/staging-backup.ps1 -EnvFile deploy/staging/staging.env -RetentionDays 14 -DryRun
+./scripts/staging-restore-drill.ps1 -EnvFile deploy/staging/staging.env -BackupFile /backups/forgeflow-20260908T000000Z.dump -ConfirmRestore -DryRun
 ```
 
-每月至少一次恢复到隔离数据库，脚本只允许 `forgeflow_restore_*`，不会覆盖在线 `forgeflow`：
+阶段 9 再在真实 Staging 每日执行，并将 `.dump`、`.dump.sha256`、`.dump.manifest` 加密复制到异地介质：
+
+```powershell
+./scripts/staging-backup.ps1 -RetentionDays 14
+```
+
+manifest 固定记录 UTC 创建时间、Migration 版本、SHA-256 和字节数。每月至少一次恢复到隔离数据库；脚本只接受 `/backups/forgeflow-<UTC>.dump`、要求 checksum/manifest，并只允许 `forgeflow_restore_*`，不会覆盖在线 `forgeflow`：
 
 ```powershell
 ./scripts/staging-restore-drill.ps1 -BackupFile /backups/forgeflow-20260811T120000Z.dump -ConfirmRestore
 ```
 
-恢复成功标准：SHA-256 与 archive list 通过、`schema_migrations` 可读、API 使用恢复库启动并通过登录→Run→审批→报告 E2E。建议 Staging RPO 24 小时、RTO 4 小时；Production 指标必须由数据负责人确认。Artifact Volume 需独立快照并与数据库时间点对齐。
+恢复成功标准：SHA-256、大小与 manifest 相符，archive list 通过，恢复后的 Migration 版本等于备份记录，API 使用恢复库启动并通过登录→Run→审批→报告 E2E。建议 Staging RPO 24 小时、RTO 4 小时；Production 指标必须由数据负责人确认。Artifact Volume 需独立快照并与数据库时间点对齐。
 
 ## 7. 发布与回滚
 
-应用回滚不自动执行 Down Migration：
+阶段 7 只对旧的 v2 Release manifest、digest 镜像和 Compose 渲染做 dry-run：
 
 ```powershell
-./scripts/staging-rollback.ps1 -Manifest .forgeflow/deploy/releases/0.11.0.json -ConfirmRollback
+./scripts/staging-rollback.ps1 -Manifest .forgeflow/release/0.11.0/release-manifest.json -ConfirmRollback -DryRun
 ```
 
-回滚前使用目标版本 CLI 检查当前 Schema；不兼容会直接阻止。数据库回滚只能按事故流程恢复到新数据库，再完成一致性检查并切换 DSN，禁止覆盖在线 Production。
+阶段 9 真实执行前先暂停新 Run、等待活动 Job 完成，并确认目标 Prompt/model Release 已按治理 API 恢复为 Active。去掉 `-DryRun` 后，脚本会核对当前部署记录与公网版本、停止 Worker、拉取旧 digest 镜像、使用目标 API 镜像运行 `db check`，再启动服务并验证 Worker Readiness。应用回滚绝不自动执行 Down Migration；不兼容会直接阻止。数据库回滚只能按事故流程恢复到新数据库，完成一致性检查后切换 DSN，禁止覆盖在线 Production。
 
 ## 8. Secret 轮换
 
@@ -139,6 +146,20 @@ Prometheus/Alertmanager 不公开。使用 SSH 本地端口转发或临时 `dock
 轮换中不得把 Secret 写入命令历史、Issue、聊天或普通日志。
 
 ## 9. 告警 Runbook
+
+阶段 7 用全部九条合成载荷验证规则、Runbook 链接和脱敏，不联系 Alertmanager：
+
+```powershell
+./scripts/staging-alert-test.ps1 -DryRun
+```
+
+阶段 9 才允许向真实私有值班渠道投递。先通知值班人员，再执行并人工确认收到和恢复消息：
+
+```powershell
+./scripts/staging-alert-test.ps1 -EnvFile deploy/staging/staging.env -ConfirmNotification
+```
+
+消息中不得包含任务正文、源代码、Cookie、Key、密码或其他 Secret。未收到消息时检查 Alertmanager 的 `url_file` Secret、路由和网络，不把 webhook 写进配置或日志。
 
 ### API or worker down
 

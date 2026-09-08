@@ -74,7 +74,7 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
 - 固定 30 Case 软件 Eval、隔离的三基线执行器、工作区外私有 Grader、原子断点恢复证据、JSON/Markdown 报告、受控 Prompt 候选差异报告和 Promotion 门禁
 - Go 1.26.6 多阶段 API/Worker/CLI 镜像、受 CSP/HSTS 保护的静态 Web 镜像
 - Caddy 自动 HTTPS、内部 Compose 网络、Docker Secret `_FILE` 注入和 API/Worker 权限隔离
-- Prometheus/Alertmanager/OTel Collector、备份校验、隔离恢复演练和 Schema 安全回滚
+- Prometheus/Alertmanager/OTel Collector、9 条脱敏告警 dry-run、带 checksum/manifest 的隔离恢复和禁止 Down Migration 的 v2 应用回滚
 - Threat Model、Operations、Security Review、Demo、ADR 和故障演练复盘
 - CLI 与基础测试
 
@@ -194,7 +194,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -Manifest $manifest -IncludeBootstrap -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～6 的 Prompt/模型治理、不可变镜像和 Staging 部署工程准备均为待集中验收。Staging 现在强制源码、Release manifest 和 digest 镜像一致，服务器不构建镜像，并具备 Bootstrap 清理、版本 readiness、公网 E2E 和 Fixture 不变性脚本。正式候选对照、Promotion/rollback、完整镜像和公网 Staging 尚未验收，因此仍不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～7 的 Prompt/模型治理、不可变镜像、Staging 部署、运维和安全演练工程准备均为待集中验收。Staging 现在强制源码、Release manifest 和 digest 镜像一致，服务器不构建镜像，并具备 Bootstrap 清理、版本 readiness、公网 E2E、Fixture 不变性、告警/恢复/安全 dry-run、v2 回滚和脱敏 Demo 脚本。正式候选对照、Promotion/rollback、完整镜像和公网 Staging 尚未验收，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
@@ -246,4 +246,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4～6 工程准备已通过并等待最终集中验收；下一步进入运维与安全演练准备，之后依次准备 Production 和 `v1.0.0` 发布资料。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4～7 工程准备已通过并等待最终集中验收；下一步进入 Production 方案和 `v1.0.0` 发布资料准备。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。

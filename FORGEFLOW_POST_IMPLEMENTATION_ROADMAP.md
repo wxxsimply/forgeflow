@@ -1,6 +1,6 @@
 # ForgeFlow 实施手册完成后的分阶段任务路线图
 
-> 文档版本：2026-09-07
+> 文档版本：2026-09-08
 > 前置文档：`FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md`  
 > 当前审计：`docs/completion-audit.md`
 
@@ -689,14 +689,14 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 
 ## 11. 阶段 7：准备运维和安全演练
 
-> 当前状态：未开始  
+> 当前状态：待集中验收（2026-09-08；9 条告警、备份/隔离恢复、安全边界、v2 回滚和脱敏 Demo 的脚本、CI 与 Runbook 已通过工程准备核对）
 > 进入条件：阶段 6 工程准备门槛通过，状态为 `待集中验收`。
 > 本阶段目标：完成告警、恢复、安全、回滚和 Demo 脚本与 Runbook；真实投递、恢复和攻击面演练后置到阶段 9。
 
 ### 11.1 告警准备
 
 ```powershell
-./scripts/staging-alert-test.ps1
+./scripts/staging-alert-test.ps1 -DryRun
 ```
 
 本阶段使用合成输入或 dry-run 快速验证规则和消息脱敏；阶段 9 再验证真实投递：
@@ -713,8 +713,8 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ### 11.2 备份恢复准备
 
 ```powershell
-./scripts/staging-backup.ps1
-./scripts/staging-restore-drill.ps1 -BackupFile <backup.dump> -ConfirmRestore
+./scripts/staging-backup.ps1 -EnvFile <validation.env> -DryRun
+./scripts/staging-restore-drill.ps1 -EnvFile <validation.env> -BackupFile /backups/forgeflow-20260908T000000Z.dump -ConfirmRestore -DryRun
 ```
 
 本阶段检查参数、防误操作保护和隔离目标；以下验收在阶段 9 执行：
@@ -728,7 +728,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ### 11.3 安全演练准备
 
 ```powershell
-./scripts/staging-security-drill.ps1
+./scripts/staging-security-drill.ps1 -DryRun
 ```
 
 本阶段先完成脚本和合成用例；阶段 9 至少真实验证：
@@ -743,7 +743,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ### 11.4 版本回滚准备
 
 ```powershell
-./scripts/staging-rollback.ps1 -Manifest <previous-release.json> -ConfirmRollback
+./scripts/staging-rollback.ps1 -Manifest <previous-v2-release-manifest.json> -ConfirmRollback -DryRun
 ```
 
 本阶段验证 manifest 解析、参数保护和 dry-run；阶段 9 使用真实旧镜像验证 Schema 兼容性、Prompt Active Release 和 Worker Readiness。应用回滚不能自动执行 Down Migration。
@@ -755,7 +755,10 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
   -BaseUri https://<staging-domain> `
   -Email <demo-user> `
   -Password (Read-Host -AsSecureString) `
-  -RepositoryPath /repositories/demo
+  -RepositoryPath /repositories/demo `
+  -ExpectedRelease <release> `
+  -ExpectedGitCommit <approved-40-character-sha> `
+  -ConfirmApprovals
 ```
 
 本阶段固定 `docs/demo.md` 的 3～5 分钟流程和脱敏规则；真实 Staging 演示在阶段 9 执行并保存结果。
@@ -768,12 +771,12 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 
 ### 11.7 阶段 7 工程准备门槛
 
-- [ ] 告警规则、模板、脱敏和路由 dry-run 通过。
-- [ ] 备份/恢复脚本具备 checksum、隔离目标和显式确认保护。
-- [ ] Sandbox、路径、命令、Secret 和治理边界用例已固化。
-- [ ] 回滚脚本禁止自动 Down Migration，并可校验旧 manifest。
-- [ ] Demo 文档可由另一名人员按步骤执行。
-- [ ] 所有真实演练项已进入阶段 9 阻断清单。
+- [x] 告警规则、模板、脱敏和路由 dry-run 通过。
+- [x] 备份/恢复脚本具备 checksum、隔离目标和显式确认保护。
+- [x] Sandbox、路径、命令、Secret 和治理边界用例已固化。
+- [x] 回滚脚本禁止自动 Down Migration，并可校验旧 manifest。
+- [x] Demo 文档可由另一名人员按步骤执行。
+- [x] 所有真实演练项已进入阶段 9 阻断清单。
 
 通过以上门槛后，阶段 7 状态改为 `待集中验收`；未取得真实演练证据前不得标记为 `已完成`。
 
@@ -1040,8 +1043,8 @@ Release 应包含：
 | 4 Prompt/模型治理准备 | 待集中验收 | 仓库所有者 | 2026-09-01 |  | PR #31 已合并补丁诊断；Prompt 嵌入/回滚配置、最终执行参数、快速检查和通用审批模板已核对，见 `docs/stage-4-engineering-readiness.md`；v4 smoke 补丁阻断保留到最终验收前处理 |
 | 5 发布镜像资产准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docker-bake.hcl`、`deploy/release/release-manifest.template.json`、`scripts/validate-release-assets.ps1`、`docs/stage-5-release-image-audit.md` |
 | 6 Staging 部署准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-6-staging-infrastructure.md`、`docs/stage-6-staging-deployment-audit.md`、digest-only Compose、Preflight/Release/Acceptance/Bootstrap cleanup |
-| 7 运维与安全演练准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 7 运维与安全演练准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-7-operations-security-audit.md`、运维 dry-run、隔离恢复、v2 回滚、安全与 Demo Runbook |
 | 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-阶段 4、阶段 5 和阶段 6 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 6 已固定 digest-only Staging Compose、源码/manifest/Secret/端口 Preflight、无服务端构建的发布流程、Release 与 Prompt/model readiness、Bootstrap 清理以及公网浏览器验收契约。下一步进入阶段 7 的运维与安全演练准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。
+阶段 4～7 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 7 已固定 9 条告警 dry-run、带 checksum/manifest 的隔离恢复、边界测试、禁止 Down Migration 的 v2 应用回滚和脱敏 Demo 契约。下一步进入阶段 8 的 Production 与发布资料准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全、Demo 和负载测试统一在阶段 9 执行。
