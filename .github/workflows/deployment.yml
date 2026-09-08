@@ -27,6 +27,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-production-readiness.ps1
 
+      - name: Validate stage 9 acceptance preflight
+        shell: pwsh
+        run: ./scripts/stage-9-acceptance-preflight.ps1 -SkipEngineeringValidators
+
       - name: Validate backup and restore shell syntax
         shell: bash
         run: |

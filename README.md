@@ -249,4 +249,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4～8 工程准备已通过并等待最终集中验收。下一步是阶段 9 的人工集中验收窗口：正式 Eval、不可变镜像供应链、公网 Staging、恢复/安全/负载演练和最终 Go/No-Go。全部真实证据通过前，不得发布 `v1.0.0` 或开放 Production 流量。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4～8 工程准备已通过并等待最终集中验收。阶段 9 已建立[集中验收窗口手册](./docs/stage-9-acceptance-window-runbook.md)、冻结计划和串行门禁；可用 `./scripts/stage-9-acceptance-preflight.ps1` 运行无外部副作用的静态预检。下一步必须先合并本批准备资产并从新的主分支 SHA 运行候选 smoke，之后才能依次执行正式 Eval、不可变镜像供应链、公网 Staging、恢复/安全/负载演练和最终 Go/No-Go。全部真实证据通过前，不得发布 `v1.0.0` 或开放 Production 流量。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
