@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <rect width="1600" height="1000" fill="#07111f"/>
+  <text x="72" y="74" fill="#f8fafc" font-family="Noto Sans SC, sans-serif" font-size="38" font-weight="700">ForgeFlow Production 信任边界与数据流</text>
+  <text x="74" y="108" fill="#8da4bf" font-family="Noto Sans SC, sans-serif" font-size="17">公网入口、控制面、数据面与高风险执行面物理分离 · 所有箭头均为最小授权单向流</text>
+
+  <g transform="translate(74 145)">
+    <path d="M20 34 C20 15 36 0 56 0 H200 C220 0 236 15 236 34 C260 38 274 54 274 74 C274 99 253 118 226 118 H42 C17 118 0 99 0 75 C0 55 8 42 20 34Z" fill="#172c46" stroke="#5b89bd" stroke-width="2"/>
+    <text x="137" y="49" text-anchor="middle" fill="#e6f1ff" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">用户 / Operator</text>
+    <text x="137" y="78" text-anchor="middle" fill="#9db2c9" font-family="Noto Sans SC, sans-serif" font-size="14">浏览器 · HTTPS · MFA</text>
+  </g>
+
+  <g transform="translate(420 154)">
+    <path d="M58 0 L116 22 V70 C116 105 94 130 58 147 C22 130 0 105 0 70 V22Z" fill="#123d45" stroke="#35c5b4" stroke-width="3"/>
+    <path d="M33 72 L51 90 L85 51" fill="none" stroke="#70f0cf" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="143" y="48" fill="#e8fffb" font-family="Noto Sans SC, sans-serif" font-size="19" font-weight="700">DNS · CDN · WAF</text>
+    <text x="143" y="78" fill="#9ad4cb" font-family="Noto Sans SC, sans-serif" font-size="14">DDoS / TLS / 限速</text>
+    <text x="143" y="102" fill="#9ad4cb" font-family="Noto Sans SC, sans-serif" font-size="14">访问日志脱敏</text>
+  </g>
+
+  <polyline points="350,204 405,204" fill="none" stroke="#5fe0cf" stroke-width="4"/>
+  <polygon points="405,196 421,204 405,212" fill="#5fe0cf"/>
+  <polyline points="710,204 800,204 800,260" fill="none" stroke="#5fe0cf" stroke-width="4"/>
+  <polygon points="792,260 800,276 808,260" fill="#5fe0cf"/>
+
+  <rect x="62" y="325" width="670" height="490" rx="34" fill="#0c1c30" stroke="#3887d4" stroke-width="3"/>
+  <text x="94" y="369" fill="#74b9ff" font-family="Noto Sans SC, sans-serif" font-size="22" font-weight="700">CONTROL PLANE · 控制面</text>
+  <text x="94" y="397" fill="#7895b5" font-family="Noto Sans SC, sans-serif" font-size="14">无模型 Key · 无 Docker endpoint · 无可写仓库</text>
+
+  <g transform="translate(104 438)">
+    <rect width="262" height="122" rx="24" fill="#123358" stroke="#4da3ff" stroke-width="2"/>
+    <circle cx="43" cy="43" r="20" fill="#4da3ff" opacity="0.25"/>
+    <path d="M32 44 L43 33 L54 44 M43 34 V58" fill="none" stroke="#8dcbff" stroke-width="3"/>
+    <text x="78" y="45" fill="#f1f7ff" font-family="Noto Sans SC, sans-serif" font-size="19" font-weight="700">API replicas ≥ 2</text>
+    <text x="26" y="82" fill="#9eb5ce" font-family="Noto Sans SC, sans-serif" font-size="14">Session · RBAC · CSRF · 审批</text>
+    <text x="26" y="104" fill="#9eb5ce" font-family="Noto Sans SC, sans-serif" font-size="14">健康检查与滚动升级</text>
+  </g>
+
+  <g transform="translate(414 438)">
+    <polygon points="126,0 252,61 126,122 0,61" fill="#29204d" stroke="#9b87f5" stroke-width="2"/>
+    <text x="126" y="52" text-anchor="middle" fill="#f5f1ff" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">Web 静态入口</text>
+    <text x="126" y="78" text-anchor="middle" fill="#bdb0ed" font-family="Noto Sans SC, sans-serif" font-size="13">CSP · HSTS · immutable</text>
+  </g>
+
+  <g transform="translate(104 611)">
+    <rect width="562" height="146" rx="28" fill="#10283f" stroke="#376b98" stroke-width="2"/>
+    <text x="28" y="39" fill="#d9ebff" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">编排与治理</text>
+    <circle cx="48" cy="82" r="15" fill="#35c5b4"/>
+    <circle cx="138" cy="82" r="15" fill="#4da3ff"/>
+    <circle cx="228" cy="82" r="15" fill="#9b87f5"/>
+    <polyline points="63,82 123,82 123,82" fill="none" stroke="#6e91b4" stroke-width="3"/>
+    <polyline points="153,82 213,82" fill="none" stroke="#6e91b4" stroke-width="3"/>
+    <text x="280" y="78" fill="#afc4da" font-family="Noto Sans SC, sans-serif" font-size="14">Queue 元数据 · Checkpoint · Audit</text>
+    <text x="280" y="104" fill="#afc4da" font-family="Noto Sans SC, sans-serif" font-size="14">Prompt / Model Active Release 门禁</text>
+    <text x="28" y="130" fill="#6f8ca9" font-family="Noto Sans SC, sans-serif" font-size="13">控制面仅发布任务描述与不可变版本，不发送 Session Secret</text>
+  </g>
+
+  <rect x="765" y="325" width="338" height="490" rx="34" fill="#171b2d" stroke="#8e78e8" stroke-width="3"/>
+  <text x="797" y="369" fill="#b7a8ff" font-family="Noto Sans SC, sans-serif" font-size="22" font-weight="700">DATA PLANE · 数据面</text>
+  <text x="797" y="397" fill="#8f89ad" font-family="Noto Sans SC, sans-serif" font-size="14">私网 TLS · 加密 · 生命周期 · PITR</text>
+
+  <g transform="translate(814 438)">
+    <ellipse cx="118" cy="24" rx="118" ry="24" fill="#43366d" stroke="#b3a3ff" stroke-width="2"/>
+    <rect x="0" y="24" width="236" height="92" fill="#342957" stroke="#b3a3ff" stroke-width="2"/>
+    <ellipse cx="118" cy="116" rx="118" ry="24" fill="#2b2348" stroke="#b3a3ff" stroke-width="2"/>
+    <text x="118" y="66" text-anchor="middle" fill="#f4f1ff" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">Managed PostgreSQL</text>
+    <text x="118" y="92" text-anchor="middle" fill="#c8bfee" font-family="Noto Sans SC, sans-serif" font-size="13">HA · PITR · 审计 · 独立凭据</text>
+  </g>
+
+  <g transform="translate(814 620)">
+    <path d="M0 34 Q0 0 34 0 H202 Q236 0 236 34 V108 Q236 142 202 142 H34 Q0 142 0 108Z" fill="#24213e" stroke="#8e78e8" stroke-width="2"/>
+    <path d="M28 45 H208 M28 72 H208 M28 99 H160" stroke="#776ab2" stroke-width="4" stroke-linecap="round"/>
+    <text x="118" y="126" text-anchor="middle" fill="#ece8ff" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="700">对象存储 · Artifact / Evidence</text>
+  </g>
+
+  <rect x="1136" y="325" width="402" height="490" rx="34" fill="#241b1a" stroke="#e68a45" stroke-width="3"/>
+  <text x="1168" y="369" fill="#ffb16f" font-family="Noto Sans SC, sans-serif" font-size="22" font-weight="700">EXECUTION PLANE · 执行面</text>
+  <text x="1168" y="397" fill="#b69982" font-family="Noto Sans SC, sans-serif" font-size="14">专用节点池 · 无公网入站 · 可随时隔离</text>
+
+  <g transform="translate(1183 438)">
+    <path d="M20 0 H302 Q322 0 322 20 V94 Q322 114 302 114 H20 Q0 114 0 94 V20 Q0 0 20 0Z" fill="#4a2d20" stroke="#f19a59" stroke-width="2"/>
+    <text x="161" y="40" text-anchor="middle" fill="#fff4eb" font-family="Noto Sans SC, sans-serif" font-size="19" font-weight="700">Worker pool</text>
+    <text x="161" y="69" text-anchor="middle" fill="#e4b996" font-family="Noto Sans SC, sans-serif" font-size="14">drain · lease · 队列限流 · 自动扩缩容</text>
+    <text x="161" y="92" text-anchor="middle" fill="#e4b996" font-family="Noto Sans SC, sans-serif" font-size="13">仅此处持有模型 Key 与仓库只读凭据</text>
+  </g>
+
+  <g transform="translate(1183 600)">
+    <polygon points="161,0 322,46 287,150 35,150 0,46" fill="#3a2822" stroke="#df7f45" stroke-width="2"/>
+    <text x="161" y="48" text-anchor="middle" fill="#fff0e5" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">Ephemeral Sandbox</text>
+    <text x="161" y="78" text-anchor="middle" fill="#dcad8b" font-family="Noto Sans SC, sans-serif" font-size="13">non-root · read-only · no network</text>
+    <text x="161" y="103" text-anchor="middle" fill="#dcad8b" font-family="Noto Sans SC, sans-serif" font-size="13">CPU / Memory / PID / Timeout</text>
+    <text x="161" y="128" text-anchor="middle" fill="#dcad8b" font-family="Noto Sans SC, sans-serif" font-size="13">临时 worktree · 退出即销毁</text>
+  </g>
+
+  <polyline points="732,518 764,518" fill="none" stroke="#58aaf8" stroke-width="4"/>
+  <polygon points="764,510 780,518 764,526" fill="#58aaf8"/>
+  <polyline points="1103,518 1135,518" fill="none" stroke="#f2a260" stroke-width="4" stroke-dasharray="8 7"/>
+  <polygon points="1135,510 1151,518 1135,526" fill="#f2a260"/>
+  <polyline points="1337,552 1337,596" fill="none" stroke="#f2a260" stroke-width="4"/>
+  <polygon points="1329,596 1337,612 1345,596" fill="#f2a260"/>
+  <polyline points="1136,710 1051,710" fill="none" stroke="#9b87f5" stroke-width="3" stroke-dasharray="7 6"/>
+  <polygon points="1051,702 1035,710 1051,718" fill="#9b87f5"/>
+
+  <g transform="translate(74 858)">
+    <text x="0" y="24" fill="#f0f5fa" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700">外部出口（仅允许清单）</text>
+    <circle cx="28" cy="70" r="19" fill="#35c5b4"/>
+    <text x="60" y="76" fill="#a9bdcf" font-family="Noto Sans SC, sans-serif" font-size="15">模型 Provider：仅 Worker，经 egress proxy，发送范围受政策约束</text>
+    <circle cx="694" cy="70" r="19" fill="#4da3ff"/>
+    <text x="726" y="76" fill="#a9bdcf" font-family="Noto Sans SC, sans-serif" font-size="15">监控 / 告警：脱敏指标与事件，不含任务正文</text>
+    <circle cx="1214" cy="70" r="19" fill="#9b87f5"/>
+    <text x="1246" y="76" fill="#a9bdcf" font-family="Noto Sans SC, sans-serif" font-size="15">异地备份：加密、校验、不可变保留</text>
+  </g>
+
+  <text x="1528" y="966" text-anchor="end" fill="#62788f" font-family="Noto Sans SC, sans-serif" font-size="13">Stage 8 reference architecture · provider-neutral · measurements pending Stage 9</text>
+</svg>

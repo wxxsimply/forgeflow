@@ -784,7 +784,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 
 ## 12. 阶段 8：准备 Production 方案和发布资料
 
-> 当前状态：未开始  
+> 当前状态：待集中验收（2026-09-08；Production 逻辑架构、安全风险登记、SLO/容量、数据治理、值班/变更及 `v1.0.0` 发布模板已通过工程准备核对）
 > 进入条件：阶段 7 工程准备门槛通过，状态为 `待集中验收`。
 > 本阶段目标：完成 Production 架构、安全、SLO、值班、数据制度和发布资料；依赖真实环境的数据、容量和恢复结论在阶段 9 回填。
 
@@ -843,13 +843,13 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 
 ### 12.6 阶段 8 工程准备门槛
 
-- [ ] 控制面、执行面、数据库、对象存储和 Secret 边界已获批准。
-- [ ] Production 不直接复用单机 Staging 的信任模型。
-- [ ] 独立安全评审范围、负责人和阻断问题处理流程已确定。
-- [ ] SLO、容量、值班、RPO/RTO 和数据政策有明确负责人；需要实测的数值标记为阶段 9 回填。
-- [ ] Production 发布、回滚和最终人工审批方案已经过文档评审。
+- [x] 控制面、执行面、数据库、对象存储和 Secret 逻辑边界已形成待 PR 合并确认的工程基线；该确认不授权部署或开放流量。
+- [x] Production 明确禁止直接复用单机 Staging 的信任模型。
+- [x] 独立安全评审范围、角色负责人和阻断问题处理流程已确定；实际人员在阶段 9 私有记录中回填。
+- [x] SLO、容量、值班、RPO/RTO 和数据政策有明确角色负责人；需要实测的数值已标记为阶段 9 回填。
+- [x] Production 发布、回滚和最终人工审批方案已形成待 PR 合并确认的文档基线。
 
-通过以上门槛后，阶段 8 状态改为 `待集中验收`。只有阶段 9 回填真实 Eval、镜像、Staging、安全、恢复和容量证据后，阶段 4～8 才能一起转为 `已完成`。
+阶段 8 PR 的合并只记录仓库所有者对逻辑架构和工程治理文档的评审，不是 Production Go。工程准备门槛通过后状态为 `待集中验收`；只有阶段 9 回填真实 Eval、镜像、Staging、安全、恢复和容量证据后，阶段 4～8 才能一起转为 `已完成`。
 
 ---
 
@@ -1044,7 +1044,7 @@ Release 应包含：
 | 5 发布镜像资产准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docker-bake.hcl`、`deploy/release/release-manifest.template.json`、`scripts/validate-release-assets.ps1`、`docs/stage-5-release-image-audit.md` |
 | 6 Staging 部署准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-6-staging-infrastructure.md`、`docs/stage-6-staging-deployment-audit.md`、digest-only Compose、Preflight/Release/Acceptance/Bootstrap cleanup |
 | 7 运维与安全演练准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-7-operations-security-audit.md`、运维 dry-run、隔离恢复、v2 回滚、安全与 Demo Runbook |
-| 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 8 Production 与发布准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-8-production-release-audit.md`、Production 架构图、安全/SLO/数据/运维治理与 `v1.0.0` 发布模板；P8-001～P8-007 保留为阶段 9 发布阻断项 |
 | 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-阶段 4～7 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 7 已固定 9 条告警 dry-run、带 checksum/manifest 的隔离恢复、边界测试、禁止 Down Migration 的 v2 应用回滚和脱敏 Demo 契约。下一步进入阶段 8 的 Production 与发布资料准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全、Demo 和负载测试统一在阶段 9 执行。
+阶段 4～8 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 8 已固定 Production 逻辑边界、安全风险登记、SLO/容量/RPO/RTO 目标、数据治理、值班与变更流程，以及 Go/No-Go 和 Release Notes 模板；对象存储适配器、真实隔离部署、管理员 MFA、不可篡改审计、Provider/Region 审批、容量/恢复实测和独立人员排班仍是阶段 9 阻断项。下一步只进入阶段 9 的集中验收窗口；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全、Demo、负载测试和 GitHub Release 均不得提前执行。

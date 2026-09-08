@@ -10,7 +10,7 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
                                                                                 -> Judge -> Repair / Human Approval / End
 ```
 
-当前已完成计划审批链路、Graph Runtime 可靠性基础、Repository Harness、模型与 Planner、Policy/Tool/Sandbox 安全底座、Developer/Reviewer/Security/Judge 纵向链路、PostgreSQL/Worker 生命周期、HTTP API/Session/RBAC、Web 登录与 Run 控制台、阶段 10 的 Observability/Eval 工程，以及阶段 11 的 Staging Compose、HTTPS、Secret、备份恢复、监控告警、发布回滚和安全文档。目标仓库只接受策略授权的结构化工具调用；修改发生在独立 Git worktree，原仓库保持不变。网络和未知工具默认拒绝，真实 Docker 执行默认关闭。
+当前已完成计划审批链路、Graph Runtime 可靠性基础、Repository Harness、模型与 Planner、Policy/Tool/Sandbox 安全底座、Developer/Reviewer/Security/Judge 纵向链路、PostgreSQL/Worker 生命周期、HTTP API/Session/RBAC、Web 登录与 Run 控制台、Observability/Eval 工程、Staging 部署与运维工程资产，以及 Production 逻辑架构和发布治理资料。目标仓库只接受策略授权的结构化工具调用；修改发生在独立 Git worktree，原仓库保持不变。网络和未知工具默认拒绝，真实 Docker 执行默认关闭。Production 尚未部署或验收。
 
 ## 当前能力
 
@@ -76,6 +76,9 @@ Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> D
 - Caddy 自动 HTTPS、内部 Compose 网络、Docker Secret `_FILE` 注入和 API/Worker 权限隔离
 - Prometheus/Alertmanager/OTel Collector、9 条脱敏告警 dry-run、带 checksum/manifest 的隔离恢复和禁止 Down Migration 的 v2 应用回滚
 - Threat Model、Operations、Security Review、Demo、ADR 和故障演练复盘
+- Production 控制/执行/数据面逻辑架构与可编辑数据流图
+- SLO、错误预算、容量、RPO/RTO、数据保留/删除/导出和事件升级基线
+- `v1.0.0` Go/No-Go、Release Notes、隐私政策和服务条款草案；法律草案尚未生效
 - CLI 与基础测试
 
 ## 快速开始
@@ -194,7 +197,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -Manifest $manifest -IncludeBootstrap -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～7 的 Prompt/模型治理、不可变镜像、Staging 部署、运维和安全演练工程准备均为待集中验收。Staging 现在强制源码、Release manifest 和 digest 镜像一致，服务器不构建镜像，并具备 Bootstrap 清理、版本 readiness、公网 E2E、Fixture 不变性、告警/恢复/安全 dry-run、v2 回滚和脱敏 Demo 脚本。正式候选对照、Promotion/rollback、完整镜像和公网 Staging 尚未验收，因此仍不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～8 的 Prompt/模型治理、不可变镜像、Staging 部署、运维/安全演练和 Production/发布治理工程准备均为待集中验收。Production 方案见[架构与数据流](./docs/production-architecture.md)、[安全就绪与风险清单](./docs/production-security-readiness.md)、[SLO 与容量](./docs/production-slo-capacity.md)、[数据治理](./docs/production-data-governance.md)和[阶段 8 审计](./docs/stage-8-production-release-audit.md)。正式候选对照、Promotion/rollback、完整镜像、公网 Staging、真实恢复/安全/负载验证尚未执行，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
@@ -246,4 +249,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4～7 工程准备已通过并等待最终集中验收；下一步进入 Production 方案和 `v1.0.0` 发布资料准备。正式数据、镜像、环境与演练验收统一留到最终窗口。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4～8 工程准备已通过并等待最终集中验收。下一步是阶段 9 的人工集中验收窗口：正式 Eval、不可变镜像供应链、公网 Staging、恢复/安全/负载演练和最终 Go/No-Go。全部真实证据通过前，不得发布 `v1.0.0` 或开放 Production 流量。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。

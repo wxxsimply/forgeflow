@@ -23,6 +23,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1
 
+      - name: Validate Production readiness contract
+        shell: pwsh
+        run: ./scripts/validate-production-readiness.ps1
+
       - name: Validate backup and restore shell syntax
         shell: bash
         run: |
