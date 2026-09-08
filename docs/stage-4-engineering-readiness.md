@@ -1,6 +1,6 @@
 # 阶段 4 工程准备与最终验收交接
 
-> 2026-09-07：工程准备已完成本地核对，等待人工提交本批文档。真实候选质量与 Promotion 尚未通过。
+> 2026-09-09：阶段 9 新 smoke 中 v1/v4 均被损坏补丁阻断；安全统一 diff 规范化已准备，等待 PR 合并和新 SHA smoke。真实候选质量与 Promotion 尚未通过。
 
 ## 工程准备依据
 
@@ -43,7 +43,7 @@ git diff --check
 
 ## 最终窗口的执行依赖
 
-1. 先解除当前 v4 smoke 的补丁预检失败，保留旧失败记录。修复须有独立合成回归验证，并从新的干净 SHA 获得可接受的快速 smoke；出现确定性失败时停止正式 Eval。不能因为工程准备完成就跳过此项。
+1. 先合并安全统一 diff 规范化，保留 2026-09-09 v1/v4 `patch_check` 失败记录。修复须有独立合成回归验证，并从新的干净 SHA 获得可接受的快速 smoke；出现确定性失败时停止正式 Eval。不能因为工程准备完成就跳过此项。
 2. 正式 180 Observation 对照通过自动 Gate，由 Admin 填写通用审批表并签署 Promotion 决策。
 3. 完成阶段 5 的镜像构建、扫描、签名和人工上传，记录 Git SHA 与 digest；候选及回滚 Prompt 均须可从实际镜像解析。
 4. 在阶段 6 的隔离 Staging 中先部署 API，保持 Worker drained，再按治理手册导入批准的 Eval、建立初始 Release、执行候选 Promotion、启动匹配 Worker 并验证 Readiness。
