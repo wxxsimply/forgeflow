@@ -28,7 +28,7 @@ x-app-environment: &app-environment
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
     restart: unless-stopped
     environment:
       POSTGRES_USER: forgeflow
@@ -52,14 +52,7 @@ services:
       - no-new-privileges:true
 
   migrate:
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-      target: api
-      args:
-        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: ${FORGEFLOW_API_IMAGE:?FORGEFLOW_API_IMAGE is required}
     entrypoint: ["/usr/local/bin/forgeflow"]
     command: ["db", "migrate"]
     read_only: true
@@ -81,14 +74,7 @@ services:
 
   api:
     <<: *forgeflow-common
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-      target: api
-      args:
-        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: ${FORGEFLOW_API_IMAGE:?FORGEFLOW_API_IMAGE is required}
     environment:
       <<: *app-environment
       FORGEFLOW_HTTP_ADDRESS: 0.0.0.0:8080
@@ -126,14 +112,7 @@ services:
 
   worker:
     <<: *forgeflow-common
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-worker:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-      target: worker
-      args:
-        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: ${FORGEFLOW_WORKER_IMAGE:?FORGEFLOW_WORKER_IMAGE is required}
     environment:
       <<: *app-environment
       FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091
@@ -168,14 +147,7 @@ services:
 
   web:
     <<: *forgeflow-common
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-web:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-    build:
-      context: ../..
-      dockerfile: web/Dockerfile
-      target: web
-      args:
-        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: ${FORGEFLOW_WEB_IMAGE:?FORGEFLOW_WEB_IMAGE is required}
     networks:
       - app
     healthcheck:
@@ -185,14 +157,7 @@ services:
       retries: 10
 
   caddy:
-    image: ${FORGEFLOW_REGISTRY:-local}/forgeflow-caddy:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-    build:
-      context: ./caddy
-      dockerfile: Dockerfile
-      args:
-        CADDY_BASE_IMAGE: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
-        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
-        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: ${FORGEFLOW_CADDY_IMAGE:?FORGEFLOW_CADDY_IMAGE is required}
     restart: unless-stopped
     environment:
       FORGEFLOW_DOMAIN: ${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
@@ -222,7 +187,7 @@ services:
     stop_grace_period: 20s
 
   otel-collector:
-    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector:0.157.0}
+    image: ${OTEL_COLLECTOR_IMAGE:?OTEL_COLLECTOR_IMAGE is required}
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
@@ -237,7 +202,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.12.0}
+    image: ${PROMETHEUS_IMAGE:?PROMETHEUS_IMAGE is required}
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
       - --storage.tsdb.path=/prometheus
@@ -257,7 +222,7 @@ services:
     cap_drop: ["ALL"]
 
   alertmanager:
-    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.32.1}
+    image: ${ALERTMANAGER_IMAGE:?ALERTMANAGER_IMAGE is required}
     command:
       - --config.file=/etc/alertmanager/alertmanager.yaml
       - --storage.path=/alertmanager
@@ -277,7 +242,7 @@ services:
 
   backup:
     profiles: ["ops"]
-    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
     entrypoint: ["/bin/sh", "/ops/backup.sh"]
     environment:
       PGHOST: postgres
@@ -302,7 +267,7 @@ services:
 
   restore-drill:
     profiles: ["ops"]
-    image: ${POSTGRES_IMAGE:-postgres:17.10-alpine3.23}
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
     entrypoint: ["/bin/sh", "/ops/restore-drill.sh"]
     environment:
       PGHOST: postgres

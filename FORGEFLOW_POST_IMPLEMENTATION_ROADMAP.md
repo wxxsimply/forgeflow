@@ -598,7 +598,7 @@ Token 只授予需要的包权限，不要使用个人主密码。
 
 ## 10. 阶段 6：准备真实 Staging 部署
 
-> 当前状态：未开始  
+> 当前状态：待集中验收（2026-09-08 工程准备门槛通过）
 > 进入条件：阶段 5 工程准备门槛通过，状态为 `待集中验收`。
 > 本阶段目标：完成基础设施清单、Secret 边界、部署脚本、Preflight 和验收清单；真实部署和产品全链路测试后置到阶段 9。
 
@@ -643,14 +643,17 @@ git status --short
 
 ```powershell
 Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
-./scripts/staging-preflight.ps1 -RequireDigests
-./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -IncludeBootstrap -ConfirmDeploy
+$manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
+./scripts/staging-preflight.ps1 -Manifest $manifest -RequireDigests
+./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -Manifest $manifest -IncludeBootstrap -ConfirmDeploy
 ```
 
-首次管理员成功登录后，立即删除 Bootstrap Password。启用完整模型和 Sandbox 时：
+首次管理员成功登录后，立即使用清理脚本删除 Bootstrap Password 并重建无 Bootstrap 的 API。启用完整模型和 Sandbox 时继续使用同一个 Release manifest：
 
 ```powershell
-./scripts/staging-release.ps1 -Release 0.12.0-rc.2 -IncludeOpenAI -ConfirmDeploy
+./scripts/staging-bootstrap-cleanup.ps1 -BaseUri https://<domain> -Email <admin-email> -Password (Read-Host -AsSecureString) -ConfirmRemoval
+./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -Manifest $manifest -IncludeOpenAI -ConfirmDeploy
+./scripts/staging-acceptance.ps1 -BaseUri https://<domain> -ExpectedRelease 0.12.0-rc.1 -ExpectedGitCommit <approved-sha> -Manifest $manifest -Email <staging-user> -Password (Read-Host -AsSecureString) -RepositoryHostPath <fixture-path> -IncludeOpenAI
 ```
 
 ### 10.5 阶段 9 执行的 Staging 验收
@@ -674,11 +677,11 @@ Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
 
 ### 10.7 阶段 6 工程准备门槛
 
-- [ ] Staging 基础设施、DNS、端口和访问控制清单已评审。
-- [ ] 配置模板不含 Secret，Secret 创建和删除步骤明确。
-- [ ] Preflight、部署、健康检查、E2E 和清理脚本已完成快速校验。
-- [ ] API、Worker、Web、Migration 和 Prompt 版本一致性检查已写入验收脚本。
-- [ ] 真实部署、Sandbox Run、Fixture 不变性和 Bootstrap 删除验证已列入阶段 9。
+- [x] Staging 基础设施、DNS、端口和访问控制清单已评审。
+- [x] 配置模板不含 Secret，Secret 创建和删除步骤明确。
+- [x] Preflight、部署、健康检查、E2E 和清理脚本已完成快速校验。
+- [x] API、Worker、Web、Migration 和 Prompt 版本一致性检查已写入验收脚本。
+- [x] 真实部署、Sandbox Run、Fixture 不变性和 Bootstrap 删除验证已列入阶段 9。
 
 通过以上门槛后，阶段 6 状态改为 `待集中验收`；公网 Staging 尚未完成时仍不得标记为 `已完成` 或 Production Ready。
 
@@ -1036,9 +1039,9 @@ Release 应包含：
 | 3 三基线 Eval | 已完成 | 仓库所有者 | 2026-08-31 | 2026-09-01 | `docs/stage-3-eval-executor-audit.md`、`release-reports/stage-3-eval-review-template.md`；PR #13 已合并；仓库所有者已签署 `APPROVED AS BASELINE` |
 | 4 Prompt/模型治理准备 | 待集中验收 | 仓库所有者 | 2026-09-01 |  | PR #31 已合并补丁诊断；Prompt 嵌入/回滚配置、最终执行参数、快速检查和通用审批模板已核对，见 `docs/stage-4-engineering-readiness.md`；v4 smoke 补丁阻断保留到最终验收前处理 |
 | 5 发布镜像资产准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docker-bake.hcl`、`deploy/release/release-manifest.template.json`、`scripts/validate-release-assets.ps1`、`docs/stage-5-release-image-audit.md` |
-| 6 Staging 部署准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
+| 6 Staging 部署准备 | 待集中验收 | 仓库所有者 | 2026-09-08 |  | `docs/stage-6-staging-infrastructure.md`、`docs/stage-6-staging-deployment-audit.md`、digest-only Compose、Preflight/Release/Acceptance/Bootstrap cleanup |
 | 7 运维与安全演练准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 8 Production 与发布准备 | 未开始 | 待填写 |  |  | 完成后状态改为 `待集中验收` |
 | 9 集中验收与 v1.0.0 发布 | 未开始 | 待填写 |  |  | 正式 Eval、镜像、Staging、恢复、安全、负载和发布统一执行 |
 
-阶段 4 和阶段 5 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 5 已固定五镜像 Bake 构建计划、OCI 版本元数据、digest Release manifest、SBOM/provenance/签名/扫描流程与风险接受模板；PR 门禁只执行快速 Dockerfile check，不在工程准备遍完整构建镜像。下一步进入阶段 6 的真实 Staging 部署准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。
+阶段 4、阶段 5 和阶段 6 的工程准备门槛已通过，当前状态均为**待集中验收**。阶段 6 已固定 digest-only Staging Compose、源码/manifest/Secret/端口 Preflight、无服务端构建的发布流程、Release 与 Prompt/model readiness、Bootstrap 清理以及公网浏览器验收契约。下一步进入阶段 7 的运维与安全演练准备；正式候选对照、Promotion/rollback、完整镜像、真实 Staging、恢复、安全和负载测试统一在阶段 9 执行。

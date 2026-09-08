@@ -19,7 +19,7 @@ services:
         condition: service_healthy
 
   sandbox-engine:
-    image: ${DOCKER_DIND_IMAGE:-docker:28.4-dind}
+    image: ${DOCKER_DIND_IMAGE:?DOCKER_DIND_IMAGE is required}
     privileged: true
     environment:
       DOCKER_TLS_CERTDIR: /certs

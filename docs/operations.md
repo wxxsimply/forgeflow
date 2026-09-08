@@ -8,31 +8,57 @@
 
 ## 2. 首次准备
 
-服务器要求 Docker Engine + Compose v2、可解析到服务器的域名、开放 80/443、至少一个已有 Git commit 的只读测试仓库。部署账号独占 `deploy/staging/secrets`，Secret 文件权限设为 `0600`。
+服务器要求 Docker Engine + Compose v2、可解析到服务器的域名、开放 80/443、至少一个已有 Git commit 的测试仓库。完整要求见 `docs/stage-6-staging-infrastructure.md`。部署账号独占 `deploy/staging/secrets`，Secret 必须是该账号拥有的普通非符号链接文件，权限设为 `0600`。
 
 ```powershell
 Copy-Item deploy/staging/staging.env.example deploy/staging/staging.env
-# 创建 postgres_password、postgres_dsn、alert_webhook_url
-./scripts/staging-preflight.ps1
+# 填写批准的 40 位 Git SHA、域名、仓库路径和全部 image@sha256 digest。
+# 首次 Bootstrap 时取消 FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL 的注释并填入管理员邮箱。
+# 在主机上创建 postgres_password、postgres_dsn、alert_webhook_url。
+./scripts/staging-preflight.ps1 `
+  -EnvFile deploy/staging/staging.env `
+  -Manifest .forgeflow/release/0.12.0-rc.1/release-manifest.json `
+  -RequireDigests
 ```
 
-`postgres_dsn` 中密码必须 URL encode。生产 Promotion 时执行 `-RequireDigests`，所有第三方镜像必须使用 `image@sha256:digest`。
+`postgres_dsn` 中密码必须 URL encode。人工使用独立 read-only pull token 执行 Registry 登录，凭据保留在仓库外。正式部署始终使用 `-RequireDigests`；ForgeFlow 和第三方镜像都必须是 `image@sha256:<64位 digest>`。Preflight 还要求当前源码 HEAD、环境文件和 Release manifest 完全一致。
 
 ## 3. 首次管理员与部署
 
-Bootstrap 只运行一次：创建 `bootstrap_admin_password` Secret，在 `staging.env` 或当前终端设置管理员邮箱，然后执行：
+服务器不构建镜像。`staging-release.ps1` 只校验、拉取并按 digest 部署阶段 5 已审核的 Release manifest。Bootstrap 只运行一次：创建 `bootstrap_admin_password` Secret，在环境文件中设置管理员邮箱，然后执行：
 
 ```powershell
-./scripts/staging-release.ps1 -Release 0.11.0 -IncludeBootstrap -ConfirmDeploy
+$manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
+./scripts/staging-release.ps1 `
+  -Release 0.12.0-rc.1 `
+  -Manifest $manifest `
+  -EnvFile deploy/staging/staging.env `
+  -IncludeBootstrap `
+  -ConfirmDeploy
 ```
 
-确认登录后立即删除 `bootstrap_admin_password`，以后部署不得再传 `-IncludeBootstrap`。真实模型只给 Worker：
+Bootstrap 部署故意不启动 Worker。确认管理员登录后，立即通过受控脚本删除一次性 Secret，并使用不含 Bootstrap 的基础 Compose 重建 API；随后从 `staging.env` 删除 `FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL`：
 
 ```powershell
-./scripts/staging-release.ps1 -Release 0.11.1 -IncludeOpenAI -ConfirmDeploy
+./scripts/staging-bootstrap-cleanup.ps1 `
+  -BaseUri https://<domain> `
+  -Email <admin-email> `
+  -Password (Read-Host -AsSecureString) `
+  -ConfirmRemoval
 ```
 
-部署顺序固定为：构建不可变版本镜像 → PostgreSQL 健康 → 显式 Migration → API/Worker/Web 健康 → Caddy。Release manifest 写入 `.forgeflow/deploy/releases`，包含前一版本、Git SHA 和 Compose 镜像清单。
+随后创建 `openai_api_key`，用同一个 Release、同一个 manifest 启动完整 Worker/Sandbox；不要在 Bootstrap 和正常部署之间更换镜像：
+
+```powershell
+./scripts/staging-release.ps1 `
+  -Release 0.12.0-rc.1 `
+  -Manifest $manifest `
+  -EnvFile deploy/staging/staging.env `
+  -IncludeOpenAI `
+  -ConfirmDeploy
+```
+
+部署顺序固定为：验证不可变 Release manifest → 拉取镜像 → PostgreSQL 健康 → 显式 Migration → API/Worker/Web 健康 → Caddy。OpenAI 模式还会把审核过的 Sandbox 镜像导入隔离 DIND。一次性 Bootstrap 记录写入 `<版本>-bootstrap-deployment.json` 且不覆盖当前正式版本；完整部署记录写入 `.forgeflow/deploy/releases/<版本>-deployment.json`，包含前一版本、Git SHA、manifest SHA、实际镜像和健康元数据。
 
 Prompt Promotion 不会对运行中的 Worker 做隐式热替换。候选镜像必须同时保留可回滚的旧 Prompt，并按“drain Worker → 部署候选 API（Worker 暂停）→ 导入真实 Eval → Admin Promotion → 使用与 Active Release 一致的 Prompt/模型环境重启 Worker”的顺序发布。Promotion/rollback 表是治理记录，不等同于镜像发布；`FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES=true` 时，任一 Agent 的 Prompt version、Prompt SHA 或模型与 Active Release 不一致都会让 Worker 启动预检或 `/readyz` 失败，并在领取新 Job 前再次阻断。首次启用门禁时先保持 Worker 停止，只启动 Migration/API，完成四个 Agent 的初始 Promotion 后再启动 Worker。
 
@@ -46,6 +72,23 @@ docker compose --env-file deploy/staging/staging.env -f deploy/staging/compose.y
 ```
 
 Prometheus/Alertmanager 不公开。使用 SSH 本地端口转发或临时 `docker compose port` 诊断，不允许长期发布管理端口。日志禁止包含 Cookie、密码、API Key、任务正文和完整仓库文件。
+
+完整部署后在阶段 9 运行公网验收。脚本要求 HTTPS，核对 API/Worker/Web 的 Release 和 Git SHA、Prompt/model readiness、浏览器登录到报告链路，并确认测试仓库执行前后完全不变：
+
+```powershell
+./scripts/staging-acceptance.ps1 `
+  -BaseUri https://<domain> `
+  -ExpectedRelease 0.12.0-rc.1 `
+  -ExpectedGitCommit <approved-40-character-sha> `
+  -Manifest $manifest `
+  -Email <staging-user> `
+  -Password (Read-Host -AsSecureString) `
+  -RepositoryHostPath <host-fixture-repository> `
+  -RepositoryContainerPath /repositories/demo `
+  -IncludeOpenAI
+```
+
+验收证据写入被忽略的 `.forgeflow/staging/acceptance`。提交或发布前必须脱敏；不得上传 Cookie、密码、API Key、原始 Evidence、Private Grader 或隐藏测试。
 
 ## 5. Worker drain 与维护
 
