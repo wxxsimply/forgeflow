@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "forgeflow.acceptance-plan/v1",
+  "release": "1.0.0",
+  "candidateGitCommit": "${GIT_COMMIT}",
+  "freeze": {
+    "plannerPrompt": "planner/v1",
+    "developerBaselinePrompt": "developer/v1",
+    "developerCandidatePrompt": "developer/v4",
+    "reviewerPrompt": "reviewer/v1",
+    "securityPrompt": "security/v1",
+    "modelProvider": "${MODEL_PROVIDER}",
+    "model": "${MODEL}",
+    "reasoningEffort": "${REASONING_EFFORT}",
+    "policyVersion": "eval-policy/v1",
+    "toolVersion": "eval-tools/v1",
+    "migrationVersion": 5,
+    "fixtureCommit": "${FIXTURE_COMMIT}",
+    "graderCommit": "${GRADER_COMMIT}"
+  },
+  "authorization": {
+    "evalDataScopeRecordId": "${PRIVATE_EVAL_DATA_SCOPE_RECORD_ID}",
+    "evalBudgetRecordId": "${PRIVATE_EVAL_BUDGET_RECORD_ID}",
+    "maxEvalCostUsd": "${MAX_EVAL_COST_USD}",
+    "releaseApprovalRecordId": "${PRIVATE_RELEASE_APPROVAL_RECORD_ID}"
+  },
+  "external": {
+    "registry": "${REGISTRY}",
+    "stagingBaseUri": "https://${STAGING_DOMAIN}",
+    "signerIdentity": "${SIGNER_IDENTITY}",
+    "oidcIssuer": "${OIDC_ISSUER}",
+    "onCallRosterRecordId": "${PRIVATE_ONCALL_RECORD_ID}",
+    "securityReviewerRecordId": "${PRIVATE_SECURITY_REVIEW_RECORD_ID}"
+  },
+  "evidence": {
+    "privateRoot": ".forgeflow/acceptance/1.0.0",
+    "publicSummaryRoot": "release-reports"
+  },
+  "steps": [
+    {"order": 1, "id": "freeze", "ownerRole": "Release Approver", "timeoutMinutes": 30, "requires": [], "evidencePath": ".forgeflow/acceptance/1.0.0/01-freeze.json", "status": "pending"},
+    {"order": 2, "id": "candidate-smoke", "ownerRole": "Service Owner", "timeoutMinutes": 15, "requires": ["freeze"], "evidencePath": ".forgeflow/acceptance/1.0.0/02-candidate-smoke.json", "status": "pending"},
+    {"order": 3, "id": "formal-eval", "ownerRole": "Service Owner", "timeoutMinutes": 300, "requires": ["candidate-smoke"], "evidencePath": ".forgeflow/acceptance/1.0.0/03-formal-eval.json", "status": "pending"},
+    {"order": 4, "id": "image-supply-chain", "ownerRole": "Platform Owner", "timeoutMinutes": 180, "requires": ["formal-eval"], "evidencePath": ".forgeflow/acceptance/1.0.0/04-image-supply-chain.json", "status": "pending"},
+    {"order": 5, "id": "staging-deploy", "ownerRole": "Platform Owner", "timeoutMinutes": 90, "requires": ["image-supply-chain"], "evidencePath": ".forgeflow/acceptance/1.0.0/05-staging-deploy.json", "status": "pending"},
+    {"order": 6, "id": "governance-drill", "ownerRole": "Release Approver", "timeoutMinutes": 60, "requires": ["staging-deploy"], "evidencePath": ".forgeflow/acceptance/1.0.0/06-governance-drill.json", "status": "pending"},
+    {"order": 7, "id": "staging-e2e", "ownerRole": "Service Owner", "timeoutMinutes": 60, "requires": ["governance-drill"], "evidencePath": ".forgeflow/acceptance/1.0.0/07-staging-e2e.json", "status": "pending"},
+    {"order": 8, "id": "operations-security", "ownerRole": "Security Reviewer", "timeoutMinutes": 120, "requires": ["staging-e2e"], "evidencePath": ".forgeflow/acceptance/1.0.0/08-operations-security.json", "status": "pending"},
+    {"order": 9, "id": "load-recovery", "ownerRole": "Platform Owner", "timeoutMinutes": 180, "requires": ["operations-security"], "evidencePath": ".forgeflow/acceptance/1.0.0/09-load-recovery.json", "status": "pending"},
+    {"order": 10, "id": "final-go-no-go", "ownerRole": "Release Approver", "timeoutMinutes": 60, "requires": ["load-recovery"], "evidencePath": ".forgeflow/acceptance/1.0.0/10-final-go-no-go.json", "status": "pending"},
+    {"order": 11, "id": "github-release", "ownerRole": "Release Approver", "timeoutMinutes": 60, "requires": ["final-go-no-go"], "evidencePath": ".forgeflow/acceptance/1.0.0/11-github-release.json", "status": "pending"}
+  ]
+}

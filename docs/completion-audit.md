@@ -4,6 +4,8 @@
 
 ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔离 Private Grader 和阶段 3 真实三基线均已完成；仓库所有者已将阶段 3 报告签署为后续候选的真实初始对照。阶段 4～8 的工程准备门槛已通过并进入待集中验收；Prompt/模型治理、不可变发布镜像、digest-only Staging、运维/安全演练，以及 Production 架构与发布治理契约已经固定。项目目前仍不满足 `v1.0.0` 最终发布条件：阶段 9 的候选正式 Eval、人工 Promotion/rollback、完整镜像供应链、公网 Staging、恢复/安全/负载验收和最终 Go/No-Go 均未执行。
 
+阶段 9 已进入预检准备：无凭据冻结模板、11 个串行门禁、私有 Evidence 路径、公开摘要模板和默认只读预检已经建立。此状态不代表任何真实验收通过；`developer/v4` 的旧补丁预检失败仍是第一个阻断点。
+
 | 阶段 | 结论 | 证据/剩余项 |
 |---|---|---|
 | 0 工程基线 | 完成 | format/test/vet/build、首次 commit、受保护 `main` 与 GitHub CI 已完成 |
@@ -33,6 +35,7 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 10. 阶段 6 删除 Staging 的服务端构建路径，要求 ForgeFlow 与第三方镜像全部按 digest 固定，并建立源码/manifest/版本一致性、Secret 生命周期、Bootstrap 清理、公网浏览器 E2E 和 Fixture 不变性门禁。
 11. 阶段 7 固定 9 条告警、隔离备份恢复、安全边界、禁止 Down Migration 的 v2 回滚和脱敏 Demo 契约，真实演练集中到阶段 9。
 12. 阶段 8 建立控制/执行/数据面逻辑架构、安全风险登记、SLO/容量/RPO/RTO、数据治理、值班/变更和 `v1.0.0` Go/No-Go 资料；未实现或未实测能力以 `P8-001`～`P8-007` 保留为发布阻断项。
+13. 阶段 9 将正式 Eval、供应链、Staging、治理、运维安全、负载恢复和最终发布固化为 11 个严格串行门禁；填充计划与原始证据只允许保存在 Git 忽略或组织批准的私有存储中。
 
 ## 本轮验证结果
 
