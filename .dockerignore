@@ -9,6 +9,8 @@ evals
 *.log
 .env
 deploy/staging/secrets
+deploy/personal-preview/preview.env
+deploy/personal-preview/secrets
 web/node_modules
 web/dist
 web/playwright-report
