@@ -1,0 +1,212 @@
+name: forgeflow-personal-preview
+
+x-app-environment: &app-environment
+  FORGEFLOW_ENV: development
+  FORGEFLOW_LOG_LEVEL: info
+  FORGEFLOW_SERVICE_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+  FORGEFLOW_POSTGRES_ENABLED: "true"
+  FORGEFLOW_POSTGRES_DSN_FILE: /run/secrets/postgres_dsn
+  FORGEFLOW_METRICS_ENABLED: "false"
+  FORGEFLOW_DATA_DIR: /var/lib/forgeflow
+  FORGEFLOW_ARTIFACT_ROOT: /var/lib/forgeflow/artifacts
+  FORGEFLOW_REPOSITORY_ROOTS: /repositories
+  FORGEFLOW_WORKFLOW_MODE: planning
+  FORGEFLOW_PLANNER_MODE: mock
+
+x-app-common: &app-common
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,noexec,nosuid,nodev
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: forgeflow
+      POSTGRES_DB: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeflow -d forgeflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: api
+      args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    entrypoint: ["/usr/local/bin/forgeflow"]
+    command: ["db", "migrate"]
+    environment:
+      <<: *app-environment
+    secrets:
+      - postgres_dsn
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+
+  api:
+    <<: *app-common
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: api
+      args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    environment:
+      <<: *app-environment
+      FORGEFLOW_HTTP_ADDRESS: 0.0.0.0:8080
+      FORGEFLOW_HTTP_COOKIE_SECURE: "false"
+      FORGEFLOW_HTTP_COOKIE_DOMAIN: ""
+      FORGEFLOW_HTTP_ALLOWED_ORIGINS: http://127.0.0.1:8080,http://localhost:8080
+    secrets:
+      - postgres_dsn
+    volumes:
+      - type: bind
+        source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
+        target: /repositories
+        read_only: true
+      - artifacts:/var/lib/forgeflow/artifacts
+      - type: volume
+        source: workspaces
+        target: /var/lib/forgeflow/workspaces
+        read_only: true
+    networks:
+      - app
+      - data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  worker:
+    <<: *app-common
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: worker
+      args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: forgeflow-worker:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    environment:
+      <<: *app-environment
+      FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091
+      FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES: "false"
+      FORGEFLOW_DOCKER_ENABLED: "false"
+      FORGEFLOW_SANDBOX_WORKSPACE_ROOT: /var/lib/forgeflow/workspaces
+    secrets:
+      - postgres_dsn
+    volumes:
+      - type: bind
+        source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
+        target: /repositories
+      - artifacts:/var/lib/forgeflow/artifacts
+      - workspaces:/var/lib/forgeflow/workspaces
+    networks:
+      - data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9091/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 90s
+
+  web:
+    <<: *app-common
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+      args:
+        FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+        FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+    image: forgeflow-web:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - app
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  postgres_dsn:
+    file: ./secrets/postgres_dsn
+
+volumes:
+  postgres-data:
+  artifacts:
+  workspaces:
+
+networks:
+  app:
+    internal: true
+  data:
+    internal: true

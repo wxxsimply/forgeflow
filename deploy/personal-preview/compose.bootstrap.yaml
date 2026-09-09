@@ -1,0 +1,11 @@
+services:
+  api:
+    environment:
+      FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL: ${FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL:?bootstrap email is required}
+      FORGEFLOW_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/bootstrap_admin_password
+    secrets:
+      - bootstrap_admin_password
+
+secrets:
+  bootstrap_admin_password:
+    file: ./secrets/bootstrap_admin_password
