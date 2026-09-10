@@ -158,8 +158,8 @@ services:
   web:
     <<: *app-common
     build:
-      context: ../../web
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: web/Dockerfile
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}

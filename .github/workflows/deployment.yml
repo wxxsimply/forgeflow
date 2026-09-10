@@ -97,6 +97,22 @@ jobs:
         with:
           driver: docker-container
 
+      - name: Validate personal preview build contexts
+        env:
+          FORGEFLOW_RELEASE: 0.0.0-ci
+          FORGEFLOW_GIT_COMMIT: ${{ github.sha }}
+          FORGEFLOW_REPOSITORY_PATH: ${{ github.workspace }}
+          FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL: admin@example.invalid
+        run: |
+          docker compose \
+            -f deploy/personal-preview/compose.yaml \
+            -f deploy/personal-preview/compose.bootstrap.yaml \
+            config --quiet
+          docker compose \
+            -f deploy/personal-preview/compose.yaml \
+            -f deploy/personal-preview/compose.bootstrap.yaml \
+            build --check
+
       - name: Validate release asset contract
         shell: pwsh
         run: ./scripts/validate-release-assets.ps1
