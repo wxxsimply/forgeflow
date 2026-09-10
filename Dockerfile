@@ -3,7 +3,10 @@ ARG FORGEFLOW_VERSION=development
 ARG FORGEFLOW_GIT_COMMIT=unknown
 FROM golang:${GO_VERSION}-alpine AS build
 ARG FORGEFLOW_GIT_COMMIT
-RUN apk add --no-cache ca-certificates git
+ARG ALPINE_REPOSITORY_URL=https://dl-cdn.alpinelinux.org/alpine
+RUN case "${ALPINE_REPOSITORY_URL}" in https://*) ;; *) echo "ALPINE_REPOSITORY_URL must use HTTPS" >&2; exit 1 ;; esac \
+    && sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_REPOSITORY_URL}|g" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates git
 ARG GOPROXY=https://proxy.golang.org,direct
 ARG GOSUMDB=sum.golang.org
 ENV GOPROXY=${GOPROXY} \
@@ -21,7 +24,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=${TARGETO
 RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w -X forgeflow/internal/buildinfo.Commit=${FORGEFLOW_GIT_COMMIT}" -o /out/forgeflow-worker ./cmd/forgeflow-worker
 
 FROM alpine:3.22 AS runtime-base
-RUN apk add --no-cache ca-certificates git openssh-client tzdata wget \
+ARG ALPINE_REPOSITORY_URL=https://dl-cdn.alpinelinux.org/alpine
+RUN case "${ALPINE_REPOSITORY_URL}" in https://*) ;; *) echo "ALPINE_REPOSITORY_URL must use HTTPS" >&2; exit 1 ;; esac \
+    && sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_REPOSITORY_URL}|g" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates git openssh-client tzdata wget \
     && addgroup -S -g 10001 forgeflow \
     && adduser -S -D -H -u 10001 -G forgeflow forgeflow \
     && mkdir -p /var/lib/forgeflow/artifacts /var/lib/forgeflow/workspaces \

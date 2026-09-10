@@ -39,11 +39,12 @@ cp deploy/personal-preview/preview.env.example deploy/personal-preview/preview.e
 默认使用 Go 官方模块代理与校验数据库。如果服务器无法连接官方端点，可以在 `preview.env` 中显式设置受信任的镜像，例如：
 
 ```dotenv
+ALPINE_REPOSITORY_URL=https://mirrors.aliyun.com/alpine
 GOPROXY=https://goproxy.cn,direct
 GOSUMDB="sum.golang.org https://goproxy.cn/sumdb/sum.golang.org"
 ```
 
-不得使用 `GOSUMDB=off`；代理选择属于部署环境配置，不应改变仓库默认供应链策略。
+`ALPINE_REPOSITORY_URL` 只替换 Alpine 软件包仓库的根地址，必须使用可信 HTTPS 镜像。不得使用 `GOSUMDB=off`；代理选择属于部署环境配置，不应改变仓库默认供应链策略。
 
 个人预览保持 `FORGEFLOW_INSTALL_DOCKER_CLI=false`，与已关闭的 Docker Sandbox 一致；只有明确启用 Docker 执行面时才允许改为 `true`。
 
