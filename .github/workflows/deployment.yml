@@ -111,6 +111,21 @@ jobs:
           docker compose \
             -f deploy/personal-preview/compose.yaml \
             -f deploy/personal-preview/compose.bootstrap.yaml \
+            config --format json \
+            | jq -e '
+              .services.caddy.cap_drop == ["ALL"]
+              and (.services.caddy.cap_add | index("NET_BIND_SERVICE") != null)
+              and (.services.caddy.networks | has("ingress"))
+              and ((.networks.ingress.internal // false) == false)
+              and any(.services.caddy.ports[]; .host_ip == "127.0.0.1" and .published == "8080")
+              and (.services.caddy.healthcheck.test | index("http://127.0.0.1:8080/healthz") != null)
+              and (.services.caddy.tmpfs | index("/data:size=32m,noexec,nosuid,nodev") != null)
+              and (.services.caddy.tmpfs | index("/config:size=8m,noexec,nosuid,nodev") != null)
+            ' > /dev/null
+
+          docker compose \
+            -f deploy/personal-preview/compose.yaml \
+            -f deploy/personal-preview/compose.bootstrap.yaml \
             build --check
 
       - name: Validate release asset contract

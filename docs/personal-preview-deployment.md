@@ -49,7 +49,7 @@ GOSUMDB="sum.golang.org https://goproxy.cn/sumdb/sum.golang.org"
 
 ## 4. 手动创建 Secret
 
-严格按照 `deploy/personal-preview/secrets/README.md` 操作。Secret 文件必须为普通文件、权限 `0600`，且不能提交 Git。
+严格按照 `deploy/personal-preview/secrets/README.md` 操作。Secret 文件必须为普通文件、权限 `0600`，且不能提交 Git。`postgres_dsn` 和 `bootstrap_admin_password` 还必须按该说明交给容器 UID `10001`，不得通过放宽文件权限解决读取失败。
 
 ## 5. 验证 Compose 配置
 
@@ -62,6 +62,10 @@ docker compose \
 ```
 
 失败时不要启动服务。
+
+个人预览使用官方 Caddy 镜像。Compose 先丢弃全部 capability，再只补回镜像执行所需的 `NET_BIND_SERVICE`；即使当前监听 8080，也不能删除这项最小 capability，否则带文件能力的 Caddy 二进制会在启动时返回 `operation not permitted`。
+
+Caddy 同时连接内部 `app` 网络和仅供入口使用的 `ingress` bridge 网络；后者是 Docker 发布 `127.0.0.1:8080` 所必需的，不能改为 `internal: true`。`/data` 与 `/config` 使用受限 tmpfs，HTTP healthcheck 用于确认代理链路真实可用。
 
 ## 6. 首次启动
 
