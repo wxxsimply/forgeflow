@@ -56,6 +56,8 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
     image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     entrypoint: ["/usr/local/bin/forgeflow"]
     command: ["db", "migrate"]
@@ -86,6 +88,8 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
     image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     environment:
       <<: *app-environment
@@ -127,6 +131,9 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
+        FORGEFLOW_INSTALL_DOCKER_CLI: ${FORGEFLOW_INSTALL_DOCKER_CLI:-false}
     image: forgeflow-worker:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     environment:
       <<: *app-environment

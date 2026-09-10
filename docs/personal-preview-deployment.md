@@ -36,6 +36,17 @@ cp deploy/personal-preview/preview.env.example deploy/personal-preview/preview.e
 
 把 `FORGEFLOW_GIT_COMMIT` 改为本批部署资产 PR 合并后的 40 位 commit，并把 `FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL` 改为自己的管理员邮箱。`preview.env` 不得包含密码或 API Key。
 
+默认使用 Go 官方模块代理与校验数据库。如果服务器无法连接官方端点，可以在 `preview.env` 中显式设置受信任的镜像，例如：
+
+```dotenv
+GOPROXY=https://goproxy.cn,direct
+GOSUMDB="sum.golang.org https://goproxy.cn/sumdb/sum.golang.org"
+```
+
+不得使用 `GOSUMDB=off`；代理选择属于部署环境配置，不应改变仓库默认供应链策略。
+
+个人预览保持 `FORGEFLOW_INSTALL_DOCKER_CLI=false`，与已关闭的 Docker Sandbox 一致；只有明确启用 Docker 执行面时才允许改为 `true`。
+
 ## 4. 手动创建 Secret
 
 严格按照 `deploy/personal-preview/secrets/README.md` 操作。Secret 文件必须为普通文件、权限 `0600`，且不能提交 Git。
