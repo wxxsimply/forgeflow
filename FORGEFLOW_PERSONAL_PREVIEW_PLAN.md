@@ -3,8 +3,8 @@
 > 生效日期：2026-09-09  
 > 当前目标：`v0.1.0-preview.1` 个人预览  
 > 未来目标：正式 `v1.0.0`，暂不执行  
-> 服务器：`39.102.136.31`，尚未配置  
-> 计划基线：`0cf6ded008d8bba4f7f7bc1ff4f391131467739f`；实际部署提交在本批 PR 合并后重新填写
+> 服务器：`39.102.136.31`，Ubuntu 22.04.5 LTS，个人预览运行中
+> 实际部署基线：`d5d5f5311bd812f511f009cfbc458f52ccbc6a17`（PR #47）
 
 ## 1. 适用范围
 
@@ -41,22 +41,31 @@ ssh -L 8080:127.0.0.1:8080 <ssh-user>@39.102.136.31
 ## 4. 当前已完成
 
 - [x] PR #38 已合并，四项必需 CI 通过。
+- [x] PR #47 已合并，四项必需 CI 通过，区域 Alpine 镜像配置已在服务器实测。
 - [x] ForgeFlow、Fixture 和 Grader 冻结 SHA 已核对。
 - [x] 阶段 5～9 静态工程契约通过。
 - [x] `go test ./...` 通过。
 - [x] Web 类型检查、11 个 Vitest 测试和生产构建通过。
 - [x] 已准备独立的个人预览 Compose、Caddy 和环境模板。
 - [x] 正式 Staging 和 Production 文件未被降级或覆盖。
+- [x] 服务器使用 SSH 密钥认证、专用 `forgeflow` 部署用户，且已禁用 root SSH 登录。
+- [x] 个人预览已部署到 `d5d5f5311bd812f511f009cfbc458f52ccbc6a17`，Migration schema version 为 `5`。
+- [x] PostgreSQL、API、Worker、Web 和 Caddy 均通过健康检查，原有 TTS 服务未受影响。
 
-## 5. 需要人工完成的下一步
+## 5. 部署执行记录
 
 ### 5.1 提交部署资产
 
-审核本次新增文件后，人工提交 GitHub PR。不要提交 `deploy/personal-preview/secrets/` 下未来生成的真实 Secret。
+- [x] 部署资产已经人工审核并通过 PR 合并。
+- [x] `deploy/personal-preview/secrets/` 中的真实 Secret 未进入 Git。
 
 ### 5.2 提供 SSH 连接信息
 
-只需提供以下非敏感信息：
+- [x] SSH 目标确认为 `forgeflow@39.102.136.31:22`。
+- [x] 服务器确认为 Ubuntu 22.04.5 LTS，Docker 29.1.3、Docker Compose 2.40.3。
+- [x] 私钥内容、密码和云平台 Token 未写入聊天、Git 或普通日志。
+
+部署复核时只记录以下非敏感信息：
 
 ```text
 SSH 用户名：
@@ -69,14 +78,20 @@ Docker 是否已安装：是/否
 
 ### 5.3 配置服务器
 
-- [ ] 云安全组只允许受控来源访问 SSH。
-- [ ] 安装 Git、Docker Engine 和 Docker Compose v2。
-- [ ] 创建 `/srv/forgeflow/app` 和 `/srv/forgeflow/repositories`。
-- [ ] 拉取仓库并 checkout 冻结提交。
-- [ ] 复制 `preview.env.example` 为 `preview.env`。
-- [ ] 按 `deploy/personal-preview/secrets/README.md` 手动创建 Secret。
+- [x] 云安全组阻止公网直接访问 ForgeFlow 8080，SSH 使用密钥认证。
+- [x] 云安全组 SSH(22) 已从 `0.0.0.0/0` 收紧到可信公网 IP/CIDR，仓库所有者已人工确认新连接成功。
+- [x] 云安全组中不再需要的公网入站 3000 和 3389 规则已删除。
+- [x] 安装 Git、Docker Engine 和 Docker Compose v2。
+- [x] 创建 `/srv/forgeflow/app` 和 `/srv/forgeflow/repositories`。
+- [x] 仓库 checkout 到实际部署提交 `d5d5f5311bd812f511f009cfbc458f52ccbc6a17`。
+- [x] 创建权限为 `0600` 的 `preview.env`，并使用可信 HTTPS 软件包镜像。
+- [x] 按 `deploy/personal-preview/secrets/README.md` 创建并验证数据库 Secret。
 
 ### 5.4 启动和清理 Bootstrap
+
+- [x] 首次启动时使用 Bootstrap overlay 创建管理员。
+- [x] 管理员完成登录、Mock Run 和注销验收后删除 `bootstrap_admin_password`。
+- [x] 服务已使用不含 Bootstrap overlay 的基础 Compose 重新启动并通过健康检查。
 
 首次启动使用 Bootstrap overlay：
 
@@ -109,15 +124,17 @@ docker compose \
 
 ## 6. 最小验收
 
-- [ ] `docker compose ps` 中长期服务为 healthy/running。
-- [ ] 服务器执行 `curl -fsS http://127.0.0.1:8080/healthz` 成功。
-- [ ] 用户通过 SSH 隧道打开登录页面。
-- [ ] 管理员登录成功。
-- [ ] 创建一个 Mock Planning Run 并看到计划结果。
-- [ ] 注销后会话失效。
-- [ ] 从公网无法直接访问 `39.102.136.31:8080`。
-- [ ] 服务器没有 DeepSeek/OpenAI Key。
-- [ ] Bootstrap Secret 已删除。
+> 验收日期：2026-09-11。登录、Mock Run、注销和公网检查由仓库所有者人工确认；其余项目由部署检查验证。
+
+- [x] `docker compose ps` 中长期服务为 healthy/running。
+- [x] 服务器执行 `curl -fsS http://127.0.0.1:8080/healthz` 成功。
+- [x] 用户通过 SSH 隧道打开登录页面。
+- [x] 管理员登录成功。
+- [x] 创建一个 Mock Planning Run 并看到计划结果。
+- [x] 注销后会话失效。
+- [x] 从公网无法直接取得 `39.102.136.31:8080` 的 ForgeFlow 响应。
+- [x] 服务器没有 DeepSeek/OpenAI Key。
+- [x] Bootstrap Secret 已删除，API 已在不含 Bootstrap 配置的基础 Compose 下重新启动。
 
 ## 7. 停止条件
 
