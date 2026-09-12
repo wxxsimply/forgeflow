@@ -42,7 +42,7 @@ describe('authentication shell', () => {
     await user.type(screen.getByLabelText('密码'), 'viewer secure password');
     await user.click(screen.getByRole('button', { name: '登录' }));
     expect(vi.mocked(api.login).mock.calls[0][0]).toEqual({ email: 'viewer@example.com', password: 'viewer secure password', remember: false });
-    expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '运行任务' })).toBeInTheDocument();
     expect(safeDestination('//evil.example/steal')).toBe('/runs');
     expect(safeDestination('/runs?status=active')).toBe('/runs?status=active');
   });
@@ -65,7 +65,7 @@ describe('authentication shell', () => {
     vi.mocked(api.getCurrentUser).mockResolvedValue(viewer);
     renderApp('/runs');
     expect(await screen.findByText('为订单接口增加幂等保护')).toBeInTheDocument();
-    expect(screen.getByText('viewer')).toBeInTheDocument();
+    expect(screen.getByText('只读用户')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /创建|审批|取消/ })).not.toBeInTheDocument();
   });
 
@@ -82,11 +82,11 @@ describe('run states', () => {
   it('renders empty and error states explicitly', async () => {
     vi.mocked(api.getCurrentUser).mockResolvedValue(viewer); vi.mocked(api.listRuns).mockResolvedValue({ items: [] });
     const view = renderApp('/runs');
-    expect(await screen.findByRole('heading', { name: '还没有 Run' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '还没有运行任务' })).toBeInTheDocument();
     view.unmount();
     vi.mocked(api.listRuns).mockRejectedValue(new APIError(503));
     renderApp('/runs');
-    expect(await screen.findByRole('heading', { name: '无法加载 Runs' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '无法加载运行任务' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument();
   });
 
@@ -96,6 +96,6 @@ describe('run states', () => {
     renderApp(`/runs/${run.runId}`);
     expect(await screen.findByRole('heading', { name: run.task })).toBeInTheDocument();
     expect(await screen.findByText('Run created')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText('plan-approval')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText('计划审批')).toHaveLength(2));
   });
 });

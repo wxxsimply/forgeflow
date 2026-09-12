@@ -9,9 +9,9 @@ export function formatDateTime(value: string): string {
 export function formatDuration(start: string, end: string): string {
   const milliseconds = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
   if (!Number.isFinite(milliseconds)) return '—';
-  if (milliseconds < 60_000) return `${Math.round(milliseconds / 1000)}s`;
-  if (milliseconds < 3_600_000) return `${Math.round(milliseconds / 60_000)}m`;
-  return `${(milliseconds / 3_600_000).toFixed(1)}h`;
+  if (milliseconds < 60_000) return `${Math.round(milliseconds / 1000)} 秒`;
+  if (milliseconds < 3_600_000) return `${Math.round(milliseconds / 60_000)} 分钟`;
+  return `${(milliseconds / 3_600_000).toFixed(1)} 小时`;
 }
 
 export function shortPath(value: string): string {
