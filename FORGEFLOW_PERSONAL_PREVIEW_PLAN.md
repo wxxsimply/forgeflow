@@ -1,42 +1,52 @@
 # ForgeFlow 个人预览执行计划
 
 > 生效日期：2026-09-09  
-> 当前目标：`v0.1.0-preview.1` 个人预览  
+> 当前目标：`v0.1.0-preview.1` 个人公开预览（公网 IP HTTPS 扩展准备中）
 > 未来目标：正式 `v1.0.0`，暂不执行  
-> 服务器：`39.102.136.31`，Ubuntu 22.04.5 LTS，个人预览运行中
+> 服务器：`39.102.136.31`，Ubuntu 22.04.5 LTS，私有入口运行中，公网入口尚未启用
 > 实际部署基线：`d5d5f5311bd812f511f009cfbc458f52ccbc6a17`（PR #47）
 
 ## 1. 适用范围
 
 本文档是当前个人预览工作的优先执行计划。`FORGEFLOW_REMAINING_EXECUTION_PLAN.md` 和 `FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md` 继续保存未来 Production 的完整门禁，但其中正式 180 Observation Eval、Promotion、镜像签名、独立安全评审、多人员值班、负载测试和 `v1.0.0` 发布不再阻断本次个人预览。
 
-个人预览不能描述为 Production Ready，不处理真实用户敏感数据，不承担生产流量。
+个人预览不能描述为 Production Ready，不处理真实用户敏感数据，也不提供生产 SLA。
 
 ## 2. 已确认的取舍
 
 - [x] 这是个人项目。
+- [x] 仓库所有者决定不配置自有域名，并要求其他互联网用户可以访问登录入口。
 - [x] 当前不执行正式 Eval、付费模型测试或负载测试。
 - [x] 保留编译、最小自动回归、Compose 校验和人工登录验证。
 - [x] 使用服务器 `39.102.136.31`。
-- [x] 服务器尚未配置域名、HTTPS、OIDC、镜像签名、值班或独立安全评审。
+- [x] 服务器不配置自有域名；公网入口只允许使用受信任的 IP HTTPS，不允许公网 HTTP 登录。
 - [x] 当前运行 `mock` Planner、`planning` Workflow，关闭 Docker Sandbox。
 - [x] DeepSeek Key 不上传服务器。
 
 ## 3. 安全访问方式
 
-当前没有域名和可信 HTTPS，因此预览入口不得直接绑定公网地址。Compose 只发布：
+默认私有模式继续只发布：
 
 ```text
 127.0.0.1:8080 -> Caddy -> Web/API
 ```
 
-用户在自己的电脑上建立 SSH 隧道：
+用户可在自己的电脑上建立 SSH 隧道：
 
 ```powershell
 ssh -L 8080:127.0.0.1:8080 <ssh-user>@39.102.136.31
 ```
 
 保持 SSH 窗口开启，再访问 `http://127.0.0.1:8080`。不要在云安全组或主机防火墙中开放 TCP 8080。
+
+可选公网模式通过独立 overlay 额外发布：
+
+```text
+0.0.0.0:443 -> Caddy TLS -> Web/API
+127.0.0.1:8080 -> Caddy -> Web/API
+```
+
+公网模式使用 Let's Encrypt 短期 IP 证书、Secure Cookie、受限 Origin 和持久证书卷；完整步骤见 `docs/public-ip-https-deployment.md`。
 
 ## 4. 当前已完成
 
@@ -136,7 +146,21 @@ docker compose \
 - [x] 服务器没有 DeepSeek/OpenAI Key。
 - [x] Bootstrap Secret 已删除，API 已在不含 Bootstrap 配置的基础 Compose 下重新启动。
 
-## 7. 停止条件
+## 7. 公网 IP HTTPS 扩展
+
+> 当前状态：仓库资产准备中，尚未改变服务器端口或阿里云安全组。
+
+- [x] 已明确只公开 HTTPS 443，继续阻止公网 8080。
+- [x] 已准备可回退的 Compose overlay 和专用 Caddy 配置。
+- [x] 已把 Secure Cookie、Origin、端口和持久卷契约加入 CI。
+- [ ] 公网 HTTPS 资产 PR 已人工审核并合并。
+- [ ] 服务器 TCP 443 已确认未被 TTS 或其他服务占用。
+- [ ] 阿里云安全组已允许公网 TCP 443，仍拒绝公网 8080。
+- [ ] Caddy 已成功取得并自动管理 `39.102.136.31` 的受信任证书。
+- [ ] 外部网络已完成健康检查、登录、Mock Run 和注销验证。
+- [ ] 浏览器无证书警告，且 HTTP、8080、数据库和内部端口未暴露。
+
+## 8. 停止条件
 
 出现以下任一情况立即停止：
 
@@ -148,7 +172,7 @@ docker compose \
 - Bootstrap 管理员未成功创建却删除了 Bootstrap Secret。
 - 服务器将被用于真实用户数据或生产流量。
 
-## 8. 未来升级到正式服务
+## 9. 未来升级到正式服务
 
 准备公开服务时，必须回到完整 Production 路线，至少补齐：
 
