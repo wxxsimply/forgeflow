@@ -4,6 +4,8 @@ ForgeFlow 是一个可治理的多 Agent 软件交付平台。当前版本先实
 
 完整开发、接口、登录、Prompt、评测和部署路线见 [FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md](./FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md)。
 
+个人预览部署见[个人预览部署手册](./docs/personal-preview-deployment.md)；无需自有域名的公网访问见[公网 IP HTTPS 部署手册](./docs/public-ip-https-deployment.md)。
+
 ```text
 Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> Diff -> Test
                                                                                 -> Reviewer + Security (isolated parallel branches)

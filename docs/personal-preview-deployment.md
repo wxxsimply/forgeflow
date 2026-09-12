@@ -1,7 +1,7 @@
 # ForgeFlow 个人预览部署手册
 
 > 服务器：`39.102.136.31`  
-> 访问方式：SSH 隧道  
+> 访问方式：默认 SSH 隧道；可选公网 IP HTTPS
 > 适用范围：个人演示，不是 Production
 
 ## 1. 人工前置条件
@@ -96,6 +96,9 @@ ssh -L 8080:127.0.0.1:8080 <ssh-user>@39.102.136.31
 
 保持终端开启，在浏览器访问 `http://127.0.0.1:8080`，然后使用 Bootstrap 管理员登录。
 
+如果需要让互联网中的其他人访问，又不配置自有域名，请使用
+[`public-ip-https-deployment.md`](./public-ip-https-deployment.md) 中的可选 overlay。不要直接把 HTTP 8080 开放到公网。
+
 ## 8. 删除 Bootstrap Secret
 
 成功登录后在服务器停止 Bootstrap 配置、删除一次性密码，再启动普通配置：
@@ -128,7 +131,7 @@ docker compose --env-file deploy/personal-preview/preview.env -f deploy/personal
 
 ## 10. 限制
 
-- 未配置 HTTPS，只允许 SSH 隧道访问。
+- 基础 Compose 未配置 HTTPS，只允许 SSH 隧道访问；公网 IP HTTPS 必须显式叠加可选 overlay。
 - 镜像在服务器从源码构建，没有正式 SBOM、签名和 Registry digest。
 - Planner 为 Mock，不调用 DeepSeek。
 - Docker Sandbox 关闭，不执行真实代码任务。
