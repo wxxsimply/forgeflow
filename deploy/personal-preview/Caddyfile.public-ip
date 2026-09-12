@@ -1,6 +1,8 @@
 {
 	admin off
 	auto_https disable_redirects
+	# IP-literal clients normally omit SNI; select the managed IP certificate.
+	default_sni {$FORGEFLOW_PUBLIC_IP}
 	email {$FORGEFLOW_ACME_EMAIL}
 	log {
 		output stdout

@@ -13,6 +13,7 @@
 - Caddy 使用 Let's Encrypt `shortlived` ACME profile 为公网 IPv4 申请证书。
 - ACME 只使用 TLS-ALPN-01，因此不需要开放或占用 TCP 80。
 - API 启用 Secure Cookie，并把允许来源限制为当前 HTTPS 公网 IP。
+- `default_sni` 指向该公网 IP，确保不发送 SNI 的 IP 直连客户端也能取得正确证书；不能只验证带 `-servername` 的连接。
 - Caddy 的 `/data` 和 `/config` 使用独立持久卷，证书、ACME 账户和续期状态不会因容器重建丢失。
 
 IP 地址证书有效期较短，Caddy 必须持续运行并能从公网接收 443 上的 ACME 验证请求。不得执行带 `-v` 的 `docker compose down`。
@@ -146,6 +147,7 @@ Invoke-RestMethod https://39.102.136.31/healthz
 ```bash
 openssl s_client \
   -connect 39.102.136.31:443 \
+  -noservername \
   -verify_ip 39.102.136.31 \
   -verify_return_error </dev/null
 ```

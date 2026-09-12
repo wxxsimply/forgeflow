@@ -1,10 +1,11 @@
 # ForgeFlow 个人预览执行计划
 
 > 生效日期：2026-09-09  
-> 当前目标：`v0.1.0-preview.1` 个人公开预览（公网 IP HTTPS 扩展准备中）
+> 当前目标：`v0.1.0-preview.1` 个人公开预览（公网 HTTPS 已上线，待人工登录验收）
 > 未来目标：正式 `v1.0.0`，暂不执行  
-> 服务器：`39.102.136.31`，Ubuntu 22.04.5 LTS，私有入口运行中，公网入口尚未启用
-> 实际部署基线：`d5d5f5311bd812f511f009cfbc458f52ccbc6a17`（PR #47）
+> 服务器：`39.102.136.31`，Ubuntu 22.04.5 LTS，公网入口 `https://39.102.136.31`
+> 应用镜像基线：`d5d5f5311bd812f511f009cfbc458f52ccbc6a17`（PR #47；本次无应用代码变化，复用镜像）
+> 部署配置基线：`3ff97639df45728508ab814432f345daeab0cba4`（PR #49）加已部署的 `default_sni` 补丁；补丁待人工提交 GitHub
 
 ## 1. 适用范围
 
@@ -93,7 +94,7 @@ Docker 是否已安装：是/否
 - [x] 云安全组中不再需要的公网入站 3000 和 3389 规则已删除。
 - [x] 安装 Git、Docker Engine 和 Docker Compose v2。
 - [x] 创建 `/srv/forgeflow/app` 和 `/srv/forgeflow/repositories`。
-- [x] 仓库 checkout 到实际部署提交 `d5d5f5311bd812f511f009cfbc458f52ccbc6a17`。
+- [x] 首次部署 checkout 为 `d5d5f5311bd812f511f009cfbc458f52ccbc6a17`；公网部署配置更新见第 7 节。
 - [x] 创建权限为 `0600` 的 `preview.env`，并使用可信 HTTPS 软件包镜像。
 - [x] 按 `deploy/personal-preview/secrets/README.md` 创建并验证数据库 Secret。
 
@@ -148,17 +149,22 @@ docker compose \
 
 ## 7. 公网 IP HTTPS 扩展
 
-> 当前状态：仓库资产准备中，尚未改变服务器端口或阿里云安全组。
+> 2026-09-12：公网 HTTPS 已上线；用户确认安全组放行 443、UFW inactive；自动检查通过，浏览器登录验收与 SNI 修复的人工提交尚待完成。
 
 - [x] 已明确只公开 HTTPS 443，继续阻止公网 8080。
 - [x] 已准备可回退的 Compose overlay 和专用 Caddy 配置。
 - [x] 已把 Secure Cookie、Origin、端口和持久卷契约加入 CI。
-- [ ] 公网 HTTPS 资产 PR 已人工审核并合并。
-- [ ] 服务器 TCP 443 已确认未被 TTS 或其他服务占用。
-- [ ] 阿里云安全组已允许公网 TCP 443，仍拒绝公网 8080。
-- [ ] Caddy 已成功取得并自动管理 `39.102.136.31` 的受信任证书。
-- [ ] 外部网络已完成健康检查、登录、Mock Run 和注销验证。
-- [ ] 浏览器无证书警告，且 HTTP、8080、数据库和内部端口未暴露。
+- [x] 公网 HTTPS 资产 PR #49 已人工审核并合并。
+- [x] 部署前 TCP 443 空闲；TTS 使用原有 80 端口，其容器未重建。
+- [x] 用户已确认安全组放行 TCP 443；Docker 的 8080 仍仅绑定回环地址。
+- [x] Caddy 已取得 Let's Encrypt IP 证书，并在持久卷中保存自动续期状态；实际续期尚未到期验证。
+- [x] 已补齐 `default_sni`：OpenSSL 无 SNI 握手及 IP/证书链验证通过。
+- [x] 外部 Windows curl 在未跳过证书校验时，HTTPS 健康接口返回 `ok`、登录页面返回 200。
+- [x] ForgeFlow 长期容器健康；此次仅重建 API 和 Caddy，应用镜像版本不变。
+- [ ] 用户在公网 HTTPS 入口完成浏览器无证书警告、登录、Mock Run 和注销验收。
+- [ ] 将已部署的 SNI 修复及记录人工提交 GitHub、合并，再将服务器工作区与合并提交同步。
+
+详细部署结果、回退及同步步骤见 `docs/public-ip-https-live-audit.md`。
 
 ## 8. 停止条件
 
