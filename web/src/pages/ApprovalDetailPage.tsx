@@ -5,6 +5,7 @@ import { APIError, decideApproval, getApproval, getRun } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { formatDateTime } from '../utils/format';
+import { actionLabel, approvalStatusLabel, riskLabel, errorMessage } from '../utils/labels';
 
 export function ApprovalDetailPage() {
   const { approvalId = '' } = useParams();
@@ -42,28 +43,28 @@ export function ApprovalDetailPage() {
   }
 
   return <div className="page approval-detail">
-    <Link className="back-link" to="/approvals">← 返回 Approvals</Link>
-    <div className="detail-heading"><div><span className="eyebrow">Approval · v{runVersion}</span><h1>{request.actionType === 'plan' || request.actionType === 'plan_approval' ? '执行计划审批' : request.actionType}</h1><p>请求于 {formatDateTime(request.requestedAt)}</p></div><span className={`status status--${request.status} status--large`}>{request.status}</span></div>
+    <Link className="back-link" to="/approvals">← 返回审批列表</Link>
+    <div className="detail-heading"><div><span className="eyebrow">审批 · v{runVersion}</span><h1>{actionLabel(request.actionType)}</h1><p>请求于 {formatDateTime(request.requestedAt)}</p></div><span className={`status status--${request.status} status--large`}>{approvalStatusLabel(request.status)}</span></div>
     {conflict && <div className="offline-banner" role="alert">审批已被其他人更新，页面已重新加载。请基于最新版本再次检查。</div>}
     <div className="approval-layout">
-      <section className="panel evidence-panel"><div className="panel-heading"><div><span className="eyebrow">Decision evidence</span><h2>计划与风险</h2></div><span className={`risk risk--${request.risk}`}>{request.risk}</span></div>
+      <section className="panel evidence-panel"><div className="panel-heading"><div><span className="eyebrow">审批依据</span><h2>计划与风险</h2></div><span className={`risk risk--${request.risk}`}>{riskLabel(request.risk)}</span></div>
         <div className="evidence-body"><h3>请求原因</h3><p>{request.reason}</p>
           <h3>影响范围</h3>{request.scope.length ? <ul className="file-list">{request.scope.map((item) => <li key={item}><code>{item}</code></li>)}</ul> : <p className="muted">未声明额外范围</p>}
           {runQuery.isPending ? <LoadingRows count={3} /> : runQuery.data?.plan ? <Plan plan={runQuery.data.plan} /> : <p className="muted">此审批没有可展示的执行计划。</p>}
         </div>
       </section>
-      <aside className="panel decision-panel"><div className="panel-heading"><div><span className="eyebrow">Human decision</span><h2>审批决定</h2></div></div><div className="evidence-body">
-        {request.status !== 'pending' ? <><p>状态：<strong>{request.status}</strong></p>{request.comment && <p>{request.comment}</p>}</> : canDecide ? <>
+      <aside className="panel decision-panel"><div className="panel-heading"><div><span className="eyebrow">人工决定</span><h2>审批决定</h2></div></div><div className="evidence-body">
+        {request.status !== 'pending' ? <><p>状态：<strong>{approvalStatusLabel(request.status)}</strong></p>{request.comment && <p>{request.comment}</p>}</> : canDecide ? <>
           <label htmlFor="approval-comment">审批备注</label><textarea id="approval-comment" rows={6} value={comment} onChange={(event) => setComment(event.target.value)} maxLength={4000} placeholder="记录判断依据、约束或拒绝原因…" />
-          {decision.error && !conflict && <div className="form-error" role="alert">{decision.error.message}</div>}
+          {decision.error && !conflict && <div className="form-error" role="alert">{errorMessage(decision.error)}</div>}
           <div className="decision-actions"><button className="danger-button" disabled={decision.isPending} onClick={() => decide('reject')}>拒绝</button><button className="primary-button primary-button--fit" disabled={decision.isPending} onClick={() => decide('approve')}>批准并继续</button></div>
-        </> : <PageState title="只读模式" detail="viewer 可以检查审批证据，但不能提交决定。" />}
-        <Link className="secondary-button view-run-link" to={`/runs/${request.runId}`}>查看关联 Run</Link>
+        </> : <PageState title="只读模式" detail="只读用户可以检查审批证据，但不能提交决定。" />}
+        <Link className="secondary-button view-run-link" to={`/runs/${request.runId}`}>查看关联任务</Link>
       </div></aside>
     </div>
   </div>;
 }
 
 function Plan({ plan }: { plan: NonNullable<Awaited<ReturnType<typeof getRun>>['plan']> }) {
-  return <><h3>计划摘要</h3><p>{plan.summary}</p><h3>执行步骤</h3><ol className="plan-steps">{plan.steps.map((step) => <li key={step.id}><strong>{step.id}</strong><span>{step.description}</span>{step.acceptanceCriteria.length > 0 && <small>验收：{step.acceptanceCriteria.join('；')}</small>}</li>)}</ol><h3>可能影响的文件</h3><ul className="file-list">{plan.filesLikelyAffected.map((file) => <li key={file}><code>{file}</code></li>)}</ul>{plan.risks.length > 0 && <><h3>计划风险</h3><ul>{plan.risks.map((risk, index) => <li key={`${risk.level}-${index}`}><strong>{risk.level}：</strong>{risk.description}</li>)}</ul></>}</>;
+  return <><h3>计划摘要</h3><p>{plan.summary}</p><h3>执行步骤</h3><ol className="plan-steps">{plan.steps.map((step) => <li key={step.id}><strong>{step.id}</strong><span>{step.description}</span>{step.acceptanceCriteria.length > 0 && <small>验收：{step.acceptanceCriteria.join('；')}</small>}</li>)}</ol><h3>可能影响的文件</h3><ul className="file-list">{plan.filesLikelyAffected.map((file) => <li key={file}><code>{file}</code></li>)}</ul>{plan.risks.length > 0 && <><h3>计划风险</h3><ul>{plan.risks.map((risk, index) => <li key={`${risk.level}-${index}`}><strong>{riskLabel(risk.level)}：</strong>{risk.description}</li>)}</ul></>}</>;
 }

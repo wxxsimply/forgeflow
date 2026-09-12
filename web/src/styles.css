@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Segoe UI Variable', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
   color: #172028;
   background: #f3f1eb;
   font-synthesis: none;
@@ -49,7 +49,7 @@ a { color: inherit; }
 .login-story .eyebrow { color: var(--orange-bright); }
 .brand--light small { color: #8f9ba1; }
 .login-story__content { max-width: 580px; }
-.login-story h1 { margin: 18px 0 24px; font-size: clamp(2.6rem, 4.7vw, 5rem); line-height: .98; letter-spacing: -.06em; }
+.login-story h1 { margin: 18px 0 24px; font-size: clamp(2.2rem, 3.3vw, 3.8rem); line-height: 1.3; letter-spacing: -.02em; }
 .login-story p { max-width: 450px; color: #aeb8bc; font-size: 1.05rem; line-height: 1.75; }
 .login-story__foot { color: #98a4a9; font: 500 .67rem 'IBM Plex Mono', monospace; letter-spacing: .09em; text-transform: uppercase; }
 .flow-line { display: grid; grid-template-columns: 12px 1fr 12px 1fr 12px 1fr 12px; align-items: center; margin-top: 64px; }
@@ -331,6 +331,8 @@ a { color: inherit; }
   .metric:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .login-panel { padding: 40px 24px; }
   .login-story { min-height: 300px; }
+  .login-story h1 { font-size: clamp(1.35rem, 6vw, 2rem); }
+  .login-story__content { margin-top: 24px; }
   .login-story__content p { display: none; }
   .session-row { grid-template-columns: 36px 1fr; }
   .session-row > :last-child { grid-column: 2; width: fit-content; }

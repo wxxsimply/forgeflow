@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { roleLabel } from '../utils/labels';
 
 export function AppShell() {
   const { user, signOut } = useAuth();
@@ -8,17 +9,17 @@ export function AppShell() {
   const navClass = ({ isActive }: { isActive: boolean }) => isActive ? 'nav-item nav-item--active' : 'nav-item';
   return <div className="app-frame">
     <aside className="sidebar">
-      <NavLink to="/runs" className="brand" aria-label="ForgeFlow Run 列表"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>Governed delivery</small></span></NavLink>
+      <NavLink to="/runs" className="brand" aria-label="ForgeFlow 任务列表"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>可控交付</small></span></NavLink>
       <nav aria-label="主导航">
-        {user?.role !== 'viewer' && <NavLink to="/runs/new" className={navClass}><PlusIcon /><span>New Run</span></NavLink>}
-        <NavLink to="/runs" end className={navClass}><RunIcon /><span>Runs</span></NavLink>
-        <NavLink to="/approvals" className={navClass}><ApprovalIcon /><span>Approvals</span></NavLink>
-        <NavLink to="/evals" className={navClass}><EvalIcon /><span>Evals</span></NavLink>
-        <NavLink to="/sessions" className={navClass}><SessionIcon /><span>Sessions</span></NavLink>
+        {user?.role !== 'viewer' && <NavLink to="/runs/new" className={navClass}><PlusIcon /><span>新建任务</span></NavLink>}
+        <NavLink to="/runs" end className={navClass}><RunIcon /><span>运行任务</span></NavLink>
+        <NavLink to="/approvals" className={navClass}><ApprovalIcon /><span>审批中心</span></NavLink>
+        <NavLink to="/evals" className={navClass}><EvalIcon /><span>评测报告</span></NavLink>
+        <NavLink to="/sessions" className={navClass}><SessionIcon /><span>登录设备</span></NavLink>
       </nav>
-      <div className="sidebar__footer"><span className="environment"><i /> Control plane online</span><span>v0.9 · Stage 9</span></div>
+      <div className="sidebar__footer"><span className="environment"><i /> 控制台已连接</span><span>交付管理控制台</span></div>
     </aside>
-    <div className="app-content"><header className="topbar"><div><span className="eyebrow">Workspace</span><strong>Delivery control plane</strong></div><div className="user-menu"><span className={`role role--${user?.role}`}>{user?.role}</span><span className="user-menu__email">{user?.email}</span><button type="button" className="text-button" onClick={handleLogout}>退出</button></div></header><main className="main-content"><Outlet /></main></div>
+    <div className="app-content"><header className="topbar"><div><span className="eyebrow">工作空间</span><strong>交付控制台</strong></div><div className="user-menu"><span className={`role role--${user?.role}`}>{roleLabel(user?.role)}</span><span className="user-menu__email">{user?.email}</span><button type="button" className="text-button" onClick={handleLogout}>退出</button></div></header><main className="main-content"><Outlet /></main></div>
   </div>;
 }
 
