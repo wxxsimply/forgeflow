@@ -16,15 +16,15 @@ test('real PostgreSQL, API and worker workflow reaches an approved report', asyn
   await page.getByRole('button', { name: '登录' }).click();
   await expect(page).toHaveURL(/\/runs$/);
 
-  await page.getByRole('link', { name: 'New Run' }).click();
+  await page.getByRole('link', { name: '新建任务' }).click();
   await page.getByRole('button', { name: '+ 登记本地仓库' }).click();
   await page.getByLabel('名称').fill(`stage9-${Date.now()}`);
-  await page.getByLabel('本地绝对路径').fill(repositoryPath);
+  await page.getByLabel('服务端仓库绝对路径').fill(repositoryPath);
   await page.getByLabel('默认基线').fill('HEAD');
   await page.getByRole('button', { name: '登记仓库' }).click();
   await expect(page.getByLabel('仓库')).not.toHaveValue('');
   await page.getByLabel('任务描述').fill('检查当前仓库并生成一份受审批保护的执行计划；不要执行外部副作用。');
-  await page.getByRole('button', { name: '创建并进入 Run' }).click();
+  await page.getByRole('button', { name: '创建并查看任务' }).click();
   await expect(page).toHaveURL(/\/runs\/[0-9a-f-]{36}$/);
 
   await expect(page.getByRole('link', { name: '检查审批' })).toBeVisible({ timeout: 30_000 });

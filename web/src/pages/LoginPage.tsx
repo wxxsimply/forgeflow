@@ -35,24 +35,24 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-story" aria-label="ForgeFlow 产品介绍">
-        <div className="brand brand--light"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>Governed delivery</small></span></div>
+        <div className="brand brand--light"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>可控交付</small></span></div>
         <div className="login-story__content">
-          <span className="eyebrow">Controlled automation</span>
-          <h1>Every agent action.<br />Visible and governed.</h1>
+          <span className="eyebrow">可控的自动化协作</span>
+          <h1>每一步智能体行动，<br />清晰可见，尽在掌控。</h1>
           <p>从计划到审查，所有执行都经过策略、证据和人工门禁。</p>
           <div className="flow-line" aria-hidden="true"><i className="done" /><span /><i className="done" /><span /><i className="active" /><span /><i /></div>
-          <div className="flow-labels" aria-hidden="true"><span>Plan</span><span>Build</span><span>Review</span><span>Ship</span></div>
+          <div className="flow-labels" aria-hidden="true"><span>规划</span><span>构建</span><span>审查</span><span>交付</span></div>
         </div>
-        <small className="login-story__foot">Secure by design · Human in control</small>
+        <small className="login-story__foot">安全内建 · 人工掌控</small>
       </section>
       <section className="login-panel">
         <form className="login-card" onSubmit={submit} aria-describedby={error ? formErrorId : undefined}>
-          <span className="eyebrow">Welcome back</span>
+          <span className="eyebrow">欢迎回来</span>
           <h2>登录控制台</h2>
           <p className="login-card__intro">使用管理员分配的账号继续。</p>
           <label htmlFor="email">邮箱</label>
           <input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} aria-describedby={emailErrorId} />
-          <span id={emailErrorId} className="field-hint">请输入你的工作邮箱。</span>
+          <span id={emailErrorId} className="field-hint">请输入你的账号邮箱。</span>
           <label htmlFor="password">密码</label>
           <input id="password" name="password" type="password" autoComplete="current-password" required minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} />
           <label className="checkbox-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>在这台设备上保持登录</span></label>

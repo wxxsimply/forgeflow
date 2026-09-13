@@ -56,6 +56,9 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        ALPINE_REPOSITORY_URL: ${ALPINE_REPOSITORY_URL:-https://dl-cdn.alpinelinux.org/alpine}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
     image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     entrypoint: ["/usr/local/bin/forgeflow"]
     command: ["db", "migrate"]
@@ -86,6 +89,9 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        ALPINE_REPOSITORY_URL: ${ALPINE_REPOSITORY_URL:-https://dl-cdn.alpinelinux.org/alpine}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
     image: forgeflow-api:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     environment:
       <<: *app-environment
@@ -127,6 +133,10 @@ services:
       args:
         FORGEFLOW_VERSION: ${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
         FORGEFLOW_GIT_COMMIT: ${FORGEFLOW_GIT_COMMIT:?FORGEFLOW_GIT_COMMIT is required}
+        ALPINE_REPOSITORY_URL: ${ALPINE_REPOSITORY_URL:-https://dl-cdn.alpinelinux.org/alpine}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.org}
+        FORGEFLOW_INSTALL_DOCKER_CLI: ${FORGEFLOW_INSTALL_DOCKER_CLI:-false}
     image: forgeflow-worker:${FORGEFLOW_RELEASE:?FORGEFLOW_RELEASE is required}
     environment:
       <<: *app-environment
@@ -181,18 +191,28 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     networks:
       - app
+      - ingress
     depends_on:
       api:
         condition: service_healthy
       web:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
     read_only: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     tmpfs:
       - /tmp:size=32m,noexec,nosuid,nodev
+      - /data:size=32m,noexec,nosuid,nodev
+      - /config:size=8m,noexec,nosuid,nodev
 
 secrets:
   postgres_password:
@@ -206,6 +226,8 @@ volumes:
   workspaces:
 
 networks:
+  ingress:
+    driver: bridge
   app:
     internal: true
   data:

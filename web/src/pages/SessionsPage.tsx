@@ -8,7 +8,7 @@ export function SessionsPage() {
   const query = useQuery({ queryKey: ['sessions'], queryFn: listSessions });
   const revoke = useMutation({ mutationFn: revokeSession, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }) });
   return <div className="page">
-    <div className="page-heading"><div><span className="eyebrow">Account security</span><h1>Sessions</h1><p>查看并撤销已登录设备。当前会话请使用右上角“退出”。</p></div></div>
+    <div className="page-heading"><div><span className="eyebrow">账号安全</span><h1>登录设备</h1><p>查看并撤销已登录设备。当前会话请使用右上角“退出”。</p></div></div>
     {query.isPending ? <LoadingRows /> : query.error ? <PageState tone="danger" title="无法加载会话" detail="请检查网络后重试。" /> : (
       <section className="session-list">{query.data.items.map((session) => <SessionRow key={session.id} session={session} current={session.id === query.data.currentSessionId} pending={revoke.isPending} onRevoke={() => revoke.mutate(session.id)} />)}</section>
     )}

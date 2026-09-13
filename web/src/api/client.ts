@@ -28,7 +28,7 @@ export class APIError extends Error {
   readonly details: Record<string, unknown>;
 
   constructor(status: number, body?: Partial<APIErrorBody>) {
-    super(body?.message || fallbackMessage(status));
+    super(body?.message && /[\u3400-\u9fff]/u.test(body.message) ? body.message : fallbackMessage(status));
     this.name = 'APIError';
     this.status = status;
     this.code = body?.code || 'network_error';
@@ -208,6 +208,7 @@ function toAPIError(response: Response, body: unknown): APIError {
 }
 
 function fallbackMessage(status: number): string {
+  if (status === 400 || status === 422) return '填写的信息不符合要求，请检查后重试。';
   if (status === 401) return '登录状态已失效，请重新登录。';
   if (status === 403) return '你没有权限执行此操作。';
   if (status === 404) return '请求的资源不存在。';

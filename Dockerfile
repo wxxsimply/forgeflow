@@ -3,7 +3,14 @@ ARG FORGEFLOW_VERSION=development
 ARG FORGEFLOW_GIT_COMMIT=unknown
 FROM golang:${GO_VERSION}-alpine AS build
 ARG FORGEFLOW_GIT_COMMIT
-RUN apk add --no-cache ca-certificates git
+ARG ALPINE_REPOSITORY_URL=https://dl-cdn.alpinelinux.org/alpine
+RUN case "${ALPINE_REPOSITORY_URL}" in https://*) ;; *) echo "ALPINE_REPOSITORY_URL must use HTTPS" >&2; exit 1 ;; esac \
+    && sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_REPOSITORY_URL}|g" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates git
+ARG GOPROXY=https://proxy.golang.org,direct
+ARG GOSUMDB=sum.golang.org
+ENV GOPROXY=${GOPROXY} \
+    GOSUMDB=${GOSUMDB}
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
@@ -17,7 +24,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=${TARGETO
 RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w -X forgeflow/internal/buildinfo.Commit=${FORGEFLOW_GIT_COMMIT}" -o /out/forgeflow-worker ./cmd/forgeflow-worker
 
 FROM alpine:3.22 AS runtime-base
-RUN apk add --no-cache ca-certificates git openssh-client tzdata wget \
+ARG ALPINE_REPOSITORY_URL=https://dl-cdn.alpinelinux.org/alpine
+RUN case "${ALPINE_REPOSITORY_URL}" in https://*) ;; *) echo "ALPINE_REPOSITORY_URL must use HTTPS" >&2; exit 1 ;; esac \
+    && sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_REPOSITORY_URL}|g" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates git openssh-client tzdata wget \
     && addgroup -S -g 10001 forgeflow \
     && adduser -S -D -H -u 10001 -G forgeflow forgeflow \
     && mkdir -p /var/lib/forgeflow/artifacts /var/lib/forgeflow/workspaces \
@@ -55,6 +65,7 @@ ENTRYPOINT ["/usr/local/bin/forgeflow-api"]
 FROM runtime-base AS worker
 ARG FORGEFLOW_VERSION=development
 ARG FORGEFLOW_GIT_COMMIT=unknown
+ARG FORGEFLOW_INSTALL_DOCKER_CLI=true
 LABEL org.opencontainers.image.title="ForgeFlow Worker" \
       org.opencontainers.image.description="ForgeFlow governed workflow worker" \
       org.opencontainers.image.source="https://github.com/wxxsimply/forgeflow" \
@@ -62,7 +73,7 @@ LABEL org.opencontainers.image.title="ForgeFlow Worker" \
       org.opencontainers.image.revision="${FORGEFLOW_GIT_COMMIT}" \
       org.opencontainers.image.licenses="Apache-2.0"
 USER root
-RUN apk add --no-cache docker-cli
+RUN if [ "${FORGEFLOW_INSTALL_DOCKER_CLI}" = "true" ]; then apk add --no-cache docker-cli; fi
 COPY --from=build /out/forgeflow-worker /usr/local/bin/forgeflow-worker
 USER 10001:10001
 EXPOSE 9091

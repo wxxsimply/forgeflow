@@ -51,7 +51,7 @@ describe('governed workflow pages', () => {
     await user.type(screen.getByLabelText('任务描述'), '增加重复提交保护');
     await user.clear(screen.getByLabelText('最大迭代次数'));
     await user.type(screen.getByLabelText('最大迭代次数'), '3');
-    await user.click(screen.getByRole('button', { name: '创建并进入 Run' }));
+    await user.click(screen.getByRole('button', { name: '创建并查看任务' }));
     await waitFor(() => expect(api.createRun).toHaveBeenCalledOnce());
     const [input, key] = vi.mocked(api.createRun).mock.calls[0];
     expect(input).toMatchObject({ repositoryId: '00000000-0000-4000-8000-000000000030', task: '增加重复提交保护', maxIterations: 3 });
@@ -79,7 +79,7 @@ describe('governed workflow pages', () => {
       { agent: 'planner', version: 'planner/v1', sha256: 'a'.repeat(64), configured: true },
     ], releases: [] });
     renderApp('/evals');
-    expect(await screen.findByText('尚无真实 Eval 报告')).toBeInTheDocument();
+    expect(await screen.findByText('尚无真实评测报告')).toBeInTheDocument();
     expect(screen.getByText(/不会生成或展示虚构成绩/)).toBeInTheDocument();
   });
 });

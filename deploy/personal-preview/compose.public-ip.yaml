@@ -1,0 +1,24 @@
+services:
+  api:
+    environment:
+      FORGEFLOW_HTTP_COOKIE_SECURE: "true"
+      FORGEFLOW_HTTP_COOKIE_DOMAIN: ""
+      FORGEFLOW_HTTP_ALLOWED_ORIGINS: https://${FORGEFLOW_PUBLIC_IP:?FORGEFLOW_PUBLIC_IP is required}
+
+  caddy:
+    environment:
+      FORGEFLOW_PUBLIC_IP: ${FORGEFLOW_PUBLIC_IP:?FORGEFLOW_PUBLIC_IP is required}
+      FORGEFLOW_ACME_EMAIL: ${FORGEFLOW_ACME_EMAIL:?FORGEFLOW_ACME_EMAIL is required}
+    ports: !override
+      - "127.0.0.1:8080:8080"
+      - "443:443"
+    volumes: !override
+      - ./Caddyfile.public-ip:/etc/caddy/Caddyfile:ro
+      - caddy-public-data:/data
+      - caddy-public-config:/config
+    tmpfs: !override
+      - /tmp:size=32m,noexec,nosuid,nodev
+
+volumes:
+  caddy-public-data:
+  caddy-public-config:
