@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Approval, Run, User } from './api/client';
@@ -44,6 +44,45 @@ beforeEach(() => {
 });
 
 describe('governed workflow pages', () => {
+  it('blocks oversized Chinese and blank input, then accepts the UTF-8 boundary', async () => {
+    const user = userEvent.setup();
+    renderApp('/runs/new');
+    await user.selectOptions(await screen.findByLabelText('仓库'), '00000000-0000-4000-8000-000000000030');
+    const task = screen.getByLabelText('任务描述');
+    const submit = screen.getByRole('button', { name: '创建并查看任务' });
+    fireEvent.change(task, { target: { value: '中'.repeat(7_000) } });
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('超过 20,000 字节');
+    fireEvent.submit(task.closest('form')!);
+    expect(api.createRun).not.toHaveBeenCalled();
+    fireEvent.change(task, { target: { value: '  \n ' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(task, { target: { value: '中'.repeat(6_666) + 'ab' } });
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+    await waitFor(() => expect(api.createRun).toHaveBeenCalledOnce());
+  });
+
+  it('keeps the retry key for identical input but replaces it after editing', async () => {
+    vi.mocked(api.createRun).mockRejectedValue(new Error('connection lost'));
+    const user = userEvent.setup();
+    renderApp('/runs/new');
+    await user.selectOptions(await screen.findByLabelText('仓库'), '00000000-0000-4000-8000-000000000030');
+    const task = screen.getByLabelText('任务描述');
+    fireEvent.change(task, { target: { value: '同一任务' } });
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await user.click(screen.getByRole('button', { name: '创建并查看任务' }));
+      await waitFor(() => expect(api.createRun).toHaveBeenCalledTimes(attempt));
+      await waitFor(() => expect(screen.getByRole('button', { name: '创建并查看任务' })).toBeEnabled());
+    }
+    fireEvent.change(task, { target: { value: '另一任务' } });
+    await user.click(screen.getByRole('button', { name: '创建并查看任务' }));
+    await waitFor(() => expect(api.createRun).toHaveBeenCalledTimes(3));
+    const calls = vi.mocked(api.createRun).mock.calls;
+    expect(calls[0][1]).toBe(calls[1][1]);
+    expect(calls[2][1]).not.toBe(calls[0][1]);
+  });
+
   it('creates a run with repository, budget and a stable idempotency key', async () => {
     const user = userEvent.setup();
     renderApp('/runs/new');

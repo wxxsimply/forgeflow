@@ -44,6 +44,8 @@ type CreateInput struct {
 	BaseRevision   string
 	MaxIterations  int
 	Budget         *domain.RunBudget
+	IdempotencyKey string
+	RequestBody    []byte
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (*domain.RunState, error) {
@@ -62,6 +64,20 @@ func (s *Service) CreateQueued(ctx context.Context, input CreateInput) (*domain.
 		Task: input.Task, RepositoryPath: input.RepositoryPath, BaseRevision: input.BaseRevision,
 		MaxIterations: input.MaxIterations, Budget: input.Budget,
 	})
+	if input.IdempotencyKey != "" {
+		creator, ok := s.store.(checkpoint.IdempotentCreator)
+		if !ok {
+			return nil, apperror.New(apperror.CodeInternal, "checkpoint store does not support atomic request creation")
+		}
+		created, err := creator.CreateIdempotent(ctx, state, input.IdempotencyKey, input.RequestBody)
+		if errors.Is(err, checkpoint.ErrIdempotencyMismatch) || errors.Is(err, checkpoint.ErrIdempotencyLegacyPending) {
+			return nil, apperror.Wrap(err, apperror.CodeConflict, "run.create.idempotency", err.Error())
+		}
+		if err != nil {
+			return nil, wrapStoreError(err, "run.create.idempotency", "could not atomically create the run")
+		}
+		return created, nil
+	}
 	if err := s.store.Save(ctx, state, state.Version); err != nil {
 		return nil, wrapStoreError(err, "run.create.checkpoint", "could not save the initial run checkpoint")
 	}

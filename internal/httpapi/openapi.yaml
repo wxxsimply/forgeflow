@@ -634,7 +634,7 @@ components:
       type: object
       additionalProperties: false
       required: [repositoryId, task]
-      properties: {repositoryId: {type: string, format: uuid}, task: {type: string, maxLength: 20000}, baseRevision: {type: string}, maxIterations: {type: integer, minimum: 1, maximum: 10}}
+      properties: {repositoryId: {type: string, format: uuid}, task: {type: string, maxLength: 20000, description: 'Non-blank task; the UTF-8 encoded payload must not exceed 20000 bytes.', x-maxBytes: 20000}, baseRevision: {type: string}, maxIterations: {type: integer, minimum: 1, maximum: 10}}
     RunMutationRequest:
       type: object
       additionalProperties: false

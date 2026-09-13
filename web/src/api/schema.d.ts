@@ -782,6 +782,7 @@ export interface components {
         CreateRunRequest: {
             /** Format: uuid */
             repositoryId: string;
+            /** @description Non-blank task; the UTF-8 encoded payload must not exceed 20000 bytes. */
             task: string;
             baseRevision?: string;
             maxIterations?: number;
