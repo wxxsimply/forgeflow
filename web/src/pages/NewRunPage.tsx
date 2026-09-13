@@ -5,10 +5,7 @@ import { APIError, createRepository, createRun, listRepositories } from '../api/
 import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { errorMessage } from '../utils/labels';
- codex/preview-reliability
 import { MAX_TASK_BYTES, taskByteLength } from '../utils/taskInput';
-=======
- main
 
 export function NewRunPage() {
   const { user } = useAuth();
@@ -83,14 +80,9 @@ export function NewRunPage() {
       <div className="form-section">
         <div className="section-number">02</div><div className="form-section__body">
           <label htmlFor="task">任务描述</label>
- codex/preview-reliability
           <textarea id="task" rows={8} value={task} onChange={(event) => setTask(event.target.value)} aria-describedby="task-limit" aria-invalid={taskTooLong} placeholder="说明期望改动、验收标准和禁止事项…" required />
           <span id="task-limit" className="field-hint">{taskBytes} / 20,000 字节（UTF-8，忽略首尾空白）。常见汉字通常占 3 字节，表情可能占更多。</span>
           {taskTooLong && <div className="form-error" role="alert">任务描述超过 20,000 字节，请缩短后再提交。</div>}
-
-          <textarea id="task" rows={8} maxLength={20000} value={task} onChange={(event) => setTask(event.target.value)} placeholder="说明期望改动、验收标准和禁止事项…" required />
-          <span className="field-hint">{task.length} / 20,000 字符。任务将作为智能体的主要执行输入。</span>
- main
         </div>
       </div>
       <div className="form-section form-section--split">
@@ -104,11 +96,7 @@ export function NewRunPage() {
         </aside>
       </div>
       {runMutation.error && <ErrorMessage error={runMutation.error} />}
- codex/preview-reliability
       <div className="form-actions"><Link className="secondary-button" to="/runs">取消</Link><button className="primary-button primary-button--fit" disabled={!repositoryId || !task.trim() || taskTooLong || runMutation.isPending}>{runMutation.isPending ? '正在创建…' : '创建并查看任务'}</button></div>
-
-      <div className="form-actions"><Link className="secondary-button" to="/runs">取消</Link><button className="primary-button primary-button--fit" disabled={!repositoryId || !task.trim() || runMutation.isPending}>{runMutation.isPending ? '正在创建…' : '创建并查看任务'}</button></div>
- main
     </form>
   </div>;
 }
