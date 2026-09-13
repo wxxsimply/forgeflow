@@ -5,15 +5,18 @@ import { APIError, createRepository, createRun, listRepositories } from '../api/
 import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { errorMessage } from '../utils/labels';
+import { MAX_TASK_BYTES, taskByteLength } from '../utils/taskInput';
 
 export function NewRunPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const requestIdentity = useRef<{ body: string; key: string } | null>(null);
   const repositories = useQuery({ queryKey: ['repositories'], queryFn: () => listRepositories() });
   const [repositoryId, setRepositoryId] = useState('');
   const [task, setTask] = useState('');
+  const taskBytes = taskByteLength(task);
+  const taskTooLong = taskBytes > MAX_TASK_BYTES;
   const [baseRevision, setBaseRevision] = useState('');
   const [maxIterations, setMaxIterations] = useState(2);
   const [showRepositoryForm, setShowRepositoryForm] = useState(false);
@@ -28,7 +31,12 @@ export function NewRunPage() {
     },
   });
   const runMutation = useMutation({
-    mutationFn: () => createRun({ repositoryId, task: task.trim(), baseRevision: baseRevision.trim() || undefined, maxIterations }, idempotencyKey.current),
+    mutationFn: () => {
+      const input = { repositoryId, task: task.trim(), baseRevision: baseRevision.trim() || undefined, maxIterations };
+      const body = JSON.stringify(input);
+      if (requestIdentity.current?.body !== body) requestIdentity.current = { body, key: crypto.randomUUID() };
+      return createRun(input, requestIdentity.current.key);
+    },
     onSuccess: (run) => navigate(`/runs/${run.runId}`),
   });
 
@@ -39,7 +47,7 @@ export function NewRunPage() {
 
   function submitRun(event: FormEvent) {
     event.preventDefault();
-    if (!repositoryId || !task.trim()) return;
+    if (!repositoryId || !task.trim() || taskTooLong || runMutation.isPending) return;
     runMutation.mutate();
   }
   function submitRepository() {
@@ -72,8 +80,9 @@ export function NewRunPage() {
       <div className="form-section">
         <div className="section-number">02</div><div className="form-section__body">
           <label htmlFor="task">任务描述</label>
-          <textarea id="task" rows={8} maxLength={20000} value={task} onChange={(event) => setTask(event.target.value)} placeholder="说明期望改动、验收标准和禁止事项…" required />
-          <span className="field-hint">{task.length} / 20,000 字符。任务将作为智能体的主要执行输入。</span>
+          <textarea id="task" rows={8} value={task} onChange={(event) => setTask(event.target.value)} aria-describedby="task-limit" aria-invalid={taskTooLong} placeholder="说明期望改动、验收标准和禁止事项…" required />
+          <span id="task-limit" className="field-hint">{taskBytes} / 20,000 字节（UTF-8，忽略首尾空白）。常见汉字通常占 3 字节，表情可能占更多。</span>
+          {taskTooLong && <div className="form-error" role="alert">任务描述超过 20,000 字节，请缩短后再提交。</div>}
         </div>
       </div>
       <div className="form-section form-section--split">
@@ -87,7 +96,7 @@ export function NewRunPage() {
         </aside>
       </div>
       {runMutation.error && <ErrorMessage error={runMutation.error} />}
-      <div className="form-actions"><Link className="secondary-button" to="/runs">取消</Link><button className="primary-button primary-button--fit" disabled={!repositoryId || !task.trim() || runMutation.isPending}>{runMutation.isPending ? '正在创建…' : '创建并查看任务'}</button></div>
+      <div className="form-actions"><Link className="secondary-button" to="/runs">取消</Link><button className="primary-button primary-button--fit" disabled={!repositoryId || !task.trim() || taskTooLong || runMutation.isPending}>{runMutation.isPending ? '正在创建…' : '创建并查看任务'}</button></div>
     </form>
   </div>;
 }

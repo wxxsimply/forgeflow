@@ -2,7 +2,6 @@ package controlplane
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -39,12 +38,6 @@ type Approval struct {
 type Page[T any] struct {
 	Items      []T    `json:"items"`
 	NextCursor string `json:"nextCursor,omitempty"`
-}
-type IdempotencyResult struct {
-	RunID   string
-	Match   bool
-	Found   bool
-	Pending bool
 }
 type AuditEntry struct {
 	ActorID, Action, ResourceType, ResourceID, RequestID, SourceIP string
@@ -233,44 +226,6 @@ func (s *Store) ListArtifacts(ctx context.Context, runID, owner string, admin bo
 	return artifact.NewPostgresMetadata(s.db).List(ctx, runID)
 }
 
-func (s *Store) ClaimIdempotency(ctx context.Context, owner, key string, request []byte) (IdempotencyResult, error) {
-	sum := sha256.Sum256(request)
-	result, err := s.db.ExecContext(ctx, `INSERT INTO idempotency_keys(owner_id,key,request_hash,run_id,status,expires_at)
-		VALUES($1,$2,$3,NULL,'pending',now()+interval '24 hours') ON CONFLICT(owner_id,key) DO NOTHING`, owner, key, sum[:])
-	if err != nil {
-		return IdempotencyResult{}, err
-	}
-	if rows, _ := result.RowsAffected(); rows == 1 {
-		return IdempotencyResult{}, nil
-	}
-	var runID sql.NullString
-	var stored []byte
-	var status string
-	err = s.db.QueryRowContext(ctx, `SELECT run_id,request_hash,status FROM idempotency_keys WHERE owner_id=$1 AND key=$2 AND expires_at>now()`, owner, key).Scan(&runID, &stored, &status)
-	if errors.Is(err, sql.ErrNoRows) {
-		_, _ = s.db.ExecContext(ctx, `DELETE FROM idempotency_keys WHERE owner_id=$1 AND key=$2 AND expires_at<=now()`, owner, key)
-		return s.ClaimIdempotency(ctx, owner, key, request)
-	}
-	if err != nil {
-		return IdempotencyResult{}, err
-	}
-	return IdempotencyResult{RunID: runID.String, Match: string(stored) == string(sum[:]), Found: true, Pending: status == "pending"}, nil
-}
-func (s *Store) SaveIdempotency(ctx context.Context, owner, key string, request []byte, runID string) error {
-	sum := sha256.Sum256(request)
-	result, err := s.db.ExecContext(ctx, `UPDATE idempotency_keys SET run_id=$4,status='completed' WHERE owner_id=$1 AND key=$2 AND request_hash=$3 AND status='pending'`, owner, key, sum[:], runID)
-	if err != nil {
-		return err
-	}
-	if rows, _ := result.RowsAffected(); rows != 1 {
-		return checkpoint.ErrConflict
-	}
-	return nil
-}
-func (s *Store) ReleaseIdempotency(ctx context.Context, owner, key string, request []byte) {
-	sum := sha256.Sum256(request)
-	_, _ = s.db.ExecContext(ctx, `DELETE FROM idempotency_keys WHERE owner_id=$1 AND key=$2 AND request_hash=$3 AND status='pending'`, owner, key, sum[:])
-}
 func (s *Store) Audit(ctx context.Context, v AuditEntry) error {
 	details, _ := json.Marshal(v.Details)
 	_, err := s.db.ExecContext(ctx, `INSERT INTO audit_log(actor_id,action,resource_type,resource_id,request_id,source_ip,details) VALUES(NULLIF($1,'')::uuid,$2,$3,$4,$5,$6,$7)`, v.ActorID, v.Action, v.ResourceType, v.ResourceID, v.RequestID, v.SourceIP, details)

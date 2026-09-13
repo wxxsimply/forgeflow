@@ -28,6 +28,26 @@ func NewPostgresStoreWithOptions(db *sql.DB, options PostgresOptions) *PostgresS
 }
 
 func (s *PostgresStore) Save(ctx context.Context, state *domain.RunState, expectedVersion int64) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("PostgreSQL checkpoint store is not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return fmt.Errorf("begin checkpoint transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if err := s.saveTx(ctx, tx, state, expectedVersion); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit checkpoint transaction: %w", err)
+	}
+	state.Version = expectedVersion + 1
+	return nil
+}
+
+// saveTx never commits or changes the caller's state; a rollback is retryable.
+func (s *PostgresStore) saveTx(ctx context.Context, tx *sql.Tx, state *domain.RunState, expectedVersion int64) error {
 	if s == nil || s.db == nil || state == nil {
 		return fmt.Errorf("PostgreSQL checkpoint store is not configured")
 	}
@@ -48,12 +68,6 @@ func (s *PostgresStore) Save(ctx context.Context, state *domain.RunState, expect
 	if err != nil {
 		return fmt.Errorf("encode run budget: %w", err)
 	}
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	if err != nil {
-		return fmt.Errorf("begin checkpoint transaction: %w", err)
-	}
-	defer tx.Rollback()
-
 	if expectedVersion == 0 {
 		result, err := tx.ExecContext(ctx, `INSERT INTO runs(
             id, owner_id, repository_id, status, version, current_node_id, task, repository_path, base_revision,
@@ -113,10 +127,6 @@ func (s *PostgresStore) Save(ctx context.Context, state *domain.RunState, expect
 			return fmt.Errorf("insert checkpoint outbox: %w", err)
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit checkpoint transaction: %w", err)
-	}
-	state.Version = snapshot.Version
 	return nil
 }
 

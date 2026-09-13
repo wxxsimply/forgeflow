@@ -96,7 +96,7 @@ func TestAuthenticationCSRFHorizontalAuthorizationAndApprovalVersion(t *testing.
 	}
 	wait.Wait()
 	for _, status := range statuses {
-		if status != http.StatusAccepted && status != http.StatusConflict {
+		if status != http.StatusAccepted {
 			t.Fatalf("concurrent idempotency statuses=%v", statuses)
 		}
 	}

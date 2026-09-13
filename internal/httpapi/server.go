@@ -442,52 +442,18 @@ func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if key != "" {
-		if len(key) > 128 {
-			s.fail(w, r, validation("Idempotency-Key is too long"))
-			return
-		}
-		existing, err := s.options.Control.ClaimIdempotency(r.Context(), p.User.ID, key, body)
-		if err != nil {
-			s.fail(w, r, err)
-			return
-		}
-		if existing.Found {
-			if !existing.Match {
-				s.fail(w, r, apperror.New(apperror.CodeConflict, "Idempotency-Key was already used with a different request"))
-				return
-			}
-			if existing.Pending {
-				s.fail(w, r, apperror.New(apperror.CodeConflict, "an identical request is already being created"))
-				return
-			}
-			state, err := s.options.Control.LoadRun(r.Context(), existing.RunID, p.User.ID, isAdmin(p))
-			if err != nil {
-				s.fail(w, r, notFound(err))
-				return
-			}
-			w.Header().Set("Location", "/api/v1/runs/"+state.RunID)
-			writeJSON(w, http.StatusAccepted, state)
-			return
-		}
+	if len(key) > 128 {
+		s.fail(w, r, validation("Idempotency-Key is too long"))
+		return
 	}
 	base := in.BaseRevision
 	if base == "" {
 		base = repo.DefaultBranch
 	}
-	state, err := s.options.Runs.CreateQueued(r.Context(), application.CreateInput{OwnerID: p.User.ID, RepositoryID: repo.ID, Task: in.Task, RepositoryPath: repo.LocalPath, BaseRevision: base, MaxIterations: in.MaxIterations})
+	state, err := s.options.Runs.CreateQueued(r.Context(), application.CreateInput{OwnerID: p.User.ID, RepositoryID: repo.ID, Task: in.Task, RepositoryPath: repo.LocalPath, BaseRevision: base, MaxIterations: in.MaxIterations, IdempotencyKey: key, RequestBody: body})
 	if err != nil {
-		if key != "" {
-			s.options.Control.ReleaseIdempotency(r.Context(), p.User.ID, key, body)
-		}
 		s.fail(w, r, err)
 		return
-	}
-	if key != "" {
-		if err := s.options.Control.SaveIdempotency(r.Context(), p.User.ID, key, body, state.RunID); err != nil {
-			s.fail(w, r, apperror.Wrap(err, apperror.CodeConflict, "run.idempotency", "could not finalize idempotent request"))
-			return
-		}
 	}
 	s.audit(r, p.User.ID, "run.create", "run", state.RunID, nil)
 	w.Header().Set("Location", "/api/v1/runs/"+state.RunID)
