@@ -94,6 +94,10 @@ jobs:
           FORGEFLOW_PREFLIGHT_TEST_IMAGE: caddy:2.11.4-alpine
         run: python3 -B -m unittest discover -s scripts -p test_preview_rollout_preflight.py -v
 
+      - name: Validate offline demo preflight guards
+        # Pure unit tests: no provider credentials, Docker daemon or network needed.
+        run: python3 -B -m unittest discover -s scripts -p test_preview_demo_preflight.py -v
+
       - name: Validate Prometheus and alert rules
         run: docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/staging/prometheus:/etc/prometheus:ro" prom/prometheus:v3.12.0 check config /etc/prometheus/prometheus.yaml
 
