@@ -17,6 +17,7 @@ import preview_demo_patch as demo
 
 TASK_ID = "1" * 32
 TASK_SHA = hashlib.sha256(b"Offline synthetic review test").hexdigest()
+PASSED = {"passed": True, "exitCode": 0, "oomKilled": False, "imageId": "sha256:" + "a" * 64, "logsCollected": False}
 
 
 class DemoPatchTests(unittest.TestCase):
@@ -33,6 +34,7 @@ class DemoPatchTests(unittest.TestCase):
         }
         self.path = Path(self.temp.name) / "proposal.json"
         self.save()
+        self.receipt_count = 0
 
     def save(self):
         self.path.write_bytes(json.dumps(self.proposal).encode())
@@ -42,6 +44,13 @@ class DemoPatchTests(unittest.TestCase):
                            json.dumps(self.proposal if value is None else value).encode(), TASK_ID, TASK_SHA)
 
     def cli(self, *extra):
+        # Each independent sandbox scenario gets an explicitly prepared receipt.
+        # Reuse/concurrency is covered separately in the evidence tests.
+        if "--sandbox" in extra:
+            self.receipt_count += 1
+            receipt = Path(self.temp.name) / (str(self.receipt_count) + ".sqlite")
+            demo.EvidenceJournal.create(receipt, self.review()[1])
+            extra = (*extra, "--evidence-db", str(receipt))
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             code = demo.main(["--source", str(self.root), "--proposal", str(self.path),
@@ -162,7 +171,7 @@ class DemoPatchTests(unittest.TestCase):
 
     def test_only_approved_copy_sent_to_fixed_sandbox(self):
         candidate, details = self.review()
-        with patch.object(demo.preflight, "sandbox", return_value={"passed": True, "exitCode": 0}) as sandbox:
+        with patch.object(demo.preflight, "sandbox", return_value=PASSED) as sandbox:
             code, result, _ = self.cli("--sandbox", "--approve-sha256", details["approvalSha256"])
         sandbox.assert_called_once_with(candidate, "golang:1.22-alpine", 90)
         self.assertEqual(code, 0)
@@ -172,7 +181,7 @@ class DemoPatchTests(unittest.TestCase):
 
     def test_test_failure_cleanup_failure_and_interrupt_are_not_success(self):
         digest = self.review()[1]["approvalSha256"]
-        with patch.object(demo.preflight, "sandbox", return_value={"passed": False, "exitCode": 1}):
+        with patch.object(demo.preflight, "sandbox", return_value={**PASSED, "passed": False, "exitCode": 1}):
             code, result, _ = self.cli("--sandbox", "--approve-sha256", digest)
             self.assertEqual(code, 1)
             self.assertTrue(result["sandboxExecuted"])
