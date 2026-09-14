@@ -96,7 +96,7 @@ jobs:
 
       - name: Validate offline demo preflight guards
         # Pure unit tests: no provider credentials, Docker daemon or network needed.
-        run: python3 -B -m unittest discover -s scripts -p test_preview_demo_preflight.py -v
+        run: python3 -B -m unittest discover -s scripts -p 'test_preview_demo_*.py' -v
 
       - name: Validate Prometheus and alert rules
         run: docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/staging/prometheus:/etc/prometheus:ro" prom/prometheus:v3.12.0 check config /etc/prometheus/prometheus.yaml
