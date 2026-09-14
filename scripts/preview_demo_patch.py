@@ -1,6 +1,6 @@
 """Offline demo patch review. No model, credentials, host commands or source writes.
 
-Review first; --sandbox requires the exact --approve-sha256 from that review.
+Review first; --sandbox requires --evidence-db and the exact --approve-sha256.
 The approval flag is a local operator decision, not an identity signature.
 """
 
@@ -14,6 +14,7 @@ import re
 import stat
 
 import preview_demo_preflight as preflight
+from preview_demo_evidence import EvidenceJournal
 
 
 EDITABLE = frozenset(("greeting.go", "greeting_test.go"))
@@ -150,6 +151,9 @@ def main(argv=None):
     parser.add_argument("--task-sha256", required=True, help="SHA-256 of the exact approved task bytes")
     parser.add_argument("--sandbox", action="store_true", help="explicitly test the approved copy, never the original")
     parser.add_argument("--approve-sha256", help="exact review digest after manual code review")
+    evidence_args = parser.add_mutually_exclusive_group()
+    evidence_args.add_argument("--record-review", type=Path, help="explicitly create a new private review receipt; never overwrite")
+    evidence_args.add_argument("--evidence-db", type=Path, help="existing review receipt; required for sandbox execution")
     parser.add_argument("--image", default="golang:1.22-alpine", help="trusted cached image; never pulled")
     parser.add_argument("--timeout-seconds", type=int, choices=range(1, 121), metavar="1..120", default=90)
     args = parser.parse_args(argv)
@@ -160,6 +164,13 @@ def main(argv=None):
     try:
         if args.sandbox != (args.approve_sha256 is not None):
             raise Blocked("explicit_patch_approval_required")
+        if args.sandbox and (args.evidence_db is None or args.record_review is not None):
+            raise Blocked("existing_review_receipt_required")
+        receipt_path = args.record_review or args.evidence_db
+        if receipt_path is not None:
+            source_root = args.source.absolute()
+            if source_root == receipt_path.absolute() or source_root in receipt_path.absolute().parents:
+                raise Blocked("evidence_inside_source")
         captured = preflight.snapshot(args.source)
         candidate, details = review(captured, read_proposal(args.proposal), args.task_id, args.task_sha256)
         if args.sandbox:
@@ -171,13 +182,31 @@ def main(argv=None):
                 raise Blocked("source_changed")
             # Preserve binding even on timeout/cleanup failure, without raw code.
             report.update({key: value for key, value in details.items() if key != "diff"})
-            report["sandboxAttempted"] = True
-            report["sandbox"] = preflight.sandbox(candidate, args.image, args.timeout_seconds)
-            report["sandboxExecuted"] = True
+            journal = EvidenceJournal.open(args.evidence_db, details)
+
+            def run():
+                report["sandboxAttempted"] = True
+                result = preflight.sandbox(candidate, args.image, args.timeout_seconds)
+                report["sandboxExecuted"] = True
+                return result
+
+            try:
+                report["sandbox"] = journal.run_once(args.approve_sha256, args.image, args.timeout_seconds, run)
+            finally:
+                # If persistence is unavailable, do not mask the original failure
+                # or claim the receipt was saved. Running/unknown blocks retries.
+                try:
+                    report["evidence"] = journal.summary()
+                except Blocked:
+                    report["evidenceUnavailable"] = True
             report["checksPassed"] = report["sandbox"]["passed"]
         else:
             report.update(details, checksPassed=True)
-        report["limitations"] = "Local review/test only; not a signature, paid authorization, persistent evidence or feature acceptance."
+            if args.record_review is not None:
+                report["evidence"] = EvidenceJournal.create(args.record_review, details).summary()
+            elif args.evidence_db is not None:
+                report["evidence"] = EvidenceJournal.open(args.evidence_db, details).summary()
+        report["limitations"] = "Local receipt only; not a signature, paid authorization, cross-database identity, full evidence or feature acceptance."
     except Blocked as error:
         report.update(checksPassed=False, reason=str(error))
         if error.container_name:
