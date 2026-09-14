@@ -88,6 +88,12 @@ jobs:
           docker run --rm -e FORGEFLOW_PUBLIC_IP=39.102.136.31 -e FORGEFLOW_ACME_EMAIL=ci@example.invalid -v "$PWD/deploy/personal-preview/Caddyfile.public-ip:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy adapt --config /etc/caddy/Caddyfile \
             | jq -e '[.apps.http.servers[] | select(.listen | index(":443")) | .tls_connection_policies[]] | length > 0 and all(.[]; .default_sni == "39.102.136.31")' > /dev/null
 
+      - name: Validate read-only personal preview rollout preflight
+        # Reuse Caddy's local image; create metadata only, without starting services.
+        env:
+          FORGEFLOW_PREFLIGHT_TEST_IMAGE: caddy:2.11.4-alpine
+        run: python3 -B -m unittest discover -s scripts -p test_preview_rollout_preflight.py -v
+
       - name: Validate Prometheus and alert rules
         run: docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/staging/prometheus:/etc/prometheus:ro" prom/prometheus:v3.12.0 check config /etc/prometheus/prometheus.yaml
 
