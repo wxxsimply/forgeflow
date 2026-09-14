@@ -13,6 +13,13 @@ func createTestRepository(t *testing.T) string {
 	t.Helper()
 	repositoryPath := filepath.Join(t.TempDir(), "repository")
 	runTestGit(t, "", "init", "-b", "main", repositoryPath)
+	// Detached Git maintenance can outlive commit and race with t.TempDir
+	// cleanup. Keep this policy local to the disposable fixture, before the
+	// first write that can trigger maintenance (and for later runner writes).
+	runTestGit(t, repositoryPath, "config", "--local", "maintenance.auto", "false")
+	runTestGit(t, repositoryPath, "config", "--local", "maintenance.autoDetach", "false")
+	runTestGit(t, repositoryPath, "config", "--local", "gc.auto", "0")
+	runTestGit(t, repositoryPath, "config", "--local", "gc.autoDetach", "false")
 	writeTestFile(t, repositoryPath, "README.md", "# Fixture\n\nRepository harness fixture.\n")
 	writeTestFile(t, repositoryPath, "AGENTS.md", "# Rules\n\nRun go test ./... before completion.\n")
 	writeTestFile(t, repositoryPath, "go.mod", "module fixture\n\ngo 1.22\n")
@@ -20,6 +27,20 @@ func createTestRepository(t *testing.T) string {
 	runTestGit(t, repositoryPath, "add", ".")
 	runTestGit(t, repositoryPath, "-c", "user.name=ForgeFlow Test", "-c", "user.email=forgeflow@example.test", "commit", "-m", "initial fixture")
 	return repositoryPath
+}
+
+func TestCreateTestRepositoryDisablesBackgroundMaintenance(t *testing.T) {
+	repositoryPath := createTestRepository(t)
+	for key, want := range map[string]string{
+		"maintenance.auto":       "false",
+		"maintenance.autoDetach": "false",
+		"gc.auto":                "0",
+		"gc.autoDetach":          "false",
+	} {
+		if got := runTestGit(t, repositoryPath, "config", "--local", "--get", key); got != want {
+			t.Errorf("fixture %s = %q, want %q", key, got, want)
+		}
+	}
 }
 
 func writeTestFile(t *testing.T, root, relativePath, content string) {
