@@ -55,6 +55,18 @@ def validate_result(value):
         raise Blocked("invalid_execution_result")
 
 
+def initialize_receipt(conn, review):
+    """Create a receipt inside the caller's transaction; never commit here."""
+    encoded = encode(binding(review))
+    conn.execute("""CREATE TABLE receipt (
+        id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL,
+        binding TEXT NOT NULL, state TEXT NOT NULL, approval TEXT,
+        image TEXT, seconds INTEGER, result TEXT,
+        reviewed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        started_at TEXT, finished_at TEXT)""")
+    conn.execute("INSERT INTO receipt(id,version,binding,state) VALUES(1,1,?,'reviewed')", (encoded,))
+
+
 class EvidenceJournal:
     def __init__(self, path, review):
         if ".." in Path(path).parts:
@@ -82,13 +94,7 @@ class EvidenceJournal:
             raise Blocked("evidence_unavailable") from None
         # Leave failed initialization in place for inspection; never overwrite.
         with journal._transaction(initializing=True) as conn:
-            conn.execute("""CREATE TABLE receipt (
-                id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL,
-                binding TEXT NOT NULL, state TEXT NOT NULL, approval TEXT,
-                image TEXT, seconds INTEGER, result TEXT,
-                reviewed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-                started_at TEXT, finished_at TEXT)""")
-            conn.execute("INSERT INTO receipt(id,version,binding,state) VALUES(1,1,?,'reviewed')", (journal._binding,))
+            initialize_receipt(conn, review)
         return journal
 
     @classmethod
