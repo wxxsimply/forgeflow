@@ -250,7 +250,9 @@ class RealCLITests(unittest.TestCase):
         archive = self.archive()
         plan = archive.plan()["planSha256"]
         self.approve(plan)
-        _, token = archive._begin(plan, self.now)
+        # Use the persisted approval time. A slower CI runner may cross a
+        # one-second boundary after setUp, making self.now legitimately older.
+        _, token = archive._begin(plan, archive.summary()["approvedAt"])
         archive._unknown(token)
         self.assertEqual(self.command("inspect")[1]["state"], "unknown")
         self.assertEqual(self.approve(plan)[0], 1)
