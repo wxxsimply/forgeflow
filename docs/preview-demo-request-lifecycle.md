@@ -57,6 +57,8 @@ python -B scripts/preview_demo_task.py review --task-id "<同一任务编号>"
 
 ## 4. 还没完成的部分
 
+更新：后续已新增 [DeepSeek 离线协议与费用模块](preview-demo-deepseek-protocol.md)，能够准备请求、校验合成返回与计算估算；尚未与本文件的 Fake 生命周期接通成真实付费任务。以下真实执行能力仍未完成。
+
 - DeepSeek 的真实 HTTP 请求、认证和原始回执解析；不能把固定 Fake 函数换成真实网络调用，就声称已经满足本说明的限次、限费保证。
 - 最新价格、token 上限、人民币换算和可靠的请求前最高费用计算。
 - 本轮真实数据发送范围、模型、次数和费用的人工确认；Fake 摘要不是付费授权，也不是身份签名。
