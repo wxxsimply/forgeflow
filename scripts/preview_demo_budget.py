@@ -163,20 +163,24 @@ class BudgetLedger:
             return self._summary(conn)
 
     def reserve(self, maximum_nano_usd):
-        amount(maximum_nano_usd)
         with self._transaction() as conn:
-            state = self._summary(conn)
-            if state["unfinished"]:
-                raise BudgetBlocked("unresolved_attempt")
-            if state["estimate_exceeded"]:
-                raise BudgetBlocked("cost_estimate_exceeded")
-            if state["attempts"] >= self._policy["max_calls"]:
-                raise BudgetBlocked("call_limit")
-            if maximum_nano_usd > state["remaining_nano_usd"]:
-                raise BudgetBlocked("cost_limit")
-            token = uuid.uuid4().hex
-            conn.execute("INSERT INTO attempts(id,reserved,status) VALUES(?,?,'reserved')", (token, maximum_nano_usd))
-        return token  # Durable commit before invoking an external side effect.
+            return self._reserve_in_transaction(conn, maximum_nano_usd)
+
+    def _reserve_in_transaction(self, conn, maximum_nano_usd):
+        """Caller must hold this ledger's validated transaction; no commit here."""
+        amount(maximum_nano_usd)
+        state = self._summary(conn)
+        if state["unfinished"]:
+            raise BudgetBlocked("unresolved_attempt")
+        if state["estimate_exceeded"]:
+            raise BudgetBlocked("cost_estimate_exceeded")
+        if state["attempts"] >= self._policy["max_calls"]:
+            raise BudgetBlocked("call_limit")
+        if maximum_nano_usd > state["remaining_nano_usd"]:
+            raise BudgetBlocked("cost_limit")
+        token = uuid.uuid4().hex
+        conn.execute("INSERT INTO attempts(id,reserved,status) VALUES(?,?,'reserved')", (token, maximum_nano_usd))
+        return token
 
     def mark_unknown(self, token):
         with self._transaction() as conn:
@@ -185,17 +189,21 @@ class BudgetLedger:
                 raise BudgetBlocked("attempt_not_pending")
 
     def _settle(self, token, actual_nano_usd, receipt_sha256, reconcile):
+        with self._transaction() as conn:
+            return self._settle_in_transaction(conn, token, actual_nano_usd, receipt_sha256, reconcile)
+
+    def _settle_in_transaction(self, conn, token, actual_nano_usd, receipt_sha256, reconcile=False):
+        """Caller must hold this ledger's validated transaction; no commit here."""
         amount(actual_nano_usd, allow_zero=True)
         if not digest(receipt_sha256):
             raise BudgetBlocked("invalid_receipt")
-        with self._transaction() as conn:
-            row = conn.execute("SELECT status FROM attempts WHERE id=?", (token,)).fetchone()
-            allowed = ("reserved", "unknown") if reconcile else ("reserved",)
-            if row is None or row[0] not in allowed:
-                raise BudgetBlocked("attempt_not_pending")
-            conn.execute("UPDATE attempts SET status='settled',actual=?,receipt=?,reconciled=? WHERE id=?",
-                         (actual_nano_usd, receipt_sha256, int(reconcile), token))
-            return self._summary(conn)
+        row = conn.execute("SELECT status FROM attempts WHERE id=?", (token,)).fetchone()
+        allowed = ("reserved", "unknown") if reconcile else ("reserved",)
+        if row is None or row[0] not in allowed:
+            raise BudgetBlocked("attempt_not_pending")
+        conn.execute("UPDATE attempts SET status='settled',actual=?,receipt=?,reconciled=? WHERE id=?",
+                     (actual_nano_usd, receipt_sha256, int(reconcile), token))
+        return self._summary(conn)
 
     def settle(self, token, actual_nano_usd, receipt_sha256):
         return self._settle(token, actual_nano_usd, receipt_sha256, False)

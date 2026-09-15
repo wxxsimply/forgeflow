@@ -12,6 +12,7 @@
 - 任务编号及绑定目录位置，用来发现误移动、误复制和输入混用。
 - 首次人工导入的提案 JSON 精确字节及 SHA-256（最多 1 MiB），和同一事务创建的审批收据。
 - 批准后的执行状态、实际镜像 ID、退出码、OOM 标志和时间；不存测试原始日志。
+- 选择新的 [离线 Fake 请求入口](preview-demo-request-lifecycle.md) 时，还会保存请求精确字节、请求批准、关联预算预留及合法 Fake 返回；这与人工导入提案二选一，不是真实模型调用。
 
 原始文件后续修改不会替换已归档快照。数据库文件包含源码和任务正文，必须留在私有受控位置，不能提交 Git、上传 PR 或作为公开演示附件。摘要检查不是秘密扫描，不能把密码或私有评分源码混进模板。
 
@@ -50,7 +51,7 @@ python -B scripts/preview_demo_task.py inspect --task-id "<同一任务编号>"
 
 ## 4. 导入提案，审查后再决定是否测试
 
-提案格式沿用 [补丁说明](preview-demo-patch-review.md)：任务编号、任务正文摘要和原始快照摘要必须与归档相符，只能替换 `greeting.go`、`greeting_test.go`。导入前仍检查 UTF-8、禁止额外字段/路径及候选 128 KiB 上限。此轮没有模型请求；所有导入标记为 `manual_import`，不能说这些提案已经由 DeepSeek 生成。
+提案格式沿用 [补丁说明](preview-demo-patch-review.md)：任务编号、任务正文摘要和原始快照摘要必须与归档相符，只能替换 `greeting.go`、`greeting_test.go`。导入前仍检查 UTF-8、禁止额外字段/路径及候选 128 KiB 上限。`propose` 的人工导入标记为 `manual_import`；新离线请求入口的固定模拟返回标记为 `fake_request`。两者都不能说成 DeepSeek 生成，后者还必须有匹配的请求和预算来源记录。
 
 ```powershell
 python -B scripts/preview_demo_task.py propose --task-id "<同一任务编号>" --proposal "<受控提案JSON文件>"
@@ -78,7 +79,7 @@ python -B scripts/preview_demo_task.py inspect --task-id "<同一任务编号>"
 
 ## 5. 边界与快速验证
 
-同库集成只覆盖输入、人工提案和单次测试收据；不会新增、结算或清空模型预算次数。待核对预算仍保留；本地审查/测试不会发送请求，因此不消耗 Fake 模型额度。授权与模型请求预算接线、真实 HTTP、人民币费用上限、真实响应来源和原始回执仍待实现。
+本文件的 `prepare/inspect/propose/review/test` 不会发送模型请求或新增、结算模型调用次数。本地审查/测试不消耗 Fake 请求额度，待核对预算仍保留。另一个 [离线请求入口](preview-demo-request-lifecycle.md) 已接通 Fake 批准、预算及返回提案保存，会占一次 Fake 预算计数；每个任务只能选择人工导入或请求流程，不能在请求开始后手动替换提案。真实 HTTP、人民币费用上限、付费授权、真实响应来源和原始回执仍待实现。
 
 独立补丁 CLI 保留兼容，但不能另建收据作为本任务的“重试”。同库一次性检查不是身份签名，也不能阻止有写权限的人整体回滚数据库；请勿复制或删库续跑。模型或人工都可能改测试制造“通过”，必须人工检查语义。此入口不提供导出到任意目录、应用到原始仓库、付费调用或网页闭环。
 
@@ -88,4 +89,4 @@ python -B scripts/preview_demo_task.py inspect --task-id "<同一任务编号>"
 python -B -m unittest discover -s scripts -p 'test_preview_demo_*.py' -q
 ```
 
-本轮总计 111 项：110 项通过，1 项 Windows 符号链接权限跳过，约 6.60 秒。其中新增 20 项同库提案集成检查，覆盖完整命令流程、重复/并发、归档内容漂移、事务失败、异常、结果保存失败及真实子进程强退。只用了临时目录、公开模板、合成任务和 Fake 回调，没有创建实际任务归档、启动 Docker 或调用模型。
+PR #62 的同库提案轮次总计 111 项：110 项通过，1 项 Windows 符号链接权限跳过，约 6.60 秒。其中新增 20 项同库提案集成检查。最新请求接线轮次总计 133 项，132 项通过、1 项同原因跳过，约 8.62 秒，详见 [请求流程检查记录](preview-demo-request-lifecycle.md)。只用了临时目录、公开模板、合成任务和 Fake 回调，没有创建实际任务归档、启动 Docker 或调用模型。
