@@ -1,7 +1,8 @@
-"""Internal real-task lifecycle. No user CLI or credential loading.
+"""Internal real-task lifecycle. Offline commands live in preview_demo_real.
 
 execute() can send a paid request after explicit persisted approval. Tests must
 replace transport.send_once. Never migrate or reuse a Fake task as a real task.
+No credential loading is provided here.
 """
 
 from contextlib import contextmanager
@@ -98,7 +99,7 @@ class RealTask(TaskArchive):
                 raise Blocked("real_plan_binding_mismatch")
             if conn.execute("SELECT id,version,body FROM policy").fetchall() != [(1, 1, policy_json(policy))]:
                 raise Blocked("real_policy_mismatch")
-        return captured, text, policy, prepared
+        return captured, text, policy, prepared, document
 
     def load(self):
         return self._snapshot()[:3]
@@ -106,9 +107,18 @@ class RealTask(TaskArchive):
     def prepared(self):
         return self._snapshot()[3]
 
+    def plan(self):
+        """Reviewed numeric configuration, never source, response or credentials."""
+        _, _, _, prepared, document = self._snapshot()
+        summary = prepared.summary()
+        if self.summary()["planSha256"] != summary["planSha256"]:
+            raise Blocked("real_plan_binding_mismatch")
+        return {**summary, "pricing": dict(prepared.pricing.__dict__),
+                "rmbFen": document["rmbFen"], "createdAt": document["createdAt"], "maxCalls": 1}
+
     @contextmanager
     def _transaction(self):
-        _, _, policy, prepared = self._snapshot()
+        _, _, policy, prepared, _ = self._snapshot()
         ledger = BudgetLedger(self.database, policy)
         try:
             with ledger._transaction() as conn:
