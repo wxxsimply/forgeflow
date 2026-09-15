@@ -170,14 +170,22 @@ class TaskArchive:
         # Both tables commit together. Concurrent imports cannot replace a
         # proposal or reset a consumed receipt. No model provenance is implied.
         with self._connection() as conn:
-            if self._has_proposal(conn):
-                raise Blocked("task_proposal_already_exists")
-            conn.execute("""CREATE TABLE task_proposal (
-                id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL,
-                origin TEXT NOT NULL, raw BLOB NOT NULL, sha256 TEXT NOT NULL)""")
-            conn.execute("INSERT INTO task_proposal VALUES(1,1,'manual_import',?,?)",
-                         (raw, hashlib.sha256(raw).hexdigest()))
-            initialize_receipt(conn, details)
+            if conn.execute("SELECT name FROM sqlite_master WHERE name='task_request'").fetchone():
+                raise Blocked("task_request_already_exists")
+            self._insert_proposal(conn, raw, details, "manual_import")
+
+    def _insert_proposal(self, conn, raw, details, origin):
+        """Trusted internal seam: raw/details validated before this transaction."""
+        if origin not in ("manual_import", "fake_request"):
+            raise Blocked("invalid_proposal_origin")
+        if self._has_proposal(conn):
+            raise Blocked("task_proposal_already_exists")
+        conn.execute("""CREATE TABLE task_proposal (
+            id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL,
+            origin TEXT NOT NULL, raw BLOB NOT NULL, sha256 TEXT NOT NULL)""")
+        conn.execute("INSERT INTO task_proposal VALUES(1,1,?,?,?)",
+                     (origin, raw, hashlib.sha256(raw).hexdigest()))
+        initialize_receipt(conn, details)
 
     def proposal(self, *, required=True):
         captured, _, policy = self.load()
@@ -187,17 +195,22 @@ class TaskArchive:
                     raise Blocked("task_proposal_missing")
                 return None
             rows = conn.execute("SELECT id,version,origin,length(raw),typeof(raw),sha256 FROM task_proposal").fetchall()
-            if (len(rows) != 1 or rows[0][:3] != (1, 1, "manual_import") or rows[0][4] != "blob"
+            if (len(rows) != 1 or rows[0][:2] != (1, 1) or rows[0][2] not in ("manual_import", "fake_request") or rows[0][4] != "blob"
                     or not 1 <= rows[0][3] <= MAX_PROPOSAL_BYTES):
                 raise Blocked("invalid_archived_proposal")
             raw = conn.execute("SELECT raw FROM task_proposal WHERE id=1").fetchone()[0]
             digest = hashlib.sha256(raw).hexdigest()
             if digest != rows[0][5]:
                 raise Blocked("archived_proposal_mismatch")
+            origin = rows[0][2]
+        if origin == "fake_request":
+            from preview_demo_request import RequestFlow
+            if RequestFlow(self).summary() is None:
+                raise Blocked("request_provenance_missing")
         candidate, details = review(captured, raw, self.task_id, policy["task_sha256"])
         # Release the archive transaction before the journal takes its lock.
         journal = EvidenceJournal.open(self.database, details)
-        return candidate, details, journal, {"origin": "manual_import", "rawSha256": digest, "rawBytes": len(raw)}
+        return candidate, details, journal, {"origin": origin, "rawSha256": digest, "rawBytes": len(raw)}
 
     def summary(self):
         captured, task, policy = self.load()
@@ -210,9 +223,11 @@ class TaskArchive:
         if proposal is not None:
             _, details, journal, metadata = proposal
             proposal_summary = {**metadata, "approvalSha256": details["approvalSha256"], "evidence": journal.summary()}
+        from preview_demo_request import RequestFlow
+        request_summary = RequestFlow(self).summary()
         return {"taskId": self.task_id, "taskSha256": policy["task_sha256"], "taskBytes": len(task),
                 **preflight.manifest(captured), "provider": "fake", "model": FAKE_MODEL,
-                "budget": budget, "proposal": proposal_summary,
+                "budget": budget, "proposal": proposal_summary, "request": request_summary,
                 "paidExecutionEnabled": False, "readyForPaidExecution": False}
 
 
