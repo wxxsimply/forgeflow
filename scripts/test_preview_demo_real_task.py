@@ -94,7 +94,7 @@ class RealTaskTests(unittest.TestCase):
         report = self.archive.summary()
         self.assertEqual(report["state"], "prepared")
         self.assertEqual(report["budget"]["attempts"], 0)
-        self.assertFalse(report["paidCLIEnabled"])
+        self.assertTrue(report["paidCLIEnabled"])
         for private in (TEXT.decode(), "func Greet", str(self.root), KEY):
             self.assertNotIn(private, json.dumps(report))
         self.send.assert_not_called()

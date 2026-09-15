@@ -113,6 +113,10 @@ class RealTask(TaskArchive):
         summary = prepared.summary()
         if self.summary()["planSha256"] != summary["planSha256"]:
             raise Blocked("real_plan_binding_mismatch")
+        # These protocol-only defaults predate the governed CLI. Readiness is
+        # calculated from current persisted state by the CLI, not frozen here.
+        summary.pop("paidExecutionEnabled")
+        summary.pop("readyForPaidExecution")
         return {**summary, "pricing": dict(prepared.pricing.__dict__),
                 "rmbFen": document["rmbFen"], "createdAt": document["createdAt"], "maxCalls": 1}
 
@@ -182,7 +186,7 @@ class RealTask(TaskArchive):
         return {"state": state, "planSha256": plan_sha, "approvalReferenceSha256": protocol.sha(reference.encode()) if reference else None,
                 "approvedAt": approved, "updatedAt": updated, "attemptId": token,
                 "response": parsed.summary() if parsed else None, "responseSha256": response_sha,
-                "budget": budget, "accountingMode": "conservative_estimate_not_invoice", "paidCLIEnabled": False}
+                "budget": budget, "accountingMode": "conservative_estimate_not_invoice", "paidCLIEnabled": True}
 
     def summary(self):
         with self._transaction() as (prepared, ledger, conn):
@@ -262,8 +266,10 @@ class RealTask(TaskArchive):
             except Blocked:
                 pass
             if isinstance(error, (KeyboardInterrupt, SystemExit)):
+                error.model_call_attempted = True
                 raise
             failure = Blocked("real_transport_unknown")
+            failure.model_call_attempted = True
             if type(getattr(error, "worker_pid", None)) is int:
                 failure.worker_pid = error.worker_pid
             raise failure from None
@@ -275,9 +281,16 @@ class RealTask(TaskArchive):
             except Blocked:
                 pass
             if isinstance(error, (KeyboardInterrupt, SystemExit)):
+                error.model_call_attempted = True
                 raise
-            raise Blocked("real_result_not_saved") from None
-        return self.summary()
+            failure = Blocked("real_result_not_saved")
+            failure.model_call_attempted = True
+            raise failure from None
+        try:
+            return self.summary()
+        except BaseException as error:
+            error.model_call_attempted = True
+            raise
 
     def proposal(self, *, required=True):
         state = self.summary()

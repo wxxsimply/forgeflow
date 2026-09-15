@@ -1,7 +1,7 @@
-"""Internal single-POST HTTPS transport. Not connected to a paid task CLI.
+"""Internal single-POST HTTPS transport used by the governed real-task CLI.
 
 Future callers MUST commit real authorization and budget before send_once.
-This module does not authorize, reserve, settle, retry, or load credential files.
+This module itself does not authorize, reserve, settle, retry, or load files.
 """
 
 import base64
