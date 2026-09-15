@@ -25,7 +25,7 @@ PASSED = {"passed": True, "exitCode": 0, "oomKilled": False,
 
 class RealCLITests(unittest.TestCase):
     def setUp(self):
-        for target, name in ((real.transport, "send_once"), (real.RealTask, "execute"), (cli.preflight, "sandbox")):
+        for target, name in ((real.transport, "send_once"), (cli.preflight, "sandbox")):
             guard = patch.object(target, name, side_effect=AssertionError("unexpected external execution"))
             guard.start()
             self.addCleanup(guard.stop)
@@ -34,6 +34,7 @@ class RealCLITests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.root = self.base / "private"
         self.root.mkdir()
+        self.root.chmod(0o700)
         self.source = self.base / "source"
         shutil.copytree(cli.preflight.DEFAULT_SOURCE, self.source)
         self.task_file = self.base / "task.txt"
@@ -45,6 +46,14 @@ class RealCLITests(unittest.TestCase):
                                                   2_000_000_000, 7_200_000, self.now - 1, self.now + 3600)
         self.price_file = self.base / "price.json"
         self.price_file.write_text(json.dumps(self.price.__dict__), encoding="utf-8")
+        self.key_file = self.base / "private-key"
+        self.key_file.write_bytes(b"synthetic-key-not-a-credential\r\n")
+        self.key_file.chmod(0o600)
+        if os.name == "nt":
+            acl = patch.object(cli.credentials, "_windows_acl",
+                               return_value=("S-1-5-21-test", (("S-1-5-21-test", 0, 1),)))
+            acl.start()
+            self.addCleanup(acl.stop)
 
     def invoke(self, *args):
         output = io.StringIO()
@@ -94,6 +103,8 @@ class RealCLITests(unittest.TestCase):
         self.assertEqual(report["plan"]["rmbFen"], 10_000)
         self.assertEqual(report["plan"]["pricing"], self.price.__dict__)
         self.assertEqual(report["plan"]["maxCalls"], 1)
+        self.assertNotIn("paidExecutionEnabled", report["plan"])
+        self.assertNotIn("readyForPaidExecution", report["plan"])
         self.assertTrue(report["priceWindowValid"])
         for private in (TEXT.decode(), "func Greet", str(self.root), "synthetic owner approval"):
             self.assertNotIn(private, output)
@@ -120,7 +131,8 @@ class RealCLITests(unittest.TestCase):
         self.assertEqual(report["state"], "approved")
         self.assertEqual(report["modelCalls"], 0)
         self.assertEqual(report["budget"]["attempts"], 0)
-        self.assertFalse(report["paidExecutionEnabled"])
+        self.assertTrue(report["paidExecutionEnabled"])
+        self.assertTrue(report["readyForPaidExecution"])
         self.assertNotIn("synthetic owner approval", output)
         self.assertEqual(self.approve(plan)[1]["reason"], "real_approval_already_recorded")
 
@@ -134,6 +146,107 @@ class RealCLITests(unittest.TestCase):
             self.assertEqual(report["reason"], "real_cli_arguments")
             self.assertNotIn(secret, output)
         self.assertEqual(list(self.root.iterdir()), [])
+
+    def response(self, archive, marker="Mocked send."):
+        prepared = archive.prepared()
+        captured, _, policy = archive.load()
+        proposal = {"schemaVersion": "forgeflow.demo.patch/v1", "taskId": TASK_ID,
+                    "taskSha256": policy["task_sha256"], "baseSnapshotSha256": policy["snapshot_sha256"],
+                    "files": {"greeting.go": captured["greeting.go"].decode() + f"\n// {marker}\n"}}
+        value = {"id": "mocked-send", "object": "chat.completion", "model": prepared.pricing.model,
+                 "choices": [{"index": 0, "finish_reason": "stop", "message": {
+                     "role": "assistant", "content": json.dumps(proposal)}}],
+                 "usage": {"prompt_tokens": 100, "prompt_cache_hit_tokens": 0,
+                           "prompt_cache_miss_tokens": 100, "completion_tokens": 10, "total_tokens": 110}}
+        return real.transport.HTTPResult(json.dumps(value).encode())
+
+    def test_send_requires_approval_exact_plan_and_valid_private_key(self):
+        self.prepare()
+        plan = self.archive().plan()["planSha256"]
+        for supplied in (plan, "0" * 64):
+            with patch.object(real.transport, "send_once") as send:
+                code, report, output = self.command("send", "--approve-plan-sha256", supplied,
+                                                    "--key-file", str(self.key_file))
+                self.assertEqual(code, 1)
+                self.assertEqual(report["budget"]["attempts"], 0)
+                self.assertNotIn("synthetic-key-not-a-credential", output)
+                send.assert_not_called()
+        self.approve(plan)
+        self.key_file.write_bytes(b"bad")
+        with patch.object(real.transport, "send_once") as send:
+            self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                          "--key-file", str(self.key_file))[0], 1)
+            send.assert_not_called()
+        self.assertEqual(self.archive().summary()["budget"]["attempts"], 0)
+
+    def test_credential_check_reads_no_model_and_discloses_no_key_or_path(self):
+        self.prepare()
+        with patch.object(real.transport, "send_once") as send:
+            code, report, output = self.command("credential-check", "--key-file", str(self.key_file))
+        self.assertEqual(code, 0)
+        self.assertTrue(report["credentialAccepted"])
+        self.assertFalse(report["modelCallAttempted"])
+        self.assertEqual(report["modelCalls"], 0)
+        self.assertNotIn("synthetic-key-not-a-credential", output)
+        self.assertNotIn(str(self.key_file), output)
+        send.assert_not_called()
+
+    def test_send_calls_transport_once_and_never_stores_or_prints_key(self):
+        self.prepare()
+        archive = self.archive()
+        plan = archive.plan()["planSha256"]
+        self.approve(plan)
+        with patch.object(real.transport, "send_once", return_value=self.response(archive)) as send:
+            code, report, output = self.command("send", "--approve-plan-sha256", plan,
+                                                "--key-file", str(self.key_file))
+            self.assertEqual(code, 0)
+            self.assertEqual(report["state"], "completed")
+            self.assertEqual(report["modelCalls"], 1)
+            self.assertTrue(report["modelCallAttempted"])
+            self.assertFalse(report["readyForPaidExecution"])
+            self.assertEqual(send.call_count, 1)
+            self.assertEqual(send.call_args.args[1], "synthetic-key-not-a-credential")
+            self.assertNotIn("synthetic-key-not-a-credential", output)
+            self.assertNotIn(str(self.key_file), output)
+            self.assertNotIn(b"synthetic-key-not-a-credential", archive.database.read_bytes())
+            self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                          "--key-file", str(self.key_file))[0], 1)
+            self.assertEqual(send.call_count, 1)
+
+    def test_unknown_send_is_sanitized_held_and_never_retried(self):
+        self.prepare()
+        archive = self.archive()
+        plan = archive.plan()["planSha256"]
+        self.approve(plan)
+        with patch.object(real.transport, "send_once",
+                          side_effect=real.Blocked("synthetic-key-not-a-credential")) as send:
+            code, report, output = self.command("send", "--approve-plan-sha256", plan,
+                                                "--key-file", str(self.key_file))
+            self.assertEqual(code, 1)
+            self.assertEqual(report["reason"], "real_transport_unknown")
+            self.assertEqual(report["state"], "unknown")
+            self.assertEqual(report["modelCalls"], 1)
+            self.assertTrue(report["modelCallAttempted"])
+            self.assertGreater(report["budget"]["held_nano_usd"], 0)
+            self.assertNotIn("synthetic-key-not-a-credential", output)
+            self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                          "--key-file", str(self.key_file))[0], 1)
+            self.assertEqual(send.call_count, 1)
+
+    def test_key_inside_repository_or_task_root_and_hardlink_are_refused(self):
+        self.prepare()
+        plan = self.archive().plan()["planSha256"]
+        self.approve(plan)
+        inside = self.archive().path / "key"
+        inside.write_bytes(b"synthetic-key-not-a-credential")
+        linked = self.base / "linked-key"
+        os.link(self.key_file, linked)
+        for path in (inside, linked):
+            with patch.object(real.transport, "send_once") as send:
+                self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                              "--key-file", str(path))[0], 1)
+                send.assert_not_called()
+        self.assertEqual(self.archive().summary()["budget"]["attempts"], 0)
 
     def test_strict_price_schema_rejects_duplicates_extra_fields_and_nonfinite(self):
         for raw in (b'{"model":"x","model":"y"}', b'{"rate":NaN}', b'[]',
@@ -191,6 +304,16 @@ class RealCLITests(unittest.TestCase):
         self.assertEqual(self.prepare()[1]["reason"], "invalid_task_text")
         self.task_file.write_bytes(TEXT)
         self.assertEqual(self.prepare("--root", str(self.source))[1]["reason"], "task_root_inside_source")
+        self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_insecure_private_root_is_rejected_before_archive_access(self):
+        if os.name == "nt":
+            with patch.object(cli.credentials, "_windows_acl",
+                              side_effect=real.Blocked("credential_insecure_permissions")):
+                self.assertEqual(self.prepare()[0], 1)
+        else:
+            self.root.chmod(0o750)
+            self.assertEqual(self.prepare()[1]["reason"], "private_root_insecure_permissions")
         self.assertEqual(list(self.root.iterdir()), [])
 
     def test_hard_linked_price_is_refused(self):
