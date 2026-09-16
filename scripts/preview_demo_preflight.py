@@ -16,6 +16,7 @@ import uuid
 FILES = ("README.md", "go.mod", "greeting.go", "greeting_test.go")
 MAX_BYTES = 128 * 1024
 OWNER_LABEL = "forgeflow.demo.preflight"
+SANDBOX_PROFILE = "forgeflow.demo.sandbox/v1"
 DEFAULT_SOURCE = Path(__file__).resolve().parent.parent / "examples" / "preview-demo"
 
 
@@ -126,8 +127,22 @@ def container_args(name, owner, image, directory):
             "--entrypoint", "go", image, "test", "-mod=readonly", "-count=1", "-timeout", "30s", "./..."]
 
 
+def valid_image_reference(image):
+    return isinstance(image, str) and bool(re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/@:-]{0,255}", image))
+
+
+def verify_cached_image(image_id, docker=None):
+    if not isinstance(image_id, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+        raise Blocked("image_not_pinned")
+    docker = docker or Docker()
+    pinned = docker.call(["image", "inspect", "--format", "{{.Id}}", image_id], 5)
+    if pinned != image_id:
+        raise Blocked("image_not_pinned")
+    return pinned
+
+
 def sandbox(captured, image, seconds, docker=None):
-    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/@:-]{0,255}", image):
+    if not valid_image_reference(image):
         raise Blocked("invalid_image")
     if not 1 <= seconds <= 120:
         raise Blocked("invalid_timeout")
@@ -154,7 +169,7 @@ def sandbox(captured, image, seconds, docker=None):
             target.chmod(0o444)
         try:
             pinned = call(["image", "inspect", "--format", "{{.Id}}", image])
-            if not re.fullmatch(r"sha256:[0-9a-f]{64}", pinned):
+            if not isinstance(pinned, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", pinned):
                 raise Blocked("image_not_pinned")
             attempted = True  # A timed-out create may still have created a container.
             call(container_args(name, owner, pinned, directory))

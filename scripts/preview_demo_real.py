@@ -50,7 +50,8 @@ def read_reference(path):
 def make_parser():
     parser = Parser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="action", required=True)
-    for action in ("prepare", "inspect", "plan", "approve", "credential-check", "send", "review", "test"):
+    for action in ("prepare", "inspect", "plan", "approve", "sandbox-check",
+                   "credential-check", "send", "review", "test"):
         command = commands.add_parser(action, allow_abbrev=False)
         command.add_argument("--root", required=True, type=Path, help="existing operator-controlled private root")
         command.add_argument("--task-id", required=True, help="32 lowercase hex characters; never reuse Fake IDs")
@@ -66,6 +67,10 @@ def make_parser():
         elif action == "approve":
             command.add_argument("--approve-plan-sha256", required=True)
             command.add_argument("--reference-file", type=Path, required=True, help="private confirmation reference, not a key")
+        elif action == "sandbox-check":
+            command.add_argument("--approve-plan-sha256", required=True, help="exact approved plan to bind the baseline receipt")
+            command.add_argument("--image", default="golang:1.22", help="trusted locally cached image; never pulled")
+            command.add_argument("--timeout", type=int, choices=range(1, 121), default=90)
         elif action == "send":
             command.add_argument("--approve-plan-sha256", required=True, help="exact already-approved plan; consumed once")
             command.add_argument("--key-file", type=Path, required=True, help="private file outside this repository and task root")
@@ -73,8 +78,6 @@ def make_parser():
             command.add_argument("--key-file", type=Path, required=True, help="validate without sending or storing the key")
         elif action == "test":
             command.add_argument("--approve-candidate-sha256", required=True)
-            command.add_argument("--image", default="golang:1.22", help="trusted locally cached image; never pulled")
-            command.add_argument("--timeout", type=int, choices=range(1, 121), default=90)
     return parser
 
 
@@ -89,7 +92,9 @@ def status(archive):
     try:
         prepared = archive.prepared()
         prepared.pricing.can_start(int(time.time()), prepared.timeout_seconds)
-        ready = summary["state"] == "approved" and summary["budget"]["attempts"] == 0
+        ready = (summary["state"] == "approved" and summary["budget"]["attempts"] == 0
+                 and summary["sandbox"] is not None
+                 and summary["sandbox"]["checkedAt"] >= summary["approvedAt"])
     except Blocked:
         pass
     return {**summary, "candidate": candidate, "paidExecutionEnabled": True,
@@ -125,6 +130,22 @@ def main(argv=None):
             archive = RealTask.open(credentials.private_directory(args.root), args.task_id)
         if args.action == "approve":
             archive.approve(args.approve_plan_sha256, read_reference(args.reference_file))
+        elif args.action == "sandbox-check":
+            current = archive.summary()
+            if current["state"] != "approved" or args.approve_plan_sha256 != current["planSha256"]:
+                raise Blocked("real_approval_mismatch")
+            if current["sandbox"] is not None:
+                raise Blocked("real_sandbox_already_recorded")
+            prepared = archive.prepared()
+            prepared.pricing.can_start(int(time.time()), prepared.timeout_seconds)
+            captured, _, _ = archive.load()
+            report["sandboxAttempted"] = True
+            result = preflight.sandbox(captured, args.image, args.timeout)
+            report["sandboxExecuted"] = True
+            report["sandboxBaseline"] = result
+            if not isinstance(result, dict) or result.get("passed") is not True:
+                raise Blocked("real_sandbox_baseline_failed")
+            archive.record_sandbox(args.approve_plan_sha256, args.image, args.timeout, result)
         elif args.action == "credential-check":
             key = credentials.load(args.key_file, forbidden_roots=(archive.root,))
             key = None
@@ -135,6 +156,9 @@ def main(argv=None):
                 raise Blocked("real_not_approved_or_consumed")
             if args.approve_plan_sha256 != current["planSha256"]:
                 raise Blocked("real_approval_mismatch")
+            if current["sandbox"] is None:
+                raise Blocked("real_sandbox_not_ready")
+            preflight.verify_cached_image(current["sandbox"]["imageId"])
             key = credentials.load(args.key_file, forbidden_roots=(archive.root,))
             try:
                 try:
@@ -149,12 +173,18 @@ def main(argv=None):
             report["review"] = archive.proposal()[1]
         elif args.action == "test":
             candidate, _, journal, _ = archive.proposal()
+            sandbox_receipt = archive.sandbox(required=True)
             def run():
                 report["sandboxAttempted"] = True
-                result = preflight.sandbox(candidate, args.image, args.timeout)
+                result = preflight.sandbox(candidate, sandbox_receipt["imageId"],
+                                           sandbox_receipt["timeoutSeconds"])
                 report["sandboxExecuted"] = True
+                if not isinstance(result, dict) or result.get("imageId") != sandbox_receipt["imageId"]:
+                    raise Blocked("real_sandbox_image_mismatch")
                 return result
-            report["execution"] = journal.run_once(args.approve_candidate_sha256, args.image, args.timeout, run)
+            report["execution"] = journal.run_once(args.approve_candidate_sha256,
+                                                   sandbox_receipt["imageId"],
+                                                   sandbox_receipt["timeoutSeconds"], run)
         report.update(status(archive), checksPassed=True)
         if args.action in ("prepare", "plan"):
             report["plan"] = archive.plan()

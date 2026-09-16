@@ -175,6 +175,17 @@ class DemoPreflightTests(unittest.TestCase):
     def test_nonzero_test_exit_is_not_success(self):
         self.assertFalse(demo.sandbox(demo.snapshot(self.root), "golang:1.22-alpine", 90, FakeDocker(exit_code=1))["passed"])
 
+    def test_cached_image_check_accepts_only_the_exact_pinned_id(self):
+        docker = FakeDocker()
+        self.assertEqual(demo.verify_cached_image(IMAGE, docker), IMAGE)
+        self.assertEqual(docker.calls, [["image", "inspect", "--format", "{{.Id}}", IMAGE]])
+        with self.assertRaisesRegex(demo.Blocked, "image_not_pinned"):
+            demo.verify_cached_image("golang:1.22", docker)
+        other = FakeDocker()
+        with patch.object(other, "call", return_value="sha256:" + "b" * 64):
+            with self.assertRaisesRegex(demo.Blocked, "image_not_pinned"):
+                demo.verify_cached_image(IMAGE, other)
+
     def test_start_and_ambiguous_create_failures_cleanup_owned_container(self):
         for step in ("create", "start"):
             with self.subTest(step=step):
