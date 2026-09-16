@@ -59,8 +59,10 @@ class RealTaskTests(unittest.TestCase):
             conn.commit()
             return rows
 
-    def approve(self):
+    def approve(self, *, sandbox=True):
         self.archive.approve(self.plan, "synthetic owner confirmation", now=self.now)
+        if sandbox:
+            self.archive.record_sandbox(self.plan, "golang:1.22", 90, PASSED, now=self.now)
 
     def response(self):
         return real.transport.HTTPResult(json.dumps(self.value).encode())
@@ -94,6 +96,7 @@ class RealTaskTests(unittest.TestCase):
         report = self.archive.summary()
         self.assertEqual(report["state"], "prepared")
         self.assertEqual(report["budget"]["attempts"], 0)
+        self.assertIsNone(report["sandbox"])
         self.assertTrue(report["paidCLIEnabled"])
         for private in (TEXT.decode(), "func Greet", str(self.root), KEY):
             self.assertNotIn(private, json.dumps(report))
@@ -143,6 +146,37 @@ class RealTaskTests(unittest.TestCase):
         self.assertNotIn("synthetic owner confirmation", json.dumps(summary))
         with self.assertRaisesRegex(real.Blocked, "real_approval_already_recorded"):
             self.approve()
+        self.send.assert_not_called()
+
+    def test_sandbox_receipt_is_required_bound_and_single_use(self):
+        with self.assertRaisesRegex(real.Blocked, "real_sandbox_requires_approval"):
+            self.archive.record_sandbox(self.plan, "golang:1.22", 90, PASSED, now=self.now)
+        self.approve(sandbox=False)
+        self.sql("DROP TABLE real_sandbox")
+        with self.assertRaisesRegex(real.Blocked, "real_sandbox_not_ready"):
+            self.execute()
+        self.send.assert_not_called()
+        self.assertEqual(self.archive.summary()["budget"]["attempts"], 0)
+        for plan, image, timeout, result in (
+                ("0" * 64, "golang:1.22", 90, PASSED),
+                (self.plan, "--privileged", 90, PASSED),
+                (self.plan, "golang:1.22", 0, PASSED),
+                (self.plan, "golang:1.22", 90, {}),
+                (self.plan, "golang:1.22", 90, {**PASSED, "passed": False})):
+            with self.assertRaises(real.Blocked):
+                self.archive.record_sandbox(plan, image, timeout, result, now=self.now)
+        receipt = self.archive.record_sandbox(self.plan, "golang:1.22", 90, PASSED, now=self.now)
+        self.assertEqual(receipt["planSha256"], self.plan)
+        self.assertEqual(receipt["imageId"], PASSED["imageId"])
+        self.assertEqual(receipt["sandboxProfile"], real.SANDBOX_PROFILE)
+        with self.assertRaisesRegex(real.Blocked, "real_sandbox_already_recorded"):
+            self.archive.record_sandbox(self.plan, "golang:1.22", 90, PASSED, now=self.now)
+
+    def test_tampered_sandbox_receipt_fails_closed(self):
+        self.approve()
+        self.sql("UPDATE real_sandbox SET image_id=?", ("sha256:" + "0" * 63,))
+        with self.assertRaisesRegex(real.Blocked, "real_sandbox_mismatch"):
+            self.archive.summary()
         self.send.assert_not_called()
 
     def test_approval_cannot_precede_plan_creation(self):

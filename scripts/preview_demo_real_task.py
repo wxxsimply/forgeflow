@@ -7,6 +7,7 @@ No credential loading is provided here.
 
 from contextlib import contextmanager
 import os
+import re
 import sqlite3
 import time
 from types import SimpleNamespace
@@ -14,13 +15,19 @@ from types import SimpleNamespace
 from preview_demo_budget import BudgetBlocked, BudgetLedger, policy_json
 from preview_demo_evidence import EvidenceJournal, encode, initialize_receipt
 from preview_demo_patch import review, validate_snapshot
-from preview_demo_preflight import Blocked, FILES, manifest
+from preview_demo_preflight import Blocked, FILES, SANDBOX_PROFILE, manifest, valid_image_reference
 from preview_demo_task import TaskArchive, task_bytes
 import preview_demo_deepseek as protocol
 import preview_demo_https as transport
 
 
 PLAN_KEYS = {"taskId", "task", "files", "pricing", "rmbFen", "maxOutputTokens", "timeoutSeconds", "createdAt"}
+SANDBOX_RESULT_KEYS = {"passed", "exitCode", "oomKilled", "imageId", "logsCollected"}
+SANDBOX_TABLE = """CREATE TABLE real_sandbox(
+    id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,
+    plan_sha TEXT NOT NULL,snapshot_sha TEXT NOT NULL,image_ref TEXT NOT NULL,
+    image_id TEXT NOT NULL,timeout_seconds INTEGER NOT NULL,profile TEXT NOT NULL,
+    checked_at INTEGER NOT NULL)"""
 
 
 def materialize(document):
@@ -82,6 +89,7 @@ class RealTask(TaskArchive):
                 raw BLOB,response_sha TEXT,report TEXT,updated_at INTEGER NOT NULL)""")
             conn.execute("INSERT INTO real_state VALUES(1,1,?,NULL,NULL,NULL,'prepared',NULL,NULL,NULL,?)",
                          (prepared.summary()["planSha256"], document["createdAt"]))
+            conn.execute(SANDBOX_TABLE)
         return archive
 
     def _snapshot(self):
@@ -120,6 +128,63 @@ class RealTask(TaskArchive):
         return {**summary, "pricing": dict(prepared.pricing.__dict__),
                 "rmbFen": document["rmbFen"], "createdAt": document["createdAt"], "maxCalls": 1}
 
+    def _sandbox(self, conn, prepared):
+        objects = conn.execute("SELECT type,name FROM sqlite_master WHERE name='real_sandbox'").fetchall()
+        if not objects:
+            return None
+        if objects != [("table", "real_sandbox")]:
+            raise Blocked("real_sandbox_mismatch")
+        rows = conn.execute("""SELECT id,version,plan_sha,snapshot_sha,image_ref,image_id,
+            timeout_seconds,profile,checked_at FROM real_sandbox""").fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise Blocked("real_sandbox_mismatch")
+        row = rows[0]
+        expected_plan = prepared.summary()["planSha256"]
+        expected_snapshot = manifest(dict(prepared.captured))["snapshotSha256"]
+        if (row[0:4] != (1, 1, expected_plan, expected_snapshot)
+                or not valid_image_reference(row[4])
+                or not isinstance(row[5], str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", row[5])
+                or type(row[6]) is not int or not 1 <= row[6] <= 120
+                or row[7] != SANDBOX_PROFILE or type(row[8]) is not int):
+            raise Blocked("real_sandbox_mismatch")
+        return {"state": "passed", "planSha256": row[2], "snapshotSha256": row[3],
+                "image": row[4], "imageId": row[5], "timeoutSeconds": row[6],
+                "sandboxProfile": row[7], "checkedAt": row[8]}
+
+    def sandbox(self, *, required=False):
+        with self._transaction() as (prepared, _, conn):
+            receipt = self._sandbox(conn, prepared)
+        if receipt is None and required:
+            raise Blocked("real_sandbox_not_ready")
+        return receipt
+
+    def record_sandbox(self, plan_sha, image, timeout_seconds, result, *, now=None):
+        now = int(time.time()) if now is None else now
+        if (not valid_image_reference(image) or type(timeout_seconds) is not int
+                or not 1 <= timeout_seconds <= 120 or not isinstance(result, dict)
+                or set(result) != SANDBOX_RESULT_KEYS or result["passed"] is not True
+                or type(result["exitCode"]) is not int or result["exitCode"] != 0
+                or result["oomKilled"] is not False or result["logsCollected"] is not False
+                or not isinstance(result["imageId"], str)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", result["imageId"])):
+            raise Blocked("real_invalid_sandbox_receipt")
+        with self._transaction() as (prepared, ledger, conn):
+            prepared.pricing.can_start(now, prepared.timeout_seconds)
+            state = self._state(conn, prepared, ledger)
+            if state["state"] != "approved":
+                raise Blocked("real_sandbox_requires_approval")
+            if plan_sha != state["planSha256"] or now < state["approvedAt"]:
+                raise Blocked("real_approval_mismatch")
+            if state["sandbox"] is not None:
+                raise Blocked("real_sandbox_already_recorded")
+            conn.execute(SANDBOX_TABLE.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
+            conn.execute("INSERT INTO real_sandbox VALUES(1,1,?,?,?,?,?,?,?)",
+                         (plan_sha, manifest(dict(prepared.captured))["snapshotSha256"], image,
+                          result["imageId"], timeout_seconds, SANDBOX_PROFILE, now))
+        return self.sandbox(required=True)
+
     @contextmanager
     def _transaction(self):
         _, _, policy, prepared, _ = self._snapshot()
@@ -142,17 +207,21 @@ class RealTask(TaskArchive):
         if plan_sha != prepared.summary()["planSha256"] or type(updated) is not int:
             raise Blocked("real_state_binding_mismatch")
         budget = ledger._summary(conn)
+        sandbox = self._sandbox(conn, prepared)
         receipt_exists = bool(conn.execute("SELECT name FROM sqlite_master WHERE name='receipt'").fetchone())
         parsed = None
         if state == "prepared":
-            if any(value is not None for value in (reference, approved, token, raw, response_sha, report)) or budget["attempts"] or receipt_exists:
+            if (any(value is not None for value in (reference, approved, token, raw, response_sha, report))
+                    or budget["attempts"] or receipt_exists or sandbox is not None):
                 raise Blocked("real_invalid_state")
         else:
             if (not isinstance(reference, str) or not reference.strip() or len(reference.encode()) > 256
                     or any(ord(char) < 32 for char in reference) or type(approved) is not int or updated < approved):
                 raise Blocked("real_invalid_approval")
             if state == "approved":
-                if any(value is not None for value in (token, raw, response_sha, report)) or budget["attempts"] or receipt_exists:
+                if (any(value is not None for value in (token, raw, response_sha, report))
+                        or budget["attempts"] or receipt_exists
+                        or (sandbox is not None and sandbox["checkedAt"] < approved)):
                     raise Blocked("real_invalid_state")
             else:
                 attempts = conn.execute("SELECT id,reserved,status,actual,receipt,reconciled FROM attempts").fetchall()
@@ -186,7 +255,8 @@ class RealTask(TaskArchive):
         return {"state": state, "planSha256": plan_sha, "approvalReferenceSha256": protocol.sha(reference.encode()) if reference else None,
                 "approvedAt": approved, "updatedAt": updated, "attemptId": token,
                 "response": parsed.summary() if parsed else None, "responseSha256": response_sha,
-                "budget": budget, "accountingMode": "conservative_estimate_not_invoice", "paidCLIEnabled": True}
+                "budget": budget, "sandbox": sandbox,
+                "accountingMode": "conservative_estimate_not_invoice", "paidCLIEnabled": True}
 
     def summary(self):
         with self._transaction() as (prepared, ledger, conn):
@@ -215,6 +285,8 @@ class RealTask(TaskArchive):
                 raise Blocked("real_not_approved_or_consumed")
             if plan_sha != state["planSha256"] or now < state["approvedAt"]:
                 raise Blocked("real_approval_mismatch")
+            if state["sandbox"] is None or state["sandbox"]["checkedAt"] < state["approvedAt"]:
+                raise Blocked("real_sandbox_not_ready")
             token = ledger._reserve_in_transaction(conn, prepared.reserved_nano_usd)
             conn.execute("UPDATE real_state SET state='running',token=?,updated_at=? WHERE id=1", (token, now))
         return prepared, token

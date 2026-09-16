@@ -29,6 +29,9 @@ class RealCLITests(unittest.TestCase):
             guard = patch.object(target, name, side_effect=AssertionError("unexpected external execution"))
             guard.start()
             self.addCleanup(guard.stop)
+        image_guard = patch.object(cli.preflight, "verify_cached_image", side_effect=lambda image: image)
+        self.verify_image = image_guard.start()
+        self.addCleanup(image_guard.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
@@ -76,11 +79,19 @@ class RealCLITests(unittest.TestCase):
     def approve(self, plan):
         return self.command("approve", "--approve-plan-sha256", plan, "--reference-file", str(self.reference))
 
+    def sandbox_ready(self, plan):
+        with patch.object(cli.preflight, "sandbox", return_value=PASSED) as sandbox:
+            result = self.command("sandbox-check", "--approve-plan-sha256", plan)
+        self.assertEqual(result[0], 0)
+        self.assertEqual(sandbox.call_count, 1)
+        return result
+
     def complete_synthetic(self):
         self.assertEqual(self.prepare()[0], 0)
         archive = self.archive()
         plan = archive.plan()["planSha256"]
         self.assertEqual(self.approve(plan)[0], 0)
+        self.sandbox_ready(plan)
         # Seed an in-memory synthetic result through the transaction seams only.
         # execute/send_once stay patched and are never called by this suite.
         prepared, token = archive._begin(plan, int(time.time()))
@@ -106,6 +117,7 @@ class RealCLITests(unittest.TestCase):
         self.assertNotIn("paidExecutionEnabled", report["plan"])
         self.assertNotIn("readyForPaidExecution", report["plan"])
         self.assertTrue(report["priceWindowValid"])
+        self.assertIsNone(report["sandbox"])
         for private in (TEXT.decode(), "func Greet", str(self.root), "synthetic owner approval"):
             self.assertNotIn(private, output)
         self.assertEqual(self.command("plan")[1]["plan"], report["plan"])
@@ -132,15 +144,17 @@ class RealCLITests(unittest.TestCase):
         self.assertEqual(report["modelCalls"], 0)
         self.assertEqual(report["budget"]["attempts"], 0)
         self.assertTrue(report["paidExecutionEnabled"])
-        self.assertTrue(report["readyForPaidExecution"])
+        self.assertFalse(report["readyForPaidExecution"])
         self.assertNotIn("synthetic owner approval", output)
+        self.assertTrue(self.sandbox_ready(plan)[1]["readyForPaidExecution"])
         self.assertEqual(self.approve(plan)[1]["reason"], "real_approval_already_recorded")
 
     def test_no_key_send_provider_override_or_abbreviated_flags_are_accepted(self):
         secret = "synthetic-value-do-not-echo"
         for args in (("send", "--key", secret), ("prepare", "--api-key", secret),
                      ("inspect", "--root", str(self.root), "--task-id", TASK_ID, "--provider", secret),
-                     ("plan", "--root", str(self.root), "--task-id", TASK_ID, "--show-pay")):
+                     ("plan", "--root", str(self.root), "--task-id", TASK_ID, "--show-pay"),
+                     ("test", "--root", str(self.root), "--task-id", TASK_ID, "--image", secret)):
             code, report, output = self.invoke(*args)
             self.assertEqual(code, 1)
             self.assertEqual(report["reason"], "real_cli_arguments")
@@ -172,6 +186,21 @@ class RealCLITests(unittest.TestCase):
                 self.assertNotIn("synthetic-key-not-a-credential", output)
                 send.assert_not_called()
         self.approve(plan)
+        with patch.object(cli.credentials, "load", side_effect=AssertionError("key read before sandbox")):
+            with patch.object(real.transport, "send_once") as send:
+                self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                              "--key-file", str(self.key_file))[1]["reason"],
+                                 "real_sandbox_not_ready")
+                send.assert_not_called()
+        self.sandbox_ready(plan)
+        with patch.object(cli.preflight, "verify_cached_image",
+                          side_effect=real.Blocked("docker_command_failed")):
+            with patch.object(cli.credentials, "load", side_effect=AssertionError("key read before image check")):
+                with patch.object(real.transport, "send_once") as send:
+                    self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
+                                                  "--key-file", str(self.key_file))[1]["reason"],
+                                     "docker_command_failed")
+                    send.assert_not_called()
         self.key_file.write_bytes(b"bad")
         with patch.object(real.transport, "send_once") as send:
             self.assertEqual(self.command("send", "--approve-plan-sha256", plan,
@@ -196,6 +225,7 @@ class RealCLITests(unittest.TestCase):
         archive = self.archive()
         plan = archive.plan()["planSha256"]
         self.approve(plan)
+        self.sandbox_ready(plan)
         with patch.object(real.transport, "send_once", return_value=self.response(archive)) as send:
             code, report, output = self.command("send", "--approve-plan-sha256", plan,
                                                 "--key-file", str(self.key_file))
@@ -205,6 +235,7 @@ class RealCLITests(unittest.TestCase):
             self.assertTrue(report["modelCallAttempted"])
             self.assertFalse(report["readyForPaidExecution"])
             self.assertEqual(send.call_count, 1)
+            self.verify_image.assert_called_with(PASSED["imageId"])
             self.assertEqual(send.call_args.args[1], "synthetic-key-not-a-credential")
             self.assertNotIn("synthetic-key-not-a-credential", output)
             self.assertNotIn(str(self.key_file), output)
@@ -218,6 +249,7 @@ class RealCLITests(unittest.TestCase):
         archive = self.archive()
         plan = archive.plan()["planSha256"]
         self.approve(plan)
+        self.sandbox_ready(plan)
         with patch.object(real.transport, "send_once",
                           side_effect=real.Blocked("synthetic-key-not-a-credential")) as send:
             code, report, output = self.command("send", "--approve-plan-sha256", plan,
@@ -237,6 +269,7 @@ class RealCLITests(unittest.TestCase):
         self.prepare()
         plan = self.archive().plan()["planSha256"]
         self.approve(plan)
+        self.sandbox_ready(plan)
         inside = self.archive().path / "key"
         inside.write_bytes(b"synthetic-key-not-a-credential")
         linked = self.base / "linked-key"
@@ -247,6 +280,35 @@ class RealCLITests(unittest.TestCase):
                                               "--key-file", str(path))[0], 1)
                 send.assert_not_called()
         self.assertEqual(self.archive().summary()["budget"]["attempts"], 0)
+
+    def test_sandbox_check_binds_archived_baseline_and_does_not_call_model(self):
+        self.prepare()
+        archive = self.archive()
+        plan = archive.plan()["planSha256"]
+        self.assertEqual(self.command("sandbox-check", "--approve-plan-sha256", plan)[1]["reason"],
+                         "real_approval_mismatch")
+        self.approve(plan)
+        failed = {**PASSED, "passed": False, "exitCode": 1}
+        with patch.object(cli.preflight, "sandbox", return_value=failed) as sandbox:
+            code, report, _ = self.command("sandbox-check", "--approve-plan-sha256", plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(report["reason"], "real_sandbox_baseline_failed")
+        self.assertTrue(report["sandboxAttempted"])
+        self.assertTrue(report["sandboxExecuted"])
+        self.assertIsNone(self.archive().sandbox())
+        sandbox.assert_called_once()
+        with patch.object(cli.preflight, "sandbox", return_value=PASSED) as sandbox:
+            code, report, output = self.command("sandbox-check", "--approve-plan-sha256", plan)
+        self.assertEqual(code, 0)
+        self.assertTrue(report["readyForPaidExecution"])
+        self.assertEqual(report["sandbox"]["imageId"], PASSED["imageId"])
+        self.assertEqual(sandbox.call_args.args[0], archive.load()[0])
+        self.assertEqual(sandbox.call_args.args[1:], ("golang:1.22", 90))
+        self.assertNotIn(TEXT.decode(), output)
+        self.assertEqual(report["modelCalls"], 0)
+        self.assertFalse(report["modelCallAttempted"])
+        self.assertEqual(self.command("sandbox-check", "--approve-plan-sha256", plan)[1]["reason"],
+                         "real_sandbox_already_recorded")
 
     def test_strict_price_schema_rejects_duplicates_extra_fields_and_nonfinite(self):
         for raw in (b'{"model":"x","model":"y"}', b'{"rate":NaN}', b'[]',
@@ -346,6 +408,7 @@ class RealCLITests(unittest.TestCase):
             self.assertTrue(report["sandboxExecuted"])
             self.assertEqual(report["candidate"]["evidence"]["state"], "completed")
             self.assertEqual(sandbox.call_args.args[0], self.archive().proposal()[0])
+            self.assertEqual(sandbox.call_args.args[1:], (PASSED["imageId"], 90))
             self.assertEqual(self.command("test", "--approve-candidate-sha256", approval)[0], 1)
             self.assertEqual(sandbox.call_count, 1)
 
@@ -357,6 +420,15 @@ class RealCLITests(unittest.TestCase):
         self.assertFalse(report["checksPassed"])
         self.assertEqual(report["state"], "completed")
         self.assertFalse(report["candidate"]["evidence"]["result"]["passed"])
+
+    def test_candidate_image_digest_mismatch_fails_closed(self):
+        approval = self.complete_synthetic()
+        mismatched = {**PASSED, "imageId": "sha256:" + "c" * 64}
+        with patch.object(cli.preflight, "sandbox", return_value=mismatched):
+            code, report, _ = self.command("test", "--approve-candidate-sha256", approval)
+        self.assertEqual(code, 1)
+        self.assertEqual(report["reason"], "real_sandbox_image_mismatch")
+        self.assertEqual(report["candidate"]["evidence"]["state"], "unknown")
 
     def test_interrupted_sandbox_preserves_unknown_receipt_and_does_not_retry(self):
         approval = self.complete_synthetic()
@@ -373,6 +445,7 @@ class RealCLITests(unittest.TestCase):
         archive = self.archive()
         plan = archive.plan()["planSha256"]
         self.approve(plan)
+        self.sandbox_ready(plan)
         # Use the persisted approval time. A slower CI runner may cross a
         # one-second boundary after setUp, making self.now legitimately older.
         _, token = archive._begin(plan, archive.summary()["approvedAt"])
