@@ -61,3 +61,10 @@
 当前真实小任务的改动应用和隔离测试已经完成。供应商账单仍未核验，网页继续使用 Mock，服务器也未部署本次改动；这些边界不能由命令行案例代替。
 
 应用候选后的提交前检查中，固定版本 `govulncheck` 未发现代码可达漏洞，仓库级 `scripts/verify.ps1` 完整通过，包括 Go 测试与构建、迁移检查、23 项前端测试和 Vite 构建。脚本层快速集合在本机 Windows 运行 226 项，其中 223 项通过、2 项平台跳过，`test_real_hung_child_is_reaped_within_supervised_deadline` 因耗时约 30 秒而未满足 10 秒限制；单项复核结果相同。该 HTTPS 子进程模块未被本轮修改，PR #74 的 Linux CI 中同一集合通过，但新 PR 仍必须等待自己的 GitHub CI，不能把历史 CI 当作本次通过。
+
+候选应用随后经 PR #75 合并为 `4403323`。本次 PR 的 Go verification、Web verification、PostgreSQL integration 和 deployment-assets `validate` 四项检查全部成功；Linux `validate` 实际运行了完整 preview demo 脚本集合，因此本机 Windows 的子进程回收时限失败没有在合并门禁中复现。该结论只解决平台测试证据，不改变“费用仍是估算、服务器未部署、网页仍为 Mock”的边界。
+
+## 剩余人工证据
+
+- 在 DeepSeek 控制台核对本次调用对应的实际扣费；只记录金额和核对日期，不提交账户截图、余额、请求明细、密钥或其他任务数据。
+- 按 [5 分钟演示稿](preview-demo-walkthrough.md) 实际排练网页 Mock 流程与独立真实案例讲解，并填写第 6 节；不能用此前笼统的“全部成功”代替逐项演练记录。
