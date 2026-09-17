@@ -1,5 +1,11 @@
 package greeting
 
+import "strings"
+
 func Greet(name string) string {
-	return "Hello, " + name + "!"
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return "Hello, guest!"
+	}
+	return "Hello, " + trimmed + "!"
 }
