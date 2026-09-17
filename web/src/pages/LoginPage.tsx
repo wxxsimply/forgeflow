@@ -37,13 +37,13 @@ export function LoginPage() {
       <section className="login-story" aria-label="ForgeFlow 产品介绍">
         <div className="brand brand--light"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>可控交付</small></span></div>
         <div className="login-story__content">
-          <span className="eyebrow">可控的自动化协作</span>
-          <h1>每一步智能体行动，<br />清晰可见，尽在掌控。</h1>
-          <p>从计划到审查，所有执行都经过策略、证据和人工门禁。</p>
+          <span className="eyebrow">公开预览 · 模拟流程</span>
+          <h1>把任务放进<br />可审查、可恢复的流程。</h1>
+          <p>当前网页展示模拟（Mock）规划、人工审批和审计记录，不会从网页调用真实模型或修改源码。</p>
           <div className="flow-line" aria-hidden="true"><i className="done" /><span /><i className="done" /><span /><i className="active" /><span /><i /></div>
-          <div className="flow-labels" aria-hidden="true"><span>规划</span><span>构建</span><span>审查</span><span>交付</span></div>
+          <div className="flow-labels" aria-hidden="true"><span>任务</span><span>规划</span><span>审批</span><span>记录</span></div>
         </div>
-        <small className="login-story__foot">安全内建 · 人工掌控</small>
+        <small className="login-story__foot">流程演示不等于生产自动执行</small>
       </section>
       <section className="login-panel">
         <form className="login-card" onSubmit={submit} aria-describedby={error ? formErrorId : undefined}>

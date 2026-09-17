@@ -86,6 +86,8 @@ describe('governed workflow pages', () => {
   it('creates a run with repository, budget and a stable idempotency key', async () => {
     const user = userEvent.setup();
     renderApp('/runs/new');
+    expect(await screen.findByRole('complementary', { name: '本页创建模拟规划任务' })).toHaveTextContent('不会修改仓库、运行测试或产生模型费用');
+    expect(screen.getByRole('complementary', { name: '默认配置上限（当前预览不消耗）' })).toHaveTextContent('不会授权或触发真实调用');
     await user.selectOptions(await screen.findByLabelText('仓库'), '00000000-0000-4000-8000-000000000030');
     await user.type(screen.getByLabelText('任务描述'), '增加重复提交保护');
     await user.clear(screen.getByLabelText('最大迭代次数'));

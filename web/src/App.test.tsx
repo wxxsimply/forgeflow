@@ -38,6 +38,7 @@ describe('authentication shell', () => {
     vi.mocked(api.login).mockResolvedValue(viewer);
     const user = userEvent.setup();
     renderApp('/login?next=https%3A%2F%2Fevil.example%2Fsteal');
+    expect(await screen.findByText(/不会从网页调用真实模型或修改源码/)).toBeInTheDocument();
     await user.type(await screen.findByLabelText('邮箱'), 'viewer@example.com');
     await user.type(screen.getByLabelText('密码'), 'viewer secure password');
     await user.click(screen.getByRole('button', { name: '登录' }));
@@ -65,6 +66,9 @@ describe('authentication shell', () => {
     vi.mocked(api.getCurrentUser).mockResolvedValue(viewer);
     renderApp('/runs');
     expect(await screen.findByText('为订单接口增加幂等保护')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '先看清当前公开预览能做什么' })).toBeInTheDocument();
+    expect(screen.getByText(/一次真实模型改代码案例已由独立命令行流程完成/)).toBeInTheDocument();
+    expect(screen.getByText(/网页真实模型调用、自动修改源码、生产发布和批量评测/)).toBeInTheDocument();
     expect(screen.getByText('只读用户')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /创建|审批|取消/ })).not.toBeInTheDocument();
   });

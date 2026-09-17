@@ -19,8 +19,23 @@ export function AppShell() {
       </nav>
       <div className="sidebar__footer"><span className="environment"><i /> 控制台已连接</span><span>交付管理控制台</span></div>
     </aside>
-    <div className="app-content"><header className="topbar"><div><span className="eyebrow">工作空间</span><strong>交付控制台</strong></div><div className="user-menu"><span className={`role role--${user?.role}`}>{roleLabel(user?.role)}</span><span className="user-menu__email">{user?.email}</span><button type="button" className="text-button" onClick={handleLogout}>退出</button></div></header><main className="main-content"><Outlet /></main></div>
+    <div className="app-content">
+      <header className="topbar"><div><span className="eyebrow">工作空间</span><strong>交付控制台</strong></div><div className="user-menu"><span className={`role role--${user?.role}`}>{roleLabel(user?.role)}</span><span className="user-menu__email">{user?.email}</span><button type="button" className="text-button" onClick={handleLogout}>退出</button></div></header>
+      <PreviewScopeNotice />
+      <main className="main-content"><Outlet /></main>
+    </div>
   </div>;
+}
+
+function PreviewScopeNotice() {
+  return <section className="preview-scope" aria-labelledby="preview-scope-title">
+    <div className="preview-scope__title"><span className="eyebrow">能力边界</span><h2 id="preview-scope-title">先看清当前公开预览能做什么</h2></div>
+    <div className="preview-scope__items">
+      <article><strong>网页当前可做</strong><p>创建模拟（Mock）规划任务、人工批准或拒绝，并查看状态与审计记录。</p></article>
+      <article><strong>真实案例在哪里</strong><p>一次真实模型改代码案例已由独立命令行流程完成；本网页不会触发它。</p></article>
+      <article><strong>尚未启用</strong><p>网页真实模型调用、自动修改源码、生产发布和批量评测。</p></article>
+    </div>
+  </section>;
 }
 
 function PlusIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" /></svg>; }
