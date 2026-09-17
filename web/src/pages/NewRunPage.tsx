@@ -57,7 +57,12 @@ export function NewRunPage() {
 
   return <div className="page narrow-page">
     <Link className="back-link" to="/runs">← 返回任务列表</Link>
-    <div className="page-heading"><div><span className="eyebrow">受控执行</span><h1>创建任务</h1><p>选择受控仓库，描述任务，并确认本次执行预算。</p></div></div>
+    <div className="page-heading"><div><span className="eyebrow">模拟规划与审批</span><h1>创建任务</h1><p>选择受控仓库并描述任务；本页不会启动真实模型或代码执行。</p></div></div>
+    <aside className="scope-callout" aria-labelledby="run-scope-title">
+      <span className="eyebrow">提交后会发生什么</span>
+      <strong id="run-scope-title">本页创建模拟规划任务</strong>
+      <p>你可以检查计划、批准或拒绝并查看记录；系统不会修改仓库、运行测试或产生模型费用。页面中的预算仅展示配置上限，不是付款或真实调用授权。</p>
+    </aside>
     <form className="panel form-panel" onSubmit={submitRun}>
       <div className="form-section">
         <div className="section-number">01</div><div className="form-section__body">
@@ -90,8 +95,9 @@ export function NewRunPage() {
           <label htmlFor="base-revision">基线版本（可选）</label><input id="base-revision" value={baseRevision} onChange={(event) => setBaseRevision(event.target.value)} placeholder="留空使用仓库默认基线" />
           <label htmlFor="max-iterations">最大迭代次数</label><input id="max-iterations" type="number" min={1} max={10} value={maxIterations} onChange={(event) => setMaxIterations(Number(event.target.value))} />
         </div>
-        <aside className="budget-card" aria-label="默认安全预算">
-          <span className="eyebrow">执行预算</span><strong>最多 {maxIterations} 次迭代</strong>
+        <aside className="budget-card" aria-label="默认配置上限（当前预览不消耗）">
+          <span className="eyebrow">配置上限</span><strong>当前为模拟流程</strong>
+          <p className="budget-card__note">最多 {maxIterations} 次流程迭代；以下限制不会授权或触发真实调用。</p>
           <ul><li>模型调用 20 次</li><li>工具调用 200 次</li><li>改动文件 32 个</li><li>差异 4,000 行 / 1 MiB</li><li>预计成本上限 $10</li><li>最长 30 分钟</li></ul>
         </aside>
       </div>
