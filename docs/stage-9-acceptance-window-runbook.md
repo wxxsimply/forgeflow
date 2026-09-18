@@ -11,7 +11,7 @@
 
 ## 2. 冻结私有验收计划
 
-本次重新进入状态校正 PR 合并且四项必需检查通过后，由发布负责人手动更新本地主分支。随后选定新的完整 40 位候选 SHA；冻结后不得再混入其他仓库变更，否则必须重新选定 SHA 并使受影响证据失效：
+私有计划初始化器 PR 合并且四项必需检查通过后，由发布负责人手动更新本地主分支。初始化器会绑定当前完整 40 位 HEAD；冻结后不得再混入其他仓库变更，否则必须重新生成计划并使受影响证据失效：
 
 ```powershell
 git switch main
@@ -20,14 +20,26 @@ git status --short
 git rev-parse HEAD
 ```
 
-只有工作区干净时才能复制模板。填充后的计划包含内部记录 ID、供应链身份和环境地址，只能留在已忽略的 `.forgeflow/acceptance`：
+只有已跟踪工作区干净时才能创建计划。先从私有记录系统把下列值读入当前 PowerShell 会话变量，再运行初始化器；不要把变量赋值、内部记录 ID 或环境地址写入仓库文件：
 
 ```powershell
-New-Item -ItemType Directory -Force .forgeflow/acceptance/1.0.0
-Copy-Item deploy/release/stage-9-acceptance-plan.template.json .forgeflow/acceptance/1.0.0/plan.json
+$planInputs = @{
+  StagingBaseUri = $stagingBaseUri
+  SignerIdentity = $signerIdentity
+  OidcIssuer = $oidcIssuer
+  OnCallRosterRecordId = $onCallRosterRecordId
+  SecurityReviewerRecordId = $securityReviewerRecordId
+  EvalDataScopeRecordId = $evalDataScopeRecordId
+  EvalBudgetRecordId = $evalBudgetRecordId
+  MaxEvalCostUsd = $maxEvalCostUsd
+  ReleaseApprovalRecordId = $releaseApprovalRecordId
+}
+& ./scripts/initialize-stage-9-acceptance-plan.ps1 @planInputs
 ```
 
-人工填写以下冻结项，不得把 Secret 写入计划：
+初始化器默认使用计划中现有的 Fixture/Grader SHA、`developer/v4`、DeepSeek 模型配置和 GHCR；若这些值已经变化，必须通过对应可选参数显式覆盖并重新评审。输出固定在已忽略的 `.forgeflow/acceptance/1.0.0/plan.json`；已有文件、越界路径、未忽略路径、脏的已跟踪工作区、占位符或无效计划都会失败关闭，脚本不会自动覆盖旧私有计划。
+
+初始化器仍要求人工从私有记录提供以下冻结项，不得把 Secret 写入计划：
 
 - 精确 ForgeFlow、Fixture 和 Private Grader 40 位 commit；
 - Prompt、Provider、模型、Reasoning、Policy、Tool 和 Migration 版本；

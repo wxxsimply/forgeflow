@@ -31,6 +31,10 @@ jobs:
         shell: pwsh
         run: ./scripts/stage-9-acceptance-preflight.ps1 -SkipEngineeringValidators
 
+      - name: Validate stage 9 acceptance plan initializer
+        shell: pwsh
+        run: ./scripts/test-stage-9-plan-initializer.ps1
+
       - name: Validate backup and restore shell syntax
         shell: bash
         run: |

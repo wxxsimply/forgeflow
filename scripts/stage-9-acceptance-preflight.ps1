@@ -100,12 +100,14 @@ function Assert-PlanShape {
 $runbookPath = Join-Path $workspace 'docs/stage-9-acceptance-window-runbook.md'
 $summaryTemplatePath = Join-Path $workspace 'release-reports/stage-9-acceptance-summary-template.md'
 $auditPath = Join-Path $workspace 'docs/stage-9-acceptance-preflight-audit.md'
-foreach ($requiredPath in @($runbookPath, $summaryTemplatePath, $auditPath)) {
+$initializerPath = Join-Path $PSScriptRoot 'initialize-stage-9-acceptance-plan.ps1'
+$initializerTestPath = Join-Path $PSScriptRoot 'test-stage-9-plan-initializer.ps1'
+foreach ($requiredPath in @($runbookPath, $summaryTemplatePath, $auditPath, $initializerPath, $initializerTestPath)) {
     Assert-Acceptance (Test-Path -LiteralPath $requiredPath -PathType Leaf) "Missing stage 9 acceptance asset: $requiredPath"
 }
 $runbook = Get-Content -Raw -LiteralPath $runbookPath
 $summaryTemplate = Get-Content -Raw -LiteralPath $summaryTemplatePath
-foreach ($contract in @('candidate-smoke', 'formal-eval', 'image-supply-chain', 'governance-drill', 'load-recovery', 'final-go-no-go', 'P8-001', 'NO-GO')) {
+foreach ($contract in @('initialize-stage-9-acceptance-plan.ps1', 'candidate-smoke', 'formal-eval', 'image-supply-chain', 'governance-drill', 'load-recovery', 'final-go-no-go', 'P8-001', 'NO-GO')) {
     Assert-Acceptance ($runbook.Contains($contract)) "Stage 9 runbook is missing contract: $contract"
 }
 foreach ($contract in @('Candidate smoke', 'Formal Eval', 'Private Grader', 'Independent Security Reviewer', 'GO/NO-GO', '私有 Evidence SHA-256')) {
