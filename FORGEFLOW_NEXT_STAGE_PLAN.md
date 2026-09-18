@@ -174,7 +174,7 @@
 - 正式生产镜像签名、安全复核、值班与发布签署。
 - 新增多智能体角色、大规模知识库等非必要功能。
 
-未来重新启动这些任务时，回到 [正式剩余执行计划](FORGEFLOW_REMAINING_EXECUTION_PLAN.md) 和 [原路线图](FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)，重新确认版本、授权、预算和验收条件。本计划不降低正式发布标准。
+未来重新启动这些任务时，先使用 [3 阶段任务](3阶段任务.md) 查看重新审查后的压缩执行顺序，再回到 [正式剩余执行计划](FORGEFLOW_REMAINING_EXECUTION_PLAN.md) 和 [原路线图](FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md) 核对详细门禁，重新确认版本、授权、预算和验收条件。本计划不降低正式发布标准。
 
 ## 9. 每轮结束必须交代什么
 
@@ -184,4 +184,4 @@
 - 结果对应哪个提交或待提交工作区，服务器是否更新。
 - 下一步需要用户做哪一个具体操作。
 
-下一步：人工提交当前 `codex/stage-9-private-plan-handoff` 分支并创建 PR，不需要部署、私有值或付费调用。PR #83 已合并为 `9ad2725d5b761cf59906e7b069b44d9f1b8c2e32`，Go verification、Web verification、PostgreSQL integration 和 deployment-assets `validate` 四项检查全部成功；本分支只把计划、审计与 Runbook 从“初始化器待合并”校正为“私有输入待收集”，并明确当前不得用示例值、开发分支或短 SHA 代填 Freeze 计划。该 PR 合并且 CI 成功后，在干净 `main` 上从仓库外准备 Staging HTTPS origin、签名/OIDC 身份、值班与独立安全复核记录、Eval 数据范围及费用上限等私有输入，再运行初始化器并由其绑定完整 HEAD；未完成私有计划预检和单独付费授权前，不得启动候选 smoke。
+下一步：人工提交当前 `codex/three-stage-task-plan` 分支并创建 PR，不需要部署、私有值或付费调用。PR #84 已合并为 `38a10120e0e365c984fe72885c85aa4b6594b4e6`，四项必需 CI 全部成功；重新审查确认个人预览和主体工程已完成，但 `v1.0.0` / Production 尚未完成。新增 `3阶段任务.md` 将剩余工作按原 11 个串行门禁压缩为“发布代码收口、候选冻结与正式 Eval”“不可变镜像与真实 Staging”“运维恢复、Go/No-Go 与发布”三个阶段，不降低既有验收标准。该 PR 合并且 CI 成功后，先从 Production 对象存储适配器开始阶段一的仓库能力收口；所有计划内代码 PR 合并后才能重新生成并预检私有 Freeze 计划，未完成预检和单独付费授权前不得启动候选 smoke。
