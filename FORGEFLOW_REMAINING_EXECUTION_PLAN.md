@@ -9,7 +9,7 @@
 >
 > 最近一次阶段 9 工程修复基线：`0cf6ded008d8bba4f7f7bc1ff4f391131467739f`（PR #38）
 >
-> 当前主线参考：`7ff279e`（PR #78 合并后）；它不是最终冻结候选，本次重新进入 PR 合并后仍需人工选定完整 40 位 SHA
+> 当前主线参考：`a45198a`（PR #82 合并后）；它不是最终冻结候选，本次初始化器 PR 合并后仍需由脚本绑定新的完整 40 位 SHA
 >
 > 当前状态：阶段 9 停在 Freeze 门禁前，尚未达到 Production Go 或 GitHub Release 条件
 
@@ -113,12 +113,13 @@
 
 #### 可自动完成
 
+- [x] 提供默认拒绝覆盖的私有计划初始化器：只允许写入已被 Git 忽略的 `.forgeflow/acceptance`，自动绑定当前完整 HEAD，并在原子落盘前运行填充计划预检；CI 覆盖成功、重复覆盖和越界路径。
 - [ ] 把已知 SHA、Prompt、模型、Policy、Tool、Migration 和 Registry 写入私有计划。
 - [ ] 校验计划路径位于 `.forgeflow/acceptance/1.0.0/` 且被 Git 忽略。
 - [ ] 校验所有冻结值完整、当前 HEAD 一致、三个仓库干净。
 - [x] 2026-09-18 重新运行阶段 5～9 静态工程契约检查；完整模式与 `-SkipEngineeringValidators` CI 去重模式均通过。该结果不代替填充私有计划后的预检。
 
-执行命令：
+初始化器参数与用法见 [阶段 9 集中验收窗口手册](docs/stage-9-acceptance-window-runbook.md)。初始化器成功时已经运行以下只读填充计划预检，也可再次独立执行：
 
 ```powershell
 pwsh ./scripts/stage-9-acceptance-preflight.ps1 `
