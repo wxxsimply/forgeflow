@@ -5,13 +5,13 @@
 
 ## 1. 当前第一个阻断点
 
-`developer/v4` 在 2026-09-09 的付费 smoke 中通过 JSON 解码和变更集校验，但在 `git apply --check` 阶段以 `corrupt patch at line 21` 失败；`developer/v1` 同一 Case 也以 `corrupt patch at line 39` 失败。执行器已准备仅修正换行、空白上下文前缀和 hunk 数量的安全规范化，但该修复必须先合并，再由新的干净 SHA smoke 证明有效。详见 `release-reports/stage-9-v4-smoke-review.md`。
+`developer/v4` 在 2026-09-09 的付费 smoke 中通过 JSON 解码和变更集校验，但在 `git apply --check` 阶段以 `corrupt patch at line 21` 失败；`developer/v1` 同一 Case 也以 `corrupt patch at line 39` 失败。执行器的安全 unified diff 规范化已经随 PR #38 合并，但尚未由新的干净候选 SHA smoke 证明有效。详见 `release-reports/stage-9-v4-smoke-review.md`。
 
 因此，阶段 9 必须先从最终候选 SHA 运行 1 Case × 2 Prompt 的候选 smoke。只要出现补丁预检失败、超时、结构错误、数据范围不符或预算不足，就停止；不得启动 180 Observation 正式对照，也不得把旧 smoke 当作通过证据。
 
 ## 2. 冻结私有验收计划
 
-阶段 9 准备 PR 合并且四项必需检查通过后，由发布负责人手动更新本地主分支：
+本次重新进入状态校正 PR 合并且四项必需检查通过后，由发布负责人手动更新本地主分支。随后选定新的完整 40 位候选 SHA；冻结后不得再混入其他仓库变更，否则必须重新选定 SHA 并使受影响证据失效：
 
 ```powershell
 git switch main

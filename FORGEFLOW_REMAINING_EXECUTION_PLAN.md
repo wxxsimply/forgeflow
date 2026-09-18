@@ -3,10 +3,15 @@
 > 当前执行方式已调整为个人预览。近期任务以 `FORGEFLOW_PERSONAL_PREVIEW_PLAN.md` 为准；本文保留为未来升级到正式 Production 时的完整验收计划。
 
 
-> 制定日期：2026-09-09  
+> 制定日期：2026-09-09；重新进入核对：2026-09-18
+>
 > 当前发布目标：`v1.0.0`  
-> 当前 ForgeFlow 基线：`0cf6ded008d8bba4f7f7bc1ff4f391131467739f`  
-> 当前状态：阶段 9 进行中，尚未达到 Production Go 或 GitHub Release 条件
+>
+> 最近一次阶段 9 工程修复基线：`0cf6ded008d8bba4f7f7bc1ff4f391131467739f`（PR #38）
+>
+> 当前主线参考：`7ff279e`（PR #78 合并后）；它不是最终冻结候选，本次重新进入 PR 合并后仍需人工选定完整 40 位 SHA
+>
+> 当前状态：阶段 9 停在 Freeze 门禁前，尚未达到 Production Go 或 GitHub Release 条件
 
 ## 1. 文档目的
 
@@ -40,7 +45,7 @@
 ### 2.3 尚未完成
 
 - [ ] 填充并通过私有阶段 9 验收计划预检。
-- [ ] 从 PR #38 合并 SHA 重跑 2 Observation 候选 smoke。
+- [ ] 从本次重新进入 PR 合并后人工批准的干净 `main` SHA 重跑 2 Observation 候选 smoke。
 - [ ] 完成 180 Observation 正式候选 Eval。
 - [ ] 人工完成 Prompt/模型 Promotion 决策和 rollback 演练。
 - [ ] 构建、扫描、签名并上传五类不可变镜像。
@@ -55,7 +60,7 @@
 
 | 项目 | 当前值 | 状态 |
 |---|---|---|
-| ForgeFlow commit | `0cf6ded008d8bba4f7f7bc1ff4f391131467739f` | 已确定 |
+| ForgeFlow commit | 待从本次重新进入 PR 合并后的干净 `main` 选定完整 40 位 SHA | 阻断 |
 | Fixture commit | `6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f` | 已确定 |
 | Grader commit | `5942ec84d403e37385203b4c7851d1b92573548a` | 已确定 |
 | Baseline Prompt | `developer/v1` | 已确定 |
@@ -111,7 +116,7 @@
 - [ ] 把已知 SHA、Prompt、模型、Policy、Tool、Migration 和 Registry 写入私有计划。
 - [ ] 校验计划路径位于 `.forgeflow/acceptance/1.0.0/` 且被 Git 忽略。
 - [ ] 校验所有冻结值完整、当前 HEAD 一致、三个仓库干净。
-- [ ] 运行阶段 5～9 静态工程契约检查。
+- [x] 2026-09-18 重新运行阶段 5～9 静态工程契约检查；完整模式与 `-SkipEngineeringValidators` CI 去重模式均通过。该结果不代替填充私有计划后的预检。
 
 执行命令：
 
