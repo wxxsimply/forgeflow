@@ -184,4 +184,4 @@
 - 结果对应哪个提交或待提交工作区，服务器是否更新。
 - 下一步需要用户做哪一个具体操作。
 
-下一步：人工提交当前 `codex/stage-9-plan-initializer` 分支并创建 PR，不需要部署、私有值或付费调用。PR #82 已合并且四项 CI 全部成功；本分支新增默认拒绝覆盖的阶段 9 私有计划初始化器、成功/覆盖/越界回归测试和 deployment-assets CI 门禁，并同步计划、审计与 Runbook。初始化器只允许写入 Git 忽略目录，自动绑定完整 HEAD，并在原子落盘前执行填充计划预检。本地干净临时克隆集成测试、两种阶段 9 静态预检和仓库级 `scripts/verify.ps1` 均通过。该 PR 合并且 CI 成功后，在干净 `main` 上准备仓库外私有输入并运行初始化器；未完成私有计划预检和单独付费授权前，不得启动候选 smoke。
+下一步：人工提交当前 `codex/stage-9-private-plan-handoff` 分支并创建 PR，不需要部署、私有值或付费调用。PR #83 已合并为 `9ad2725d5b761cf59906e7b069b44d9f1b8c2e32`，Go verification、Web verification、PostgreSQL integration 和 deployment-assets `validate` 四项检查全部成功；本分支只把计划、审计与 Runbook 从“初始化器待合并”校正为“私有输入待收集”，并明确当前不得用示例值、开发分支或短 SHA 代填 Freeze 计划。该 PR 合并且 CI 成功后，在干净 `main` 上从仓库外准备 Staging HTTPS origin、签名/OIDC 身份、值班与独立安全复核记录、Eval 数据范围及费用上限等私有输入，再运行初始化器并由其绑定完整 HEAD；未完成私有计划预检和单独付费授权前，不得启动候选 smoke。

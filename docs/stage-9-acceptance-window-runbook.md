@@ -1,9 +1,11 @@
 # ForgeFlow 阶段 9 集中验收窗口手册
 
-> 状态：执行入口已准备；真实验收尚未开始
+> 状态：初始化器已随 PR #83 合并；私有 Freeze 输入尚未齐备，真实验收尚未开始
 > 原则：按门禁串行执行，前一步未通过时不得启动后一步
 
-## 1. 当前第一个阻断点
+## 1. Freeze 前置与候选 smoke 技术阻断
+
+当前操作阻断是 Staging HTTPS origin、签名/OIDC 身份、值班与独立安全复核记录、Eval 数据范围和费用上限等私有 Freeze 输入尚未提供。不得用示例值、短 SHA 或当前开发分支代填，也不得因此跳过 Freeze 直接启动付费 smoke。
 
 `developer/v4` 在 2026-09-09 的付费 smoke 中通过 JSON 解码和变更集校验，但在 `git apply --check` 阶段以 `corrupt patch at line 21` 失败；`developer/v1` 同一 Case 也以 `corrupt patch at line 39` 失败。执行器的安全 unified diff 规范化已经随 PR #38 合并，但尚未由新的干净候选 SHA smoke 证明有效。详见 `release-reports/stage-9-v4-smoke-review.md`。
 
@@ -11,7 +13,7 @@
 
 ## 2. 冻结私有验收计划
 
-私有计划初始化器 PR 合并且四项必需检查通过后，由发布负责人手动更新本地主分支。初始化器会绑定当前完整 40 位 HEAD；冻结后不得再混入其他仓库变更，否则必须重新生成计划并使受影响证据失效：
+PR #83 已合并私有计划初始化器且四项必需检查全部成功。本次状态交接 PR 合并后，由发布负责人手动更新本地主分支；初始化器会绑定当时的完整 40 位 HEAD。冻结后不得再混入其他仓库变更，否则必须重新生成计划并使受影响证据失效：
 
 ```powershell
 git switch main
