@@ -1,6 +1,6 @@
 # 阶段 9 集中验收预检审计
 
-> 状态：重新进入检查完成；仍停在私有 Freeze 门禁前
+> 状态：初始化器已合并；仍停在私有输入收集和 Freeze 门禁前
 > 日期：2026-09-08；重新核对：2026-09-18
 
 ## 已完成
@@ -9,6 +9,7 @@
 - PR #38 已合并安全 unified diff 规范化与回归测试，合并提交为 `0cf6ded008d8bba4f7f7bc1ff4f391131467739f`；该修复尚未由新的付费候选 smoke 验证。
 - PR #78 已合并个人预览能力边界文案，四项必需 CI 全部成功。
 - PR #82 已合并阶段 9 重新进入状态校正，四项必需 CI 全部成功；本轮初始化器开发起点为 `a45198a`。该短 SHA 只用于说明起点，不是最终冻结候选。
+- PR #83 已合并私有计划初始化器，合并提交为 `9ad2725d5b761cf59906e7b069b44d9f1b8c2e32`；Go verification、Web verification、PostgreSQL integration 和 deployment-assets `validate` 四项检查全部成功。
 - 新增不含凭据的 `forgeflow.acceptance-plan/v1` 模板，固定 11 个串行门禁、负责人角色、超时、依赖和私有 Evidence 路径。
 - 新增默认只读的阶段 9 预检，统一调用阶段 5～8 工程契约校验，并能校验填充计划必须位于 Git 忽略目录、无占位符、绑定当前干净 HEAD。
 - 新增集中验收窗口手册和公开脱敏摘要模板。
@@ -28,11 +29,11 @@
 
 ## 当前阻断
 
-1. 私有计划初始化器尚待人工提交和 PR 合并；合并后必须在干净 `main` 上运行，让脚本绑定最终候选 40 位 SHA，不能把当前分支或短 SHA 预先写入私有冻结计划。
+1. 本次合并状态与私有输入交接校正尚待人工提交和 PR 合并；合并后必须在干净 `main` 上运行初始化器，让脚本绑定最终候选 40 位 SHA，不能把当前分支、`9ad2725` 或其他短 SHA 预先写入私有冻结计划。
 2. `developer/v1` 与 `developer/v4` 的旧 smoke 均出现 `patch_check` 损坏；规范化修复已进入主线，但尚未由新候选 smoke 验证。
 3. 费用/数据授权记录、独立评审人、值班、Registry、Staging 和 Production 私有配置尚未填入本地验收计划。
 4. `P8-001`～`P8-007` 仍全部是 Production Go 阻断项。
 
 ## 下一人工节点
 
-仓库所有者审核并合并私有计划初始化器 PR。四项必需检查成功后，在仓库外准备 Staging HTTPS origin、签名身份、OIDC issuer、值班与独立安全复核记录、Eval 数据范围和费用上限记录；从干净的新 `main` 运行 `initialize-stage-9-acceptance-plan.ps1`，由脚本绑定完整 HEAD、生成私有计划并执行预检。只有预检通过且当次付费/数据范围授权仍有效时，才能另行明确授权使用新 Campaign 重跑候选 smoke。
+仓库所有者审核并合并本次状态交接 PR。四项必需检查成功后，在仓库外准备 Staging HTTPS origin、签名身份、OIDC issuer、值班与独立安全复核记录、Eval 数据范围和费用上限记录；从干净的新 `main` 运行 `initialize-stage-9-acceptance-plan.ps1`，由脚本绑定完整 HEAD、生成私有计划并执行预检。只有预检通过且当次付费/数据范围授权仍有效时，才能另行明确授权使用新 Campaign 重跑候选 smoke。
