@@ -33,7 +33,7 @@
 | SSRF/元数据访问 | 内网凭据泄漏 | API 无出口；Sandbox 无网络；Worker Base URL 由运维配置 | 网络策略演练 |
 | 告警 webhook 泄漏 | 事故通道被滥用 | `url_file` Secret，仅 Alertmanager 可读；告警不含任务正文 | Compose 检查 |
 | 资源耗尽 | 队列阻塞或费用失控 | Run/Token/Tool/Diff/容器预算、限速、队列告警 | 预算与负载测试 |
-| 管理员账号接管 | 数据导出/删除、Promotion 或 IAM 被滥用 | 上游 IAP 或应用 MFA、最小权限、短 Session、Break-glass 告警 | 管理员 MFA 与撤销演练 |
+| 管理员账号接管 | 数据导出/删除、Promotion 或 IAM 被滥用 | 应用内管理员 TOTP、恢复码摘要、防重放、受限 Session、最小权限、短 Session、Break-glass 告警 | 管理员 MFA、旁路拒绝与撤销演练 |
 | 审计删除或抵赖 | 无法确定操作者和事故范围 | 外部 append-only 后端、工作负载身份、时间同步、删除保护 | 篡改/查询恢复演练 |
 | 删除/导出越权 | 数据泄漏或跨租户删除 | owner scope、幂等 Job、双人确认、短时下载、删除清单 | 导出/删除 IDOR 与恢复测试 |
 | 数据跨境或子处理者漂移 | 违反用户告知、合同或数据驻留 | Region allowlist、子处理者登记、配置门禁和版本化隐私政策 | 配置与登记审计 |
@@ -42,7 +42,7 @@
 
 - `P8-001`：S3 适配器、逐 Run 迁移和补偿恢复代码已准备；真实 Bucket/IAM/KMS、版本/生命周期、权限、迁移一致性与恢复验证尚未完成。
 - `P8-002`：Compose Worker 仍与控制面同机；Production 专用 Worker/Sandbox 节点池和网络策略尚未部署。
-- `P8-003`：应用没有内建管理员 MFA；上线前必须由批准的 IAP 强制 MFA 或实现应用 MFA。
+- `P8-003`：应用内管理员 TOTP 工程基础已实现；Operator MFA、真实 HTTPS Staging、独立安全评审、密钥轮换和 break-glass 尚未验收。
 - `P8-004`：OTel/审计仍未接入外部 append-only、删除保护的 Production 后端。
 - `P8-005`：云厂商、Region、数据驻留和子处理者尚未批准。
 - `P8-006`：阶段 3 三基线已完成并获签署，但候选正式 Eval、完整镜像证据、Production 负载/RPO/RTO 和故障切换仍未执行。

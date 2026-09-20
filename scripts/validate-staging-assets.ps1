@@ -31,6 +31,9 @@ foreach ($variable in @('FORGEFLOW_API_IMAGE', 'FORGEFLOW_WORKER_IMAGE', 'FORGEF
     Assert-StagingAsset ($compose.Contains("${$variable:?$variable is required}")) "Compose does not require $variable"
 }
 Assert-StagingAsset ($compose -match 'FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES') 'Worker governance readiness gate is missing'
+foreach ($contract in @('FORGEFLOW_ADMIN_MFA_REQUIRED', 'FORGEFLOW_MFA_ENCRYPTION_KEY_FILE', 'mfa_encryption_key')) {
+    Assert-StagingAsset ($compose.Contains($contract)) "Staging Compose is missing administrator MFA contract: $contract"
+}
 
 $openAICompose = Get-Content -Raw -LiteralPath (Join-Path $workspace 'deploy/staging/compose.openai.yaml')
 Assert-StagingAsset ($openAICompose.Contains('${DOCKER_DIND_IMAGE:?DOCKER_DIND_IMAGE is required}')) 'OpenAI overlay must require a digest-pinned DIND image'
@@ -43,6 +46,7 @@ foreach ($variable in @('FORGEFLOW_API_IMAGE', 'FORGEFLOW_WORKER_IMAGE', 'FORGEF
 }
 Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_GIT_COMMIT=<approved-40-character-git-sha>$') 'Staging template must bind the approved Git SHA'
 Assert-StagingAsset ($environmentTemplate -match 'FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL') 'Staging template must document the one-time bootstrap email'
+Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_ADMIN_MFA_REQUIRED=true$') 'Staging template must fail closed on administrator MFA'
 
 $releaseScript = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'staging-release.ps1')
 foreach ($contract in @('$Manifest', '-RequireDigests', '--no-build', 'staging-preflight.ps1', 'FORGEFLOW_SANDBOX_IMAGE')) {

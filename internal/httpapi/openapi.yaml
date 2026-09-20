@@ -50,6 +50,33 @@ paths:
         - {$ref: '#/components/parameters/SessionId'}
         - {$ref: '#/components/parameters/CSRF'}
       responses: {'204': {description: Revoked}, '404': {$ref: '#/components/responses/Error'}}
+  /account/mfa:
+    get:
+      operationId: getMFAStatus
+      description: Available to an administrator session that is restricted pending MFA enrollment.
+      responses:
+        '200': {description: Administrator MFA state, content: {application/json: {schema: {$ref: '#/components/schemas/MFAStatus'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+  /account/mfa/setup:
+    post:
+      operationId: setupMFA
+      description: Re-verifies the current administrator password and creates a ten-minute TOTP enrollment secret.
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MFASetupRequest'}}}}
+      responses:
+        '201': {description: Pending TOTP enrollment, content: {application/json: {schema: {$ref: '#/components/schemas/MFAEnrollment'}}}}
+        '401': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /account/mfa/confirm:
+    post:
+      operationId: confirmMFA
+      description: Enables TOTP, elevates the current session, revokes other sessions, and returns recovery codes once.
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MFAConfirmRequest'}}}}
+      responses:
+        '200': {description: MFA enabled and recovery codes issued, content: {application/json: {schema: {$ref: '#/components/schemas/MFAConfirmation'}}}}
+        '401': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
   /account/exports:
     post:
       operationId: createUserDataExport
@@ -344,12 +371,14 @@ components:
     User:
       type: object
       additionalProperties: false
-      required: [id, email, role, status, createdAt]
+      required: [id, email, role, status, mfaEnabled, mfaRequired, createdAt]
       properties:
         id: {type: string, format: uuid}
         email: {type: string, format: email}
         role: {$ref: '#/components/schemas/Role'}
         status: {type: string, enum: [active, disabled, deletion_pending]}
+        mfaEnabled: {type: boolean}
+        mfaRequired: {type: boolean}
         createdAt: {type: string, format: date-time}
     Session:
       type: object
@@ -363,6 +392,7 @@ components:
         lastSeenAt: {type: string, format: date-time}
         expiresAt: {type: string, format: date-time}
         idleExpiresAt: {type: string, format: date-time}
+        mfaVerifiedAt: {type: string, format: date-time}
         revokedAt: {type: string, format: date-time}
     LoginResponse:
       type: object
@@ -379,6 +409,38 @@ components:
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/Session'}}
         currentSessionId: {type: string, format: uuid}
+    MFAStatus:
+      type: object
+      additionalProperties: false
+      required: [enabled, required]
+      properties:
+        enabled: {type: boolean}
+        required: {type: boolean}
+        pendingExpiresAt: {type: string, format: date-time}
+    MFASetupRequest:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties: {password: {type: string, minLength: 1, maxLength: 1024}}
+    MFAEnrollment:
+      type: object
+      additionalProperties: false
+      required: [secret, provisioningUri, expiresAt]
+      properties:
+        secret: {type: string, pattern: '^[A-Z2-7]{32}$'}
+        provisioningUri: {type: string, pattern: '^otpauth://totp/'}
+        expiresAt: {type: string, format: date-time}
+    MFAConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties: {code: {type: string, pattern: '^[0-9]{6}$'}}
+    MFAConfirmation:
+      type: object
+      additionalProperties: false
+      required: [recoveryCodes]
+      properties:
+        recoveryCodes: {type: array, minItems: 10, maxItems: 10, items: {type: string, pattern: '^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$'}}
     UserDataExportTicket:
       type: object
       additionalProperties: false
@@ -706,7 +768,7 @@ components:
       type: object
       additionalProperties: false
       required: [email, password]
-      properties: {email: {type: string, format: email}, password: {type: string}, remember: {type: boolean}}
+      properties: {email: {type: string, format: email}, password: {type: string}, secondFactor: {type: string, maxLength: 64}, remember: {type: boolean}}
     CreateRepositoryRequest:
       type: object
       additionalProperties: false

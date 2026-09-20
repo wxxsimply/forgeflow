@@ -19,7 +19,7 @@ ForgeFlow 提供以下登录态 API，并在 Web 的“数据与账户”页面�
 
 导出 ZIP 包含 `database.json` 和 `artifacts/{artifactId}`。数据库快照覆盖用户、会话元数据、仓库、Run、Checkpoint、事件、审批、节点执行、Job、Artifact 元数据、模型/工具调用、Outbox、幂等记录、审计及与用户有关的治理记录。Artifact 读取复用对象存储的大小和 SHA-256 校验。
 
-以下字段不会进入导出：密码哈希、标准化邮箱、Session token/CSRF 哈希、幂等请求哈希和删除 owner 哈希。导出不会包含其他 owner 的记录。
+以下字段不会进入导出：密码哈希、标准化邮箱、MFA 密钥密文/待确认密文/恢复码摘要/防重放时间片、Session token/CSRF 哈希、幂等请求哈希和删除 owner 哈希。导出不会包含其他 owner 的记录。
 
 环境变量：
 

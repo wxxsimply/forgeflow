@@ -13,7 +13,7 @@
     "reasoningEffort": "${REASONING_EFFORT}",
     "policyVersion": "eval-policy/v1",
     "toolVersion": "eval-tools/v1",
-    "migrationVersion": 6,
+    "migrationVersion": 7,
     "fixtureCommit": "${FIXTURE_COMMIT}",
     "graderCommit": "${GRADER_COMMIT}"
   },

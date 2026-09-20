@@ -48,6 +48,9 @@ func main() {
 }
 
 func run(ctx context.Context, configuration config.Config) error {
+	if err := validateAPISecurityConfig(configuration); err != nil {
+		return err
+	}
 	if !configuration.PostgresEnabled {
 		return fmt.Errorf("FORGEFLOW_POSTGRES_ENABLED=true is required for the API")
 	}
@@ -79,7 +82,7 @@ func run(ctx context.Context, configuration config.Config) error {
 		return err
 	}
 	authStore := auth.NewPostgresStore(db)
-	authService, err := auth.NewService(authStore, auth.Options{SessionTTL: configuration.SessionTTL, IdleTTL: configuration.SessionIdleTTL})
+	authService, err := auth.NewService(authStore, auth.Options{SessionTTL: configuration.SessionTTL, IdleTTL: configuration.SessionIdleTTL, AdminMFARequired: configuration.AdminMFARequired, MFAEncryptionKey: configuration.MFAEncryptionKey})
 	if err != nil {
 		return err
 	}
@@ -123,6 +126,16 @@ func run(ctx context.Context, configuration config.Config) error {
 		}
 		return err
 	}
+}
+
+func validateAPISecurityConfig(configuration config.Config) error {
+	if configuration.Environment == "production" && !configuration.AdminMFARequired {
+		return fmt.Errorf("FORGEFLOW_ADMIN_MFA_REQUIRED must be true for the production API")
+	}
+	if configuration.AdminMFARequired && len(configuration.MFAEncryptionKey) != 32 {
+		return fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY must contain exactly 32 bytes when administrator MFA is required")
+	}
+	return nil
 }
 
 func shutdownTelemetry(telemetry *observability.Telemetry) {

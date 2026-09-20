@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, type PropsWithChildren, useContext } from 'react';
 import { APIError, getCurrentUser, login, logout, type User } from '../api/client';
 
-type LoginInput = { email: string; password: string; remember: boolean };
+type LoginInput = { email: string; password: string; secondFactor?: string; remember: boolean };
 type AuthContextValue = {
   user: User | null;
   loading: boolean;

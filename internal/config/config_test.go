@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -235,8 +236,14 @@ func TestLoadRejectsFileArtifactBackendInProduction(t *testing.T) {
 }
 
 func TestLoadAcceptsKMSBackedS3ArtifactsInProduction(t *testing.T) {
+	mfaKeyPath := filepath.Join(t.TempDir(), "mfa_key")
+	if err := os.WriteFile(mfaKeyPath, []byte("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("FORGEFLOW_ENV", "production")
 	t.Setenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS", "https://forgeflow.example.com")
+	t.Setenv("FORGEFLOW_ADMIN_MFA_REQUIRED", "true")
+	t.Setenv("FORGEFLOW_MFA_ENCRYPTION_KEY_FILE", mfaKeyPath)
 	t.Setenv("FORGEFLOW_ARTIFACT_BACKEND", "s3")
 	t.Setenv("FORGEFLOW_ARTIFACT_S3_BUCKET", "forgeflow-production")
 	t.Setenv("FORGEFLOW_ARTIFACT_S3_REGION", "ap-southeast-1")
@@ -251,6 +258,15 @@ func TestLoadAcceptsKMSBackedS3ArtifactsInProduction(t *testing.T) {
 	}
 	if configuration.ArtifactBackend != "s3" || configuration.ArtifactS3SSE != "aws:kms" || configuration.ArtifactS3KMSKeyID == "" {
 		t.Fatalf("artifact configuration = %+v", configuration)
+	}
+}
+
+func TestLoadRejectsDirectMFAKeyInProduction(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_ADMIN_MFA_REQUIRED", "true")
+	t.Setenv("FORGEFLOW_MFA_ENCRYPTION_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "MFA_ENCRYPTION_KEY_FILE") {
+		t.Fatalf("Load accepted a direct Production MFA key: %v", err)
 	}
 }
 

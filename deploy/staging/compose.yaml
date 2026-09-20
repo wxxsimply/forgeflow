@@ -93,8 +93,11 @@ services:
       FORGEFLOW_HTTP_COOKIE_SECURE: "true"
       FORGEFLOW_HTTP_COOKIE_DOMAIN: ${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
       FORGEFLOW_HTTP_ALLOWED_ORIGINS: https://${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
+      FORGEFLOW_ADMIN_MFA_REQUIRED: ${FORGEFLOW_ADMIN_MFA_REQUIRED:-true}
+      FORGEFLOW_MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
     secrets:
       - postgres_dsn
+      - mfa_encryption_key
     volumes:
       - type: bind
         source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
@@ -308,6 +311,8 @@ secrets:
     file: ./secrets/postgres_password
   postgres_dsn:
     file: ./secrets/postgres_dsn
+  mfa_encryption_key:
+    file: ./secrets/mfa_encryption_key
   alert_webhook_url:
     file: ./secrets/alert_webhook_url
 

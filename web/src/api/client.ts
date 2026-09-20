@@ -19,6 +19,9 @@ export type Prompt = components['schemas']['Prompt'];
 export type PromptRelease = components['schemas']['PromptRelease'];
 export type UserDataExportTicket = components['schemas']['UserDataExportTicket'];
 export type UserDeletion = components['schemas']['UserDeletion'];
+export type MFAStatus = components['schemas']['MFAStatus'];
+export type MFAEnrollment = components['schemas']['MFAEnrollment'];
+export type MFAConfirmation = components['schemas']['MFAConfirmation'];
 
 type APIErrorBody = components['schemas']['Error'];
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -53,11 +56,29 @@ client.use({
   },
 });
 
-export async function login(input: { email: string; password: string; remember: boolean }): Promise<User> {
+export async function login(input: { email: string; password: string; secondFactor?: string; remember: boolean }): Promise<User> {
   const { data, error, response } = await client.POST('/auth/login', { body: input });
   if (!data) throw toAPIError(response, error);
   memoryCSRFToken = data.csrfToken;
   return data.user;
+}
+
+export async function getMFAStatus(): Promise<MFAStatus> {
+  const { data, error, response } = await client.GET('/account/mfa');
+  if (!data) throw toAPIError(response, error);
+  return data;
+}
+
+export async function setupMFA(password: string): Promise<MFAEnrollment> {
+  const { data, error, response } = await client.POST('/account/mfa/setup', { params: { header: csrfHeader() }, body: { password } });
+  if (!data) throw toAPIError(response, error);
+  return data;
+}
+
+export async function confirmMFA(code: string): Promise<MFAConfirmation> {
+  const { data, error, response } = await client.POST('/account/mfa/confirm', { params: { header: csrfHeader() }, body: { code } });
+  if (!data) throw toAPIError(response, error);
+  return data;
 }
 
 export async function getCurrentUser(): Promise<User> {
