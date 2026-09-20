@@ -43,7 +43,7 @@ function Assert-PlanShape {
 
     Assert-Acceptance ($Value.schemaVersion -eq 'forgeflow.acceptance-plan/v1') 'Unexpected acceptance plan schema'
     Assert-Acceptance ($Value.release -match '^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$') 'Release must be a semantic version'
-    Assert-Acceptance ($Value.freeze.migrationVersion -eq 5) 'Migration version must be frozen at 5 for this candidate'
+    Assert-Acceptance ($Value.freeze.migrationVersion -eq 6) 'Migration version must be frozen at 6 for this candidate'
     Assert-Acceptance ($Value.freeze.developerBaselinePrompt -eq 'developer/v1') 'Developer baseline must remain developer/v1'
     Assert-Acceptance ($Value.freeze.developerCandidatePrompt -match '^developer/v[2-9][0-9]*$') 'Developer candidate must be a non-baseline immutable version'
     Assert-Acceptance ($Value.freeze.policyVersion -eq 'eval-policy/v1') 'Unexpected Eval policy version'
@@ -137,7 +137,7 @@ Assert-PlanShape -Value $template.Value -AllowPlaceholders $true
 if ([string]::IsNullOrWhiteSpace($Plan)) {
     $scope = if ($SkipEngineeringValidators) { 'stage 9 contract only; earlier validators are separate CI steps' } else { 'stage 5-9 engineering contracts' }
     Write-Host "Stage 9 static acceptance preflight passed ($scope). No paid Eval, registry write, deployment, governance mutation, or external request was performed."
-    exit 0
+    return
 }
 
 $privatePlanRoot = [IO.Path]::GetFullPath((Join-Path $workspace '.forgeflow/acceptance'))
