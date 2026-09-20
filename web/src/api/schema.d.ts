@@ -84,6 +84,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Available to an administrator session that is restricted pending MFA enrollment. */
+        get: operations["getMFAStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/mfa/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Re-verifies the current administrator password and creates a ten-minute TOTP enrollment secret. */
+        post: operations["setupMFA"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/mfa/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Enables TOTP, elevates the current session, revokes other sessions, and returns recovery codes once. */
+        post: operations["confirmMFA"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/exports": {
         parameters: {
             query?: never;
@@ -534,6 +585,8 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @enum {string} */
             status: "active" | "disabled" | "deletion_pending";
+            mfaEnabled: boolean;
+            mfaRequired: boolean;
             /** Format: date-time */
             createdAt: string;
         };
@@ -551,6 +604,8 @@ export interface components {
             /** Format: date-time */
             idleExpiresAt: string;
             /** Format: date-time */
+            mfaVerifiedAt?: string;
+            /** Format: date-time */
             revokedAt?: string;
         };
         LoginResponse: {
@@ -562,6 +617,27 @@ export interface components {
             items: components["schemas"]["Session"][];
             /** Format: uuid */
             currentSessionId: string;
+        };
+        MFAStatus: {
+            enabled: boolean;
+            required: boolean;
+            /** Format: date-time */
+            pendingExpiresAt?: string;
+        };
+        MFASetupRequest: {
+            password: string;
+        };
+        MFAEnrollment: {
+            secret: string;
+            provisioningUri: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        MFAConfirmRequest: {
+            code: string;
+        };
+        MFAConfirmation: {
+            recoveryCodes: string[];
         };
         UserDataExportTicket: {
             /** Format: uuid */
@@ -898,6 +974,7 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
+            secondFactor?: string;
             remember?: boolean;
         };
         CreateRepositoryRequest: {
@@ -1214,6 +1291,83 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["Error"];
+        };
+    };
+    getMFAStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Administrator MFA state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            403: components["responses"]["Error"];
+        };
+    };
+    setupMFA: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["CSRF"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFASetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Pending TOTP enrollment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAEnrollment"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    confirmMFA: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["CSRF"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFAConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description MFA enabled and recovery codes issued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAConfirmation"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     createUserDataExport: {

@@ -42,6 +42,7 @@ function ProtectedRoute() {
   if (auth.loading) return <FullPageStatus title="正在恢复会话" detail="正在验证安全会话，请稍候。" busy />;
   if (auth.error) return <FullPageStatus title="无法连接 ForgeFlow" detail="请检查 API 服务和网络后刷新页面。" />;
   if (!auth.user) return <Navigate to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`} replace />;
+  if (auth.user.mfaRequired && !auth.user.mfaEnabled && location.pathname !== '/account') return <Navigate to="/account" replace />;
   return <Outlet />;
 }
 

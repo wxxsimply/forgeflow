@@ -98,7 +98,7 @@ type snapshotSection struct {
 }
 
 var snapshotSections = []snapshotSection{
-	{"users", `SELECT COALESCE(jsonb_agg(to_jsonb(t)-ARRAY['password_hash','normalized_email']), '[]'::jsonb) FROM users t WHERE id=$1`},
+	{"users", `SELECT COALESCE(jsonb_agg(to_jsonb(t)-ARRAY['password_hash','normalized_email','mfa_secret_ciphertext','mfa_pending_secret_ciphertext','mfa_recovery_code_hashes','mfa_last_used_step']), '[]'::jsonb) FROM users t WHERE id=$1`},
 	{"sessions", `SELECT COALESCE(jsonb_agg(to_jsonb(t)-ARRAY['token_hash','csrf_hash']), '[]'::jsonb) FROM sessions t WHERE user_id=$1`},
 	{"repositories", `SELECT COALESCE(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM repositories t WHERE owner_id=$1`},
 	{"runs", `SELECT COALESCE(jsonb_agg(to_jsonb(t)), '[]'::jsonb) FROM runs t WHERE owner_id=$1`},

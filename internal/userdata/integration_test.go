@@ -30,6 +30,9 @@ func TestExportAndResumableDeletion(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if _, err := db.ExecContext(ctx, `UPDATE users SET mfa_secret_ciphertext=decode('deadbeef','hex'),mfa_pending_secret_ciphertext=decode('cafebabe','hex'),mfa_recovery_code_hashes='["must-not-export-mfa-recovery"]'::jsonb,mfa_last_used_step=123 WHERE id=$1`, ownerID); err != nil {
+		t.Fatal(err)
+	}
 	store := &deletionStore{db: db}
 	service, err := userdata.New(db, store, userdata.Options{ExportTTL: 10 * time.Minute, MaxExportBytes: 16 * 1024 * 1024, BackupRetention: 7 * 24 * time.Hour})
 	if err != nil {
@@ -61,7 +64,7 @@ func TestExportAndResumableDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(databaseJSON, []byte("owner@example.com")) || bytes.Contains(databaseJSON, []byte("not-exported")) {
+	if !bytes.Contains(databaseJSON, []byte("owner@example.com")) || bytes.Contains(databaseJSON, []byte("not-exported")) || bytes.Contains(databaseJSON, []byte("must-not-export-mfa-recovery")) || bytes.Contains(databaseJSON, []byte("mfa_secret_ciphertext")) {
 		t.Fatalf("export did not include safe owner data: %s", databaseJSON)
 	}
 	if _, err := service.BuildExport(ctx, otherAdminID, ticket.ID); apperror.CodeOf(err) != apperror.CodeNotFound {

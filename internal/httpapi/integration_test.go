@@ -3,8 +3,13 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/base32"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -260,6 +265,75 @@ func TestLoginRateLimitAndUniformFailure(t *testing.T) {
 	}
 }
 
+func TestAdministratorMFAEnrollmentAndLogin(t *testing.T) {
+	f := newFixture(t, auth.NewMemoryLimiter(20, time.Minute), true)
+	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
+
+	response := f.request(t, admin, http.MethodGet, "/api/v1/auth/me", "", false, nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("restricted session cannot inspect itself: status=%d body=%s", response.StatusCode, read(response))
+	}
+	response.Body.Close()
+	response = f.request(t, admin, http.MethodGet, "/api/v1/auth/sessions", "", false, nil)
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("restricted session bypassed MFA gate: status=%d body=%s", response.StatusCode, read(response))
+	}
+	response.Body.Close()
+
+	response = f.request(t, admin, http.MethodPost, "/api/v1/account/mfa/setup", `{"password":"wrong password"}`, true, nil)
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong password setup status=%d body=%s", response.StatusCode, read(response))
+	}
+	response = f.request(t, admin, http.MethodPost, "/api/v1/account/mfa/setup", `{"password":"correct horse battery staple"}`, true, nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("setup status=%d body=%s", response.StatusCode, read(response))
+	}
+	var enrollment struct {
+		Secret string `json:"secret"`
+	}
+	decodeResponse(t, response, &enrollment)
+	secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(enrollment.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentCode := integrationTOTP(secret, time.Now())
+	response = f.request(t, admin, http.MethodPost, "/api/v1/account/mfa/confirm", `{"code":"`+currentCode+`"}`, true, nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("confirm status=%d body=%s", response.StatusCode, read(response))
+	}
+	var confirmation struct {
+		RecoveryCodes []string `json:"recoveryCodes"`
+	}
+	decodeResponse(t, response, &confirmation)
+	if len(confirmation.RecoveryCodes) != 10 {
+		t.Fatalf("recovery codes=%v", confirmation.RecoveryCodes)
+	}
+	response = f.request(t, admin, http.MethodGet, "/api/v1/auth/sessions", "", false, nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("confirmed session stayed restricted: status=%d body=%s", response.StatusCode, read(response))
+	}
+	response.Body.Close()
+
+	response = f.rawLoginWithFactor(t, "admin@example.com", "correct horse battery staple", "", "")
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("login without MFA status=%d body=%s", response.StatusCode, read(response))
+	}
+	response = f.rawLoginWithFactor(t, "admin@example.com", "correct horse battery staple", integrationTOTP(secret, time.Now().Add(30*time.Second)), "")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("TOTP login status=%d body=%s", response.StatusCode, read(response))
+	}
+	response.Body.Close()
+	response = f.rawLoginWithFactor(t, "admin@example.com", "correct horse battery staple", confirmation.RecoveryCodes[0], "")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("recovery login status=%d body=%s", response.StatusCode, read(response))
+	}
+	response.Body.Close()
+	response = f.rawLoginWithFactor(t, "admin@example.com", "correct horse battery staple", confirmation.RecoveryCodes[0], "")
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("reused recovery status=%d body=%s", response.StatusCode, read(response))
+	}
+}
+
 func TestPromptPromotionRollbackIsImmutableAuditedAndDoesNotRewriteRuns(t *testing.T) {
 	f := newFixture(t, auth.NewMemoryLimiter(20, time.Minute))
 	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
@@ -382,8 +456,12 @@ func (f *apiFixture) login(t *testing.T, email, password, old string) loginState
 	return state
 }
 func (f *apiFixture) rawLogin(t *testing.T, email, password, old string) *http.Response {
+	return f.rawLoginWithFactor(t, email, password, "", old)
+}
+func (f *apiFixture) rawLoginWithFactor(t *testing.T, email, password, factor, old string) *http.Response {
 	t.Helper()
-	req, _ := http.NewRequest(http.MethodPost, f.server.URL+"/api/v1/auth/login", strings.NewReader(`{"email":"`+email+`","password":"`+password+`"}`))
+	body, _ := json.Marshal(map[string]any{"email": email, "password": password, "secondFactor": factor})
+	req, _ := http.NewRequest(http.MethodPost, f.server.URL+"/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if old != "" {
 		req.AddCookie(&http.Cookie{Name: httpapi.SessionCookie, Value: old})
@@ -412,7 +490,7 @@ func (f *apiFixture) request(t *testing.T, state loginState, method, path, body 
 	}
 	return response
 }
-func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
+func newFixture(t *testing.T, accountLimiter auth.Limiter, requireAdminMFA ...bool) *apiFixture {
 	t.Helper()
 	dsn := strings.TrimSpace(os.Getenv("FORGEFLOW_TEST_POSTGRES_DSN"))
 	if dsn == "" {
@@ -446,7 +524,8 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 		t.Fatal(err)
 	}
 	store := auth.NewPostgresStore(db)
-	authService, err := auth.NewService(store, auth.Options{PasswordParams: testPasswordParams(), SessionTTL: time.Hour, IdleTTL: time.Hour, AccountLimiter: accountLimiter, SourceLimiter: auth.NewMemoryLimiter(100, time.Minute)})
+	adminMFARequired := len(requireAdminMFA) > 0 && requireAdminMFA[0]
+	authService, err := auth.NewService(store, auth.Options{PasswordParams: testPasswordParams(), SessionTTL: time.Hour, IdleTTL: time.Hour, AdminMFARequired: adminMFARequired, MFAEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), AccountLimiter: accountLimiter, SourceLimiter: auth.NewMemoryLimiter(100, time.Minute)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,6 +559,17 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
 	return &apiFixture{server: httpServer, db: db, auth: authService, authStore: store, runs: runs, artifacts: artifactStore}
+}
+
+func integrationTOTP(secret []byte, at time.Time) string {
+	var counter [8]byte
+	binary.BigEndian.PutUint64(counter[:], uint64(at.Unix()/30))
+	mac := hmac.New(sha1.New, secret)
+	_, _ = mac.Write(counter[:])
+	sum := mac.Sum(nil)
+	offset := sum[len(sum)-1] & 0x0f
+	value := binary.BigEndian.Uint32(sum[offset:offset+4]) & 0x7fffffff
+	return fmt.Sprintf("%06d", value%1_000_000)
 }
 func testPasswordParams() auth.PasswordParams {
 	return auth.PasswordParams{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}

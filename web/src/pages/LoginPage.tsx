@@ -11,22 +11,25 @@ export function LoginPage() {
   const formErrorId = useId();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [secondFactor, setSecondFactor] = useState('');
   const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const destination = safeDestination(new URLSearchParams(location.search).get('next'));
-  useEffect(() => { if (!loading && user) navigate('/runs', { replace: true }); }, [loading, navigate, user]);
+  useEffect(() => {
+    if (!loading && user) navigate(user.mfaRequired && !user.mfaEnabled ? '/account' : '/runs', { replace: true });
+  }, [loading, navigate, user]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
     setError(''); setSubmitting(true);
     try {
-      await signIn({ email, password, remember });
-      navigate(destination, { replace: true });
+      const signedIn = await signIn({ email, password, secondFactor: secondFactor.trim() || undefined, remember });
+      navigate(signedIn.mfaRequired && !signedIn.mfaEnabled ? '/account' : destination, { replace: true });
     } catch (caught) {
-      if (caught instanceof APIError && caught.status === 401) setError('邮箱或密码错误。');
+      if (caught instanceof APIError && caught.status === 401) setError('邮箱、密码或管理员验证码错误。');
       else if (caught instanceof APIError && caught.status === 429) setError('尝试次数过多，请稍后再试。');
       else setError('暂时无法连接 ForgeFlow，请检查网络后重试。');
     } finally { setSubmitting(false); }
@@ -55,6 +58,9 @@ export function LoginPage() {
           <span id={emailErrorId} className="field-hint">请输入你的账号邮箱。</span>
           <label htmlFor="password">密码</label>
           <input id="password" name="password" type="password" autoComplete="current-password" required minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} />
+          <label htmlFor="second-factor">管理员验证码或恢复码</label>
+          <input id="second-factor" name="secondFactor" autoComplete="one-time-code" autoCapitalize="characters" value={secondFactor} onChange={(event) => setSecondFactor(event.target.value)} aria-describedby="second-factor-hint" />
+          <span id="second-factor-hint" className="field-hint">管理员启用 MFA 后必填；普通账号请留空。</span>
           <label className="checkbox-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>在这台设备上保持登录</span></label>
           {error && <p id={formErrorId} className="form-error" role="alert">{error}</p>}
           <button className="primary-button" type="submit" disabled={submitting}>

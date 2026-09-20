@@ -14,12 +14,14 @@ import (
 )
 
 type Options struct {
-	SessionTTL     time.Duration
-	IdleTTL        time.Duration
-	PasswordParams PasswordParams
-	AccountLimiter Limiter
-	SourceLimiter  Limiter
-	Now            func() time.Time
+	SessionTTL       time.Duration
+	IdleTTL          time.Duration
+	PasswordParams   PasswordParams
+	AccountLimiter   Limiter
+	SourceLimiter    Limiter
+	AdminMFARequired bool
+	MFAEncryptionKey []byte
+	Now              func() time.Time
 }
 
 type Service struct {
@@ -60,6 +62,12 @@ func NewService(store Store, options Options) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(options.MFAEncryptionKey) != 0 && len(options.MFAEncryptionKey) != 32 {
+		return nil, fmt.Errorf("MFA encryption key must contain exactly 32 bytes")
+	}
+	if options.AdminMFARequired && len(options.MFAEncryptionKey) != 32 {
+		return nil, fmt.Errorf("MFA encryption key is required when administrator MFA is enforced")
+	}
 	return &Service{store: store, options: options, dummyHash: dummy}, nil
 }
 
@@ -86,7 +94,7 @@ func (s *Service) BootstrapAdmin(ctx context.Context, email, password string) (U
 	return user, nil
 }
 
-func (s *Service) Login(ctx context.Context, email, password, sourceIP, userAgent string, oldToken string) (LoginResult, time.Duration, error) {
+func (s *Service) Login(ctx context.Context, email, password, secondFactor, sourceIP, userAgent string, oldToken string) (LoginResult, time.Duration, error) {
 	now := s.options.Now()
 	normalized := NormalizeEmail(email)
 	if len(normalized) > 320 || len(password) == 0 || len(password) > 1024 {
@@ -115,6 +123,17 @@ func (s *Service) Login(ctx context.Context, email, password, sourceIP, userAgen
 			_ = s.store.UpdatePasswordHash(ctx, credential.ID, upgraded)
 		}
 	}
+	mfaVerified := false
+	if credential.Role == RoleAdmin && credential.MFAEnabledAt != nil {
+		verified, factorErr := s.verifyAdminSecondFactor(ctx, credential, secondFactor, now)
+		if factorErr != nil {
+			return LoginResult{}, 0, factorErr
+		}
+		if !verified {
+			return LoginResult{}, 0, apperror.New(apperror.CodeUnauthorized, "email, password, or second factor is incorrect")
+		}
+		mfaVerified = true
+	}
 	if oldToken != "" {
 		_ = s.store.RevokeToken(ctx, digest(oldToken))
 	}
@@ -129,11 +148,14 @@ func (s *Service) Login(ctx context.Context, email, password, sourceIP, userAgen
 	session := Session{ID: domain.NewID(), UserID: credential.ID, TokenHash: tokenHash, CSRFHash: csrfHash,
 		SourceIP: sourceIP, UserAgent: userAgent, CreatedAt: now, LastSeenAt: now,
 		ExpiresAt: now.Add(s.options.SessionTTL), IdleExpiresAt: now.Add(s.options.IdleTTL)}
+	if mfaVerified {
+		session.MFAVerifiedAt = &now
+	}
 	if err := s.store.CreateSession(ctx, session); err != nil {
 		return LoginResult{}, 0, err
 	}
 	s.options.AccountLimiter.Reset(accountKey)
-	return LoginResult{Principal: Principal{User: credential.User, Session: session}, Token: token, CSRFToken: csrf}, 0, nil
+	return LoginResult{Principal: Principal{User: s.projectUser(credential), Session: session}, Token: token, CSRFToken: csrf}, 0, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, token string) (Principal, error) {
@@ -158,7 +180,14 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Principal, er
 		session.IdleExpiresAt = now.Add(s.options.IdleTTL)
 		_ = s.store.TouchSession(ctx, session.ID, session.LastSeenAt, session.IdleExpiresAt)
 	}
-	return Principal{User: user.User, Session: session}, nil
+	return Principal{User: s.projectUser(user), Session: session}, nil
+}
+
+func (s *Service) projectUser(credential UserCredential) User {
+	user := credential.User
+	user.MFAEnabled = credential.MFAEnabledAt != nil
+	user.MFARequired = user.Role == RoleAdmin && (s.options.AdminMFARequired || user.MFAEnabled)
+	return user
 }
 
 func (s *Service) ValidateCSRF(principal Principal, headerToken, cookieToken string) error {

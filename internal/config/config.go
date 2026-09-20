@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,8 @@ type Config struct {
 	RepositoryRoots          []string
 	SessionTTL               time.Duration
 	SessionIdleTTL           time.Duration
+	AdminMFARequired         bool
+	MFAEncryptionKey         []byte
 	BootstrapAdminEmail      string
 	BootstrapAdminPassword   string
 	DataDir                  string
@@ -98,6 +101,7 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	environment := envOrDefault("FORGEFLOW_ENV", "development")
 	otelSampleRatio, err := envFloat("FORGEFLOW_OTEL_SAMPLE_RATIO", 0.1)
 	if err != nil {
 		return Config{}, err
@@ -117,6 +121,24 @@ func Load() (Config, error) {
 	sessionIdleTTL, err := envDuration("FORGEFLOW_SESSION_IDLE_TTL", 30*time.Minute)
 	if err != nil {
 		return Config{}, err
+	}
+	adminMFARequired, err := envBool("FORGEFLOW_ADMIN_MFA_REQUIRED", false)
+	if err != nil {
+		return Config{}, err
+	}
+	mfaEncryptionKeyEncoded, err := envOrFile("FORGEFLOW_MFA_ENCRYPTION_KEY")
+	if err != nil {
+		return Config{}, err
+	}
+	var mfaEncryptionKey []byte
+	if strings.TrimSpace(mfaEncryptionKeyEncoded) != "" {
+		mfaEncryptionKey, err = base64.StdEncoding.DecodeString(strings.TrimSpace(mfaEncryptionKeyEncoded))
+		if err != nil || len(mfaEncryptionKey) != 32 {
+			return Config{}, fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY must be standard base64 encoding exactly 32 bytes")
+		}
+	}
+	if direct, directSet := os.LookupEnv("FORGEFLOW_MFA_ENCRYPTION_KEY"); environment == "production" && directSet && strings.TrimSpace(direct) != "" {
+		return Config{}, fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY must be provided through FORGEFLOW_MFA_ENCRYPTION_KEY_FILE in production")
 	}
 	maxRetries, err := envInt("FORGEFLOW_OPENAI_MAX_RETRIES", 2)
 	if err != nil {
@@ -264,7 +286,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	configuration := Config{
-		Environment: envOrDefault("FORGEFLOW_ENV", "development"), LogLevel: envOrDefault("FORGEFLOW_LOG_LEVEL", "info"),
+		Environment: environment, LogLevel: envOrDefault("FORGEFLOW_LOG_LEVEL", "info"),
 		ServiceVersion: strings.TrimSpace(os.Getenv("FORGEFLOW_SERVICE_VERSION")), OTLPEndpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_OTEL_ENDPOINT")),
 		OTELSampleRatio: otelSampleRatio, MetricsEnabled: metricsEnabled,
 		HTTPAddress:      envOrDefault("FORGEFLOW_HTTP_ADDRESS", "127.0.0.1:8080"),
@@ -272,6 +294,7 @@ func Load() (Config, error) {
 		HTTPAllowedOrigins: splitCSV(os.Getenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS")),
 		RepositoryRoots:    splitCSV(envOrDefault("FORGEFLOW_REPOSITORY_ROOTS", ".")),
 		SessionTTL:         sessionTTL, SessionIdleTTL: sessionIdleTTL,
+		AdminMFARequired: adminMFARequired, MFAEncryptionKey: mfaEncryptionKey,
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL")),
 		BootstrapAdminPassword: bootstrapAdminPassword,
 		DataDir:                dataDirectory, WorkflowMode: envOrDefault("FORGEFLOW_WORKFLOW_MODE", "planning"), PlannerMode: envOrDefault("FORGEFLOW_PLANNER_MODE", "mock"),
@@ -347,6 +370,9 @@ func (c Config) Validate() error {
 	}
 	if c.SessionTTL < time.Minute || c.SessionTTL > 90*24*time.Hour || c.SessionIdleTTL < time.Minute || c.SessionIdleTTL > c.SessionTTL {
 		return fmt.Errorf("session expiry configuration is invalid")
+	}
+	if c.AdminMFARequired && len(c.MFAEncryptionKey) != 32 {
+		return fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY is required when FORGEFLOW_ADMIN_MFA_REQUIRED=true")
 	}
 	if (c.BootstrapAdminEmail == "") != (c.BootstrapAdminPassword == "") {
 		return fmt.Errorf("bootstrap admin email and password must be configured together")

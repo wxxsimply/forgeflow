@@ -36,7 +36,7 @@
 ### 身份与入口
 
 - TLS 1.2+、自动续期、HSTS、CSP、请求大小限制和边缘限速。
-- 管理员/Operator 必须使用 MFA。当前应用没有内建 MFA，因此上线前必须由经批准的 Identity-Aware Proxy 强制管理员 MFA，或实现并独立评审应用 MFA。
+- 管理员/Operator 必须使用 MFA。Migration 7 已提供应用内管理员 TOTP、恢复码、受限未绑定 Session 和失败关闭配置；Operator 仍须由经批准的 IAP 强制 MFA，或在后续独立变更中扩展应用 MFA。真实 Staging 与独立评审前仍不得上线。
 - Production 管理入口与普通用户入口分离策略；Break-glass 账号离线保管、每次使用告警、24 小时内复核。
 - Session 绝对/空闲期限、Secure/HttpOnly/SameSite、CSRF 和撤销保持强制；禁止在 URL 或日志中传 Token。
 
@@ -77,7 +77,7 @@
 |---|---|---|---|---|---|---|
 | P8-001 | S3 适配器代码已准备，真实对象存储与恢复证据未验收 | High | KMS/tenant key/完整性/删除、迁移与失败补偿单元测试；Production 配置失败关闭 | Data Owner + Service Owner | 真实 Bucket/IAM/KMS、迁移/一致性/权限/恢复测试通过 | Open |
 | P8-002 | 专用 Worker 节点池、Sandbox daemon 和网络策略尚未部署 | Critical | 单机 Staging 仅模拟网络隔离 | Platform Owner | 真实专用执行面与正/负网络测试通过 | Open |
-| P8-003 | 管理员 MFA 尚无应用内实现 | High | Session/CSRF/RBAC；可使用上游保护 | Security Owner | IAP 强制 MFA 或应用 MFA 独立评审通过 | Open |
+| P8-003 | 管理员 TOTP 工程基础已实现；Operator、真实 Staging、密钥轮换和 break-glass 尚未验收 | High | AES-GCM 密钥密文、恢复码摘要、时间片防重放、受限 Session、旧 Session 撤销和 Production 失败关闭 | Security Owner | 管理员应用 MFA 与 Operator 上游/应用 MFA 均独立评审，并通过 HTTPS、旁路拒绝、密钥轮换和 break-glass 演练 | Open |
 | P8-004 | 外部 append-only 审计和受控 Trace 后端未接入 | High | PostgreSQL 审计、结构化日志 | Security Owner + Platform Owner | 删除保护、访问审计、脱敏和查询恢复验证 | Open |
 | P8-005 | 云厂商、Region、数据驻留和子处理者尚未批准 | High | Provider-neutral 边界已定义 | Product Owner + Data Owner | 私有决策记录与用户告知材料批准 | Open |
 | P8-006 | Production 负载、RPO/RTO 和故障切换未实测 | High | 目标和测试矩阵已固定 | Platform Owner + Data Owner | 阶段 9 实测达到 `production-slo-capacity.md` | Open |

@@ -13,13 +13,15 @@ vi.mock('./api/client', async (importOriginal) => {
     getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(),
     listRuns: vi.fn(), getRun: vi.fn(), listRunEvents: vi.fn(),
     listSessions: vi.fn(), revokeSession: vi.fn(),
+    getMFAStatus: vi.fn(), setupMFA: vi.fn(), confirmMFA: vi.fn(),
     createUserDataExport: vi.fn(), downloadUserDataExport: vi.fn(), deleteCurrentAccount: vi.fn(),
   };
 });
 
 import * as api from './api/client';
 
-const viewer: User = { id: '00000000-0000-4000-8000-000000000001', email: 'viewer@example.com', role: 'viewer', status: 'active', createdAt: '2026-08-10T08:00:00Z' };
+const viewer: User = { id: '00000000-0000-4000-8000-000000000001', email: 'viewer@example.com', role: 'viewer', status: 'active', mfaEnabled: false, mfaRequired: false, createdAt: '2026-08-10T08:00:00Z' };
+const unenrolledAdmin: User = { ...viewer, email: 'admin@example.com', role: 'admin', mfaRequired: true };
 const run: Run = {
   runId: '00000000-0000-4000-8000-000000000010', traceId: '00000000-0000-4000-8000-000000000011', version: 4,
   status: 'waiting_for_plan_approval', task: '为订单接口增加幂等保护', repositoryPath: 'D:/Code/orders', baseRevision: 'main',
@@ -30,6 +32,7 @@ beforeEach(() => {
   vi.mocked(api.getCurrentUser).mockReset(); vi.mocked(api.login).mockReset(); vi.mocked(api.logout).mockReset();
   vi.mocked(api.listRuns).mockReset(); vi.mocked(api.getRun).mockReset(); vi.mocked(api.listRunEvents).mockReset();
   vi.mocked(api.listSessions).mockReset(); vi.mocked(api.revokeSession).mockReset();
+  vi.mocked(api.getMFAStatus).mockReset(); vi.mocked(api.setupMFA).mockReset(); vi.mocked(api.confirmMFA).mockReset();
   vi.mocked(api.createUserDataExport).mockReset(); vi.mocked(api.downloadUserDataExport).mockReset(); vi.mocked(api.deleteCurrentAccount).mockReset();
   vi.mocked(api.listRuns).mockResolvedValue({ items: [run] });
 });
@@ -44,7 +47,7 @@ describe('authentication shell', () => {
     await user.type(await screen.findByLabelText('邮箱'), 'viewer@example.com');
     await user.type(screen.getByLabelText('密码'), 'viewer secure password');
     await user.click(screen.getByRole('button', { name: '登录' }));
-    expect(vi.mocked(api.login).mock.calls[0][0]).toEqual({ email: 'viewer@example.com', password: 'viewer secure password', remember: false });
+    expect(vi.mocked(api.login).mock.calls[0][0]).toEqual({ email: 'viewer@example.com', password: 'viewer secure password', secondFactor: undefined, remember: false });
     expect(await screen.findByRole('heading', { name: '运行任务' })).toBeInTheDocument();
     expect(safeDestination('//evil.example/steal')).toBe('/runs');
     expect(safeDestination('/runs?status=active')).toBe('/runs?status=active');
@@ -57,11 +60,33 @@ describe('authentication shell', () => {
     await user.type(await screen.findByLabelText('邮箱'), 'nobody@example.com');
     await user.type(screen.getByLabelText('密码'), 'incorrect password');
     await user.click(screen.getByRole('button', { name: '登录' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('邮箱或密码错误');
+    expect(await screen.findByRole('alert')).toHaveTextContent('邮箱、密码或管理员验证码错误');
     expect(screen.queryByText(/database trace/i)).not.toBeInTheDocument();
     vi.mocked(api.login).mockRejectedValue(new APIError(429));
     await user.click(screen.getByRole('button', { name: '登录' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('尝试次数过多');
+  });
+
+  it('redirects an unenrolled administrator into MFA setup and shows recovery codes once', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValue(new APIError(401));
+    vi.mocked(api.login).mockResolvedValue(unenrolledAdmin);
+    vi.mocked(api.getMFAStatus).mockResolvedValue({ enabled: false, required: true });
+    vi.mocked(api.setupMFA).mockResolvedValue({ secret: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', provisioningUri: 'otpauth://totp/ForgeFlow%3Aadmin', expiresAt: '2026-09-21T03:00:00Z' });
+    vi.mocked(api.confirmMFA).mockResolvedValue({ recoveryCodes: Array.from({ length: 10 }, (_, index) => `ABCD-EFGH-JKLM-${String(index).padStart(4, '2')}`) });
+    const user = userEvent.setup(); renderApp('/login?next=/runs');
+    await user.type(await screen.findByLabelText('邮箱'), 'admin@example.com');
+    await user.type(screen.getByLabelText('密码'), 'correct horse battery staple');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByRole('heading', { name: '多因素认证' })).toBeInTheDocument();
+    expect(screen.getByText(/当前会话仅可完成 MFA 绑定/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '生成并下载' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('当前密码', { selector: '#mfa-password' }), 'correct horse battery staple');
+    await user.click(screen.getByRole('button', { name: '开始绑定' }));
+    expect(await screen.findByText('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('6 位动态验证码'), '123456');
+    await user.click(screen.getByRole('button', { name: '确认并启用' }));
+    expect(await screen.findByText(/恢复码只显示这一次/)).toBeInTheDocument();
+    expect(vi.mocked(api.confirmMFA)).toHaveBeenCalledWith('123456');
   });
 
   it('restores a viewer session and renders a read-only run list', async () => {

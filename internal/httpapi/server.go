@@ -103,10 +103,13 @@ func New(options Options) (*Server, error) {
 	}
 	mux.HandleFunc("GET /api/openapi.yaml", s.openAPI)
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
-	mux.Handle("POST /api/v1/auth/logout", s.protected(true, http.HandlerFunc(s.logout)))
-	mux.Handle("GET /api/v1/auth/me", s.protected(false, http.HandlerFunc(s.me)))
+	mux.Handle("POST /api/v1/auth/logout", s.protectedMFA(true, true, http.HandlerFunc(s.logout)))
+	mux.Handle("GET /api/v1/auth/me", s.protectedMFA(false, true, http.HandlerFunc(s.me)))
 	mux.Handle("GET /api/v1/auth/sessions", s.protected(false, http.HandlerFunc(s.sessions)))
 	mux.Handle("DELETE /api/v1/auth/sessions/{sessionId}", s.protected(true, s.validatedID("sessionId", http.HandlerFunc(s.revokeSession))))
+	mux.Handle("GET /api/v1/account/mfa", s.protectedMFA(false, true, http.HandlerFunc(s.mfaStatus)))
+	mux.Handle("POST /api/v1/account/mfa/setup", s.protectedMFA(true, true, http.HandlerFunc(s.setupMFA)))
+	mux.Handle("POST /api/v1/account/mfa/confirm", s.protectedMFA(true, true, http.HandlerFunc(s.confirmMFA)))
 	mux.Handle("POST /api/v1/account/exports", s.protected(true, http.HandlerFunc(s.createUserDataExport)))
 	mux.Handle("GET /api/v1/account/exports/{exportId}/content", s.protected(false, s.validatedID("exportId", http.HandlerFunc(s.downloadUserDataExport))))
 	mux.Handle("DELETE /api/v1/account", s.protected(true, http.HandlerFunc(s.deleteAccount)))
@@ -208,6 +211,10 @@ func (s *Server) requestContext(next http.Handler) http.Handler {
 	})
 }
 func (s *Server) protected(csrf bool, next http.Handler) http.Handler {
+	return s.protectedMFA(csrf, false, next)
+}
+
+func (s *Server) protectedMFA(csrf, allowUnverifiedMFA bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(SessionCookie)
 		if err != nil {
@@ -226,6 +233,10 @@ func (s *Server) protected(csrf bool, next http.Handler) http.Handler {
 				s.fail(w, r, apperror.New(apperror.CodeForbidden, "CSRF validation failed"))
 				return
 			}
+		}
+		if principal.User.MFARequired && principal.Session.MFAVerifiedAt == nil && !allowUnverifiedMFA {
+			s.fail(w, r, apperror.New(apperror.CodeForbidden, "administrator MFA enrollment or verification is required"))
+			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, principal)))
 	})
@@ -247,9 +258,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		Remember bool   `json:"remember"`
+		Email        string `json:"email"`
+		Password     string `json:"password"`
+		SecondFactor string `json:"secondFactor"`
+		Remember     bool   `json:"remember"`
 	}
 	if err := decode(r, &in); err != nil {
 		s.fail(w, r, err)
@@ -259,7 +271,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if c, _ := r.Cookie(SessionCookie); c != nil {
 		old = c.Value
 	}
-	result, retry, err := s.options.Auth.Login(r.Context(), in.Email, in.Password, sourceIP(r), r.UserAgent(), old)
+	result, retry, err := s.options.Auth.Login(r.Context(), in.Email, in.Password, in.SecondFactor, sourceIP(r), r.UserAgent(), old)
 	if err != nil {
 		outcome := "failure"
 		if retry > 0 {
@@ -315,6 +327,58 @@ func (s *Server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		s.clearCookies(w)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) mfaStatus(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	status, err := s.options.Auth.MFAStatus(r.Context(), p.User.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (s *Server) setupMFA(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !s.allowMutation(w, r, "mfa-setup:"+p.User.ID) {
+		return
+	}
+	var in struct {
+		Password string `json:"password"`
+	}
+	if err := decode(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	enrollment, err := s.options.Auth.BeginMFAEnrollment(r.Context(), p.User.ID, in.Password)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "auth.mfa.setup", "user", p.User.ID, map[string]any{"expiresAt": enrollment.ExpiresAt})
+	writeJSON(w, http.StatusCreated, enrollment)
+}
+
+func (s *Server) confirmMFA(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !s.allowMutation(w, r, "mfa-confirm:"+p.User.ID) {
+		return
+	}
+	var in struct {
+		Code string `json:"code"`
+	}
+	if err := decode(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	confirmation, err := s.options.Auth.ConfirmMFAEnrollment(r.Context(), p.User.ID, p.Session.ID, in.Code)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "auth.mfa.enable", "user", p.User.ID, map[string]any{"otherSessionsRevoked": true})
+	writeJSON(w, http.StatusOK, confirmation)
 }
 
 func (s *Server) createUserDataExport(w http.ResponseWriter, r *http.Request) {

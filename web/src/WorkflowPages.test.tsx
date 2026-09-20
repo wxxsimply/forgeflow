@@ -20,7 +20,7 @@ vi.mock('./api/client', async (importOriginal) => {
 
 import * as api from './api/client';
 
-const operator: User = { id: '00000000-0000-4000-8000-000000000001', email: 'operator@example.com', role: 'operator', status: 'active', createdAt: '2026-08-10T08:00:00Z' };
+const operator: User = { id: '00000000-0000-4000-8000-000000000001', email: 'operator@example.com', role: 'operator', status: 'active', mfaEnabled: false, mfaRequired: false, createdAt: '2026-08-10T08:00:00Z' };
 const run: Run = {
   runId: '00000000-0000-4000-8000-000000000010', traceId: '00000000-0000-4000-8000-000000000011', version: 4,
   status: 'waiting_for_plan_approval', task: '为订单接口增加幂等保护', repositoryPath: 'D:/Code/orders', baseRevision: 'main', currentNodeId: 'plan-approval',

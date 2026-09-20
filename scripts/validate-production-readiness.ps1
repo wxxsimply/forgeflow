@@ -27,6 +27,11 @@ foreach ($id in 1..7) {
     $riskID = 'P8-{0:D3}' -f $id
     Assert-Production ($security.Contains($riskID)) "Production risk register is missing $riskID"
 }
+
+$adminMFA = Read-Required 'docs/admin-mfa.md'
+foreach ($contract in @('Migration 7', 'AES-256-GCM', '恢复码', '时间片', '受限会话', 'FORGEFLOW_ADMIN_MFA_REQUIRED=true', 'Operator', 'P8-003', 'No-Go')) {
+    Assert-Production ($adminMFA.Contains($contract)) "Administrator MFA runbook is missing contract: $contract"
+}
 foreach ($contract in @('Independent reviewer', 'Critical', 'High', 'MFA', 'append-only', 'Risk Accepted', '默认 No-Go')) {
     Assert-Production ($security.Contains($contract)) "Production security review is missing contract: $contract"
 }

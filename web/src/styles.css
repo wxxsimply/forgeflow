@@ -376,6 +376,10 @@ a { color: inherit; }
 .account-card h2 { margin: 10px 0; color: var(--ink); }
 .account-card > p { min-height: 72px; color: var(--muted); font-size: .82rem; line-height: 1.65; }
 .account-delete-form { display: grid; gap: 9px; margin-top: 18px; }
+.mfa-secret { display: block; padding: 12px 13px; overflow-wrap: anywhere; letter-spacing: .08em; background: var(--paper); }
+.mfa-recovery { display: grid; gap: 10px; margin-top: 18px; }
+.recovery-code-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 8px; }
+.recovery-code-grid code { padding: 9px 11px; text-align: center; background: var(--paper); }
 .account-delete-form label { margin-top: 7px; font-size: .76rem; font-weight: 700; }
 .account-delete-form input { width: 100%; padding: 12px 13px; color: var(--ink); border: 1px solid #c8cbc6; border-radius: 4px; background: #fff; }
 .account-delete-form .danger-button { justify-self: start; margin-top: 10px; min-height: 43px; }
