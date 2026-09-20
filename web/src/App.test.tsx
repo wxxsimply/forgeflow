@@ -13,6 +13,7 @@ vi.mock('./api/client', async (importOriginal) => {
     getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(),
     listRuns: vi.fn(), getRun: vi.fn(), listRunEvents: vi.fn(),
     listSessions: vi.fn(), revokeSession: vi.fn(),
+    createUserDataExport: vi.fn(), downloadUserDataExport: vi.fn(), deleteCurrentAccount: vi.fn(),
   };
 });
 
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.mocked(api.getCurrentUser).mockReset(); vi.mocked(api.login).mockReset(); vi.mocked(api.logout).mockReset();
   vi.mocked(api.listRuns).mockReset(); vi.mocked(api.getRun).mockReset(); vi.mocked(api.listRunEvents).mockReset();
   vi.mocked(api.listSessions).mockReset(); vi.mocked(api.revokeSession).mockReset();
+  vi.mocked(api.createUserDataExport).mockReset(); vi.mocked(api.downloadUserDataExport).mockReset(); vi.mocked(api.deleteCurrentAccount).mockReset();
   vi.mocked(api.listRuns).mockResolvedValue({ items: [run] });
 });
 
@@ -79,6 +81,19 @@ describe('authentication shell', () => {
     await user.click(await screen.findByRole('button', { name: '退出' }));
     expect(api.logout).toHaveBeenCalledOnce();
     expect(await screen.findByRole('heading', { name: '登录控制台' })).toBeInTheDocument();
+  });
+});
+
+describe('account data', () => {
+  it('exposes owner data export from the account page', async () => {
+    vi.mocked(api.getCurrentUser).mockResolvedValue(viewer);
+    vi.mocked(api.createUserDataExport).mockResolvedValue({ id: '00000000-0000-4000-8000-000000000030', expiresAt: '2026-08-10T08:15:00Z' });
+    vi.mocked(api.downloadUserDataExport).mockResolvedValue();
+    const user = userEvent.setup();
+    renderApp('/account');
+    await user.click(await screen.findByRole('button', { name: '生成并下载' }));
+    await waitFor(() => expect(api.downloadUserDataExport).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000030'));
+    expect(screen.getByRole('status')).toHaveTextContent('导出已开始下载');
   });
 });
 

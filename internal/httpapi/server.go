@@ -28,6 +28,7 @@ import (
 	"forgeflow/internal/governance"
 	"forgeflow/internal/observability"
 	repoharness "forgeflow/internal/repository"
+	"forgeflow/internal/userdata"
 )
 
 const SessionCookie = "forgeflow_session"
@@ -53,6 +54,7 @@ type Options struct {
 	GitCommit       string
 	Governance      *governance.Store
 	Catalog         *governance.Catalog
+	UserData        *userdata.Service
 }
 
 type Server struct {
@@ -67,7 +69,7 @@ const principalKey contextKey = "principal"
 const requestIDKey contextKey = "request-id"
 
 func New(options Options) (*Server, error) {
-	if options.Auth == nil || options.Control == nil || options.Runs == nil || options.Artifacts == nil || options.Inspector == nil || options.Governance == nil || options.Catalog == nil {
+	if options.Auth == nil || options.Control == nil || options.Runs == nil || options.Artifacts == nil || options.Inspector == nil || options.Governance == nil || options.Catalog == nil || options.UserData == nil {
 		return nil, fmt.Errorf("HTTP API dependencies are required")
 	}
 	if options.CookieMaxAge <= 0 {
@@ -105,6 +107,11 @@ func New(options Options) (*Server, error) {
 	mux.Handle("GET /api/v1/auth/me", s.protected(false, http.HandlerFunc(s.me)))
 	mux.Handle("GET /api/v1/auth/sessions", s.protected(false, http.HandlerFunc(s.sessions)))
 	mux.Handle("DELETE /api/v1/auth/sessions/{sessionId}", s.protected(true, s.validatedID("sessionId", http.HandlerFunc(s.revokeSession))))
+	mux.Handle("POST /api/v1/account/exports", s.protected(true, http.HandlerFunc(s.createUserDataExport)))
+	mux.Handle("GET /api/v1/account/exports/{exportId}/content", s.protected(false, s.validatedID("exportId", http.HandlerFunc(s.downloadUserDataExport))))
+	mux.Handle("DELETE /api/v1/account", s.protected(true, http.HandlerFunc(s.deleteAccount)))
+	mux.Handle("GET /api/v1/admin/user-deletions/{deletionId}", s.protected(false, s.validatedID("deletionId", http.HandlerFunc(s.getUserDeletion))))
+	mux.Handle("POST /api/v1/admin/user-deletions/{deletionId}/retry", s.protected(true, s.validatedID("deletionId", http.HandlerFunc(s.retryUserDeletion))))
 	mux.Handle("POST /api/v1/repositories", s.protected(true, http.HandlerFunc(s.createRepository)))
 	mux.Handle("GET /api/v1/repositories", s.protected(false, http.HandlerFunc(s.listRepositories)))
 	mux.Handle("GET /api/v1/repositories/{repositoryId}", s.protected(false, s.validatedID("repositoryId", http.HandlerFunc(s.getRepository))))
@@ -308,6 +315,99 @@ func (s *Server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		s.clearCookies(w)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) createUserDataExport(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !s.allowMutation(w, r, "data-export:"+p.User.ID) {
+		return
+	}
+	ticket, err := s.options.UserData.CreateExport(r.Context(), p.User.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "account.export.create", "user_data_export", ticket.ID, map[string]any{"expiresAt": ticket.ExpiresAt})
+	w.Header().Set("Location", "/api/v1/account/exports/"+ticket.ID+"/content")
+	writeJSON(w, http.StatusCreated, ticket)
+}
+
+func (s *Server) downloadUserDataExport(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	exportID := r.PathValue("exportId")
+	archive, err := s.options.UserData.BuildExport(r.Context(), p.User.ID, exportID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "account.export.download", "user_data_export", exportID, map[string]any{"bytes": len(archive.Data)})
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", archive.Filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(archive.Data)))
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(archive.Data); err != nil {
+		slog.Warn("user data export response write failed", "export_id", exportID, "error", err)
+	}
+}
+
+func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !s.allowMutation(w, r, "account-delete:"+p.User.ID) {
+		return
+	}
+	var in struct {
+		Password     string `json:"password"`
+		Confirmation string `json:"confirmation"`
+	}
+	if err := decode(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if in.Confirmation != "DELETE" {
+		s.fail(w, r, validation("confirmation must equal DELETE"))
+		return
+	}
+	if err := s.options.Auth.VerifyCurrentPassword(r.Context(), p.User.ID, in.Password); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	deletion, err := s.options.UserData.RequestDeletion(r.Context(), p.User.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "account.delete.request", "user_deletion", deletion.ID, map[string]any{"backupPurgeAfter": deletion.BackupPurgeAfter})
+	s.clearCookies(w)
+	writeJSON(w, http.StatusAccepted, deletion)
+}
+
+func (s *Server) getUserDeletion(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !isAdmin(p) {
+		s.fail(w, r, forbidden())
+		return
+	}
+	value, err := s.options.UserData.GetDeletion(r.Context(), r.PathValue("deletionId"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) retryUserDeletion(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	if !isAdmin(p) {
+		s.fail(w, r, forbidden())
+		return
+	}
+	value, err := s.options.UserData.RetryDeletion(r.Context(), r.PathValue("deletionId"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, p.User.ID, "account.delete.retry", "user_deletion", value.ID, nil)
+	writeJSON(w, http.StatusAccepted, value)
 }
 
 func (s *Server) createRepository(w http.ResponseWriter, r *http.Request) {

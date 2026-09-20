@@ -43,10 +43,10 @@ ForgeFlow 只为以下用途处理数据：认证与授权、执行用户明确�
 2. Data Owner 创建不可猜 request ID，记录用户、范围、UTC、截止时间和审批人，不记录密码。
 3. 仅查询 owner-scoped 用户、Repository metadata、Run、审批、事件和 Artifact；Secret、内部检测规则、其他租户、Private Grader/隐藏测试和内部安全证据不导出。
 4. 生成结构化 JSON manifest 和原始用户 Artifact，逐项记录 SHA-256、大小、内容类型与时间。
-5. 使用短时、单次、HTTPS 下载或加密离线交付；下载 URL 不进入普通日志，默认 24 小时过期。
+5. 使用登录态、owner-bound、一次性、HTTPS 下载或加密离线交付；下载 URL 不进入普通日志，工程默认 15 分钟过期。
 6. 记录交付审计并删除临时导出包。
 
-当前没有自助导出端点。初始邀请制阶段可由经批准的双人运维流程执行；开放自助注册或规模化 Production 前必须实现 owner-scoped 导出 API/Job、速率限制和集成测试。
+Migration 6 已实现 owner-scoped 自助导出 API、Web 入口、CSRF/速率限制、敏感字段排除、Artifact 完整性校验和 PostgreSQL 集成测试；详细契约见[用户数据生命周期 Runbook](user-data-lifecycle.md)。真实 HTTPS Staging 的跨租户、过期、容量和对象存储验收尚未完成，因此仍不得视为 Production 验收通过。
 
 ## 5. 用户删除流程
 
@@ -57,7 +57,7 @@ ForgeFlow 只为以下用途处理数据：认证与授权、执行用户明确�
 5. 将删除标记加入备份恢复重放清单，并在备份尾期结束后验证不可恢复。
 6. 向用户确认完成范围、例外类别和备份尾期，不披露内部安全信息。
 
-当前代码没有完整的用户级联删除编排。Production 用户数据接入前必须实现 dry-run、双人确认、租户边界、幂等、部分失败恢复和审计测试；在实现前只能使用可整体销毁的专用测试租户。
+Migration 6 已实现密码二次验证、确认词、最后管理员保护、账号冻结、Session 撤销、异步 Job、Artifact 清单与逐项进度、失败重试、数据库级联、治理 actor 匿名化和最小完成审计。应用只记录 `backup_purge_after` 并保留恢复重放清单，不会自行改写不可变备份；真实备份介质、Legal Hold 和对象版本清除仍须在阶段二按[用户数据生命周期 Runbook](user-data-lifecycle.md)验收。
 
 ## 6. 访问、审计和 Legal Hold
 

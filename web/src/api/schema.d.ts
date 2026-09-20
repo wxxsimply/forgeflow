@@ -84,6 +84,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createUserDataExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/exports/{exportId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadUserDataExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteCurrentAccount"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/user-deletions/{deletionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only deletion status and Artifact purge manifest. */
+        get: operations["getUserDeletion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/user-deletions/{deletionId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin-only recovery for a failed deletion. */
+        post: operations["retryUserDeletion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/repositories": {
         parameters: {
             query?: never;
@@ -451,7 +533,7 @@ export interface components {
             email: string;
             role: components["schemas"]["Role"];
             /** @enum {string} */
-            status: "active" | "disabled";
+            status: "active" | "disabled" | "deletion_pending";
             /** Format: date-time */
             createdAt: string;
         };
@@ -480,6 +562,35 @@ export interface components {
             items: components["schemas"]["Session"][];
             /** Format: uuid */
             currentSessionId: string;
+        };
+        UserDataExportTicket: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DeleteAccountRequest: {
+            password: string;
+            /** @constant */
+            confirmation: "DELETE";
+        };
+        UserDeletion: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "pending" | "processing" | "failed" | "completed";
+            artifactManifest: components["schemas"]["Artifact"][];
+            deletedArtifactIds: string[];
+            attempts: number;
+            lastError?: string;
+            /** Format: date-time */
+            backupPurgeAfter: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            completedAt?: string;
         };
         Repository: {
             /** Format: uuid */
@@ -860,8 +971,8 @@ export interface components {
         EvalRun: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            createdBy: string;
+            /** @description Empty after the originating user is deleted */
+            createdBy?: string;
             dataset: string;
             datasetVersion: string;
             /** @enum {string} */
@@ -931,8 +1042,8 @@ export interface components {
             model: string;
             /** Format: uuid */
             evalRunId: string;
-            /** Format: uuid */
-            promotedBy: string;
+            /** @description Empty after the promoting user is deleted */
+            promotedBy?: string;
             /** Format: uuid */
             rollbackOf?: string;
             comment: string;
@@ -982,6 +1093,8 @@ export interface components {
         ArtifactId: string;
         ApprovalId: string;
         SessionId: string;
+        ExportId: string;
+        DeletionId: string;
         EvalRunId: string;
         AgentName: string;
         PromptVersion: string;
@@ -1101,6 +1214,130 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["Error"];
+        };
+    };
+    createUserDataExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["CSRF"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Short-lived one-time export ticket */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDataExportTicket"];
+                };
+            };
+            429: components["responses"]["Error"];
+        };
+    };
+    downloadUserDataExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exportId: components["parameters"]["ExportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owner-scoped ZIP containing database.json and verified Artifact bodies */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteCurrentAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["CSRF"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account frozen and deletion queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDeletion"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getUserDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deletionId: components["parameters"]["DeletionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deletion state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDeletion"];
+                };
+            };
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    retryUserDeletion: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": components["parameters"]["CSRF"];
+            };
+            path: {
+                deletionId: components["parameters"]["DeletionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deletion requeued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDeletion"];
+                };
+            };
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
     listRepositories: {

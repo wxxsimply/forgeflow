@@ -17,6 +17,8 @@ export type EvalRun = components['schemas']['EvalRun'];
 export type Agent = components['schemas']['Agent'];
 export type Prompt = components['schemas']['Prompt'];
 export type PromptRelease = components['schemas']['PromptRelease'];
+export type UserDataExportTicket = components['schemas']['UserDataExportTicket'];
+export type UserDeletion = components['schemas']['UserDeletion'];
 
 type APIErrorBody = components['schemas']['Error'];
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -79,6 +81,39 @@ export async function listSessions(): Promise<components['schemas']['SessionList
 export async function revokeSession(sessionId: string): Promise<void> {
   const { error, response } = await client.DELETE('/auth/sessions/{sessionId}', { params: { path: { sessionId }, header: csrfHeader() } });
   if (!response.ok) throw toAPIError(response, error);
+}
+
+export async function createUserDataExport(): Promise<UserDataExportTicket> {
+  const { data, error, response } = await client.POST('/account/exports', { params: { header: csrfHeader() } });
+  if (!data) throw toAPIError(response, error);
+  return data;
+}
+
+export async function downloadUserDataExport(exportId: string): Promise<void> {
+  const response = await fetch(`/api/v1/account/exports/${encodeURIComponent(exportId)}/content`, { credentials: 'include' });
+  if (!response.ok) {
+    let body: unknown;
+    try { body = await response.json(); } catch { body = undefined; }
+    throw toAPIError(response, body);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = match?.[1] || `forgeflow-user-data-${exportId}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  const objectURL = link.href;
+  link.remove();
+  URL.revokeObjectURL(objectURL);
+}
+
+export async function deleteCurrentAccount(password: string): Promise<UserDeletion> {
+  const { data, error, response } = await client.DELETE('/account', { params: { header: csrfHeader() }, body: { password, confirmation: 'DELETE' } });
+  if (!data) throw toAPIError(response, error);
+  memoryCSRFToken = '';
+  return data;
 }
 
 export async function listRepositories(cursor?: string): Promise<RepositoryPage> {

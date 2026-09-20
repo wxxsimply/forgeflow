@@ -27,6 +27,7 @@ import (
 	"forgeflow/internal/planner"
 	pg "forgeflow/internal/postgres"
 	"forgeflow/internal/repository"
+	"forgeflow/internal/userdata"
 	"forgeflow/migrations"
 )
 
@@ -180,6 +181,68 @@ func TestAuthenticationCSRFHorizontalAuthorizationAndApprovalVersion(t *testing.
 	response = f.request(t, admin, http.MethodGet, "/api/v1/runs/"+waiting.RunID+"/stream?once=1", "", false, nil)
 	if response.StatusCode != http.StatusOK || !strings.Contains(read(response), "id: 1") {
 		t.Fatalf("SSE did not expose sequenced events")
+	}
+}
+
+func TestUserDataExportAndAccountDeletionEndpoints(t *testing.T) {
+	f := newFixture(t, auth.NewMemoryLimiter(20, time.Minute))
+	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
+	viewerHash, err := auth.HashPassword("viewer secure password", testPasswordParams())
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewerID := domain.NewID()
+	if err := f.authStore.CreateUser(context.Background(), auth.UserCredential{User: auth.User{
+		ID: viewerID, Email: "viewer@example.com", Role: auth.RoleViewer, Status: "active", CreatedAt: time.Now().UTC(),
+	}, PasswordHash: viewerHash}); err != nil {
+		t.Fatal(err)
+	}
+	viewer := f.login(t, "viewer@example.com", "viewer secure password", "")
+
+	response := f.request(t, viewer, http.MethodPost, "/api/v1/account/exports", "", true, nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create export status=%d body=%s", response.StatusCode, read(response))
+	}
+	var ticket userdata.ExportTicket
+	decodeResponse(t, response, &ticket)
+	response = f.request(t, admin, http.MethodGet, "/api/v1/account/exports/"+ticket.ID+"/content", "", false, nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-owner export status=%d body=%s", response.StatusCode, read(response))
+	}
+	response = f.request(t, viewer, http.MethodGet, "/api/v1/account/exports/"+ticket.ID+"/content", "", false, nil)
+	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "application/zip" {
+		t.Fatalf("download export status=%d type=%q body=%s", response.StatusCode, response.Header.Get("Content-Type"), read(response))
+	}
+	archive, err := io.ReadAll(response.Body)
+	response.Body.Close()
+	if err != nil || len(archive) < 4 || string(archive[:2]) != "PK" {
+		t.Fatalf("invalid export archive bytes=%d err=%v", len(archive), err)
+	}
+	response = f.request(t, viewer, http.MethodGet, "/api/v1/account/exports/"+ticket.ID+"/content", "", false, nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("reused export ticket status=%d body=%s", response.StatusCode, read(response))
+	}
+
+	response = f.request(t, viewer, http.MethodDelete, "/api/v1/account", `{"password":"wrong","confirmation":"DELETE"}`, true, nil)
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong password deletion status=%d body=%s", response.StatusCode, read(response))
+	}
+	response = f.request(t, viewer, http.MethodDelete, "/api/v1/account", `{"password":"viewer secure password","confirmation":"DELETE"}`, true, nil)
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("delete account status=%d body=%s", response.StatusCode, read(response))
+	}
+	var deletion userdata.Deletion
+	decodeResponse(t, response, &deletion)
+	if deletion.Status != "pending" {
+		t.Fatalf("deletion=%+v", deletion)
+	}
+	var status string
+	if err := f.db.QueryRow(`SELECT status FROM users WHERE id=$1`, viewerID).Scan(&status); err != nil || status != "deletion_pending" {
+		t.Fatalf("user status=%q err=%v", status, err)
+	}
+	var jobs int
+	if err := f.db.QueryRow(`SELECT count(*) FROM jobs WHERE type='user.delete' AND payload->>'deletionId'=$1`, deletion.ID).Scan(&jobs); err != nil || jobs != 1 {
+		t.Fatalf("deletion jobs=%d err=%v", jobs, err)
 	}
 }
 
@@ -379,7 +442,7 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 	if err := migrations.Apply(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`TRUNCATE TABLE prompt_releases,eval_runs,audit_log,idempotency_keys,sessions,tool_calls,model_calls,artifacts,jobs,outbox,node_executions,approvals,run_events,checkpoints,runs,repositories,users CASCADE`); err != nil {
+	if _, err := db.Exec(`TRUNCATE TABLE user_deletion_requests,user_data_exports,prompt_releases,eval_runs,audit_log,idempotency_keys,sessions,tool_calls,model_calls,artifacts,jobs,outbox,node_executions,approvals,run_events,checkpoints,runs,repositories,users CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	store := auth.NewPostgresStore(db)
@@ -406,7 +469,11 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 		t.Fatal(err)
 	}
 
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog})
+	userDataService, err := userdata.New(db, artifactStore, userdata.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService})
 	if err != nil {
 		t.Fatal(err)
 	}

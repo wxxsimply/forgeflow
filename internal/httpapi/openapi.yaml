@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ForgeFlow Control Plane API
-  version: 0.10.0
+  version: 0.11.0
   description: Cookie-session API. Send X-CSRF-Token on every authenticated non-GET request.
 servers:
   - url: /api/v1
@@ -50,6 +50,49 @@ paths:
         - {$ref: '#/components/parameters/SessionId'}
         - {$ref: '#/components/parameters/CSRF'}
       responses: {'204': {description: Revoked}, '404': {$ref: '#/components/responses/Error'}}
+  /account/exports:
+    post:
+      operationId: createUserDataExport
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      responses:
+        '201': {description: Short-lived one-time export ticket, content: {application/json: {schema: {$ref: '#/components/schemas/UserDataExportTicket'}}}}
+        '429': {$ref: '#/components/responses/Error'}
+  /account/exports/{exportId}/content:
+    get:
+      operationId: downloadUserDataExport
+      parameters: [{$ref: '#/components/parameters/ExportId'}]
+      responses:
+        '200': {description: Owner-scoped ZIP containing database.json and verified Artifact bodies, content: {application/zip: {schema: {type: string, format: binary}}}}
+        '404': {$ref: '#/components/responses/Error'}
+  /account:
+    delete:
+      operationId: deleteCurrentAccount
+      parameters: [{$ref: '#/components/parameters/CSRF'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/DeleteAccountRequest'}}}
+      responses:
+        '202': {description: Account frozen and deletion queued, content: {application/json: {schema: {$ref: '#/components/schemas/UserDeletion'}}}}
+        '401': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /admin/user-deletions/{deletionId}:
+    get:
+      operationId: getUserDeletion
+      description: Admin-only deletion status and Artifact purge manifest.
+      parameters: [{$ref: '#/components/parameters/DeletionId'}]
+      responses:
+        '200': {description: Deletion state, content: {application/json: {schema: {$ref: '#/components/schemas/UserDeletion'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+  /admin/user-deletions/{deletionId}/retry:
+    post:
+      operationId: retryUserDeletion
+      description: Admin-only recovery for a failed deletion.
+      parameters: [{$ref: '#/components/parameters/DeletionId'}, {$ref: '#/components/parameters/CSRF'}]
+      responses:
+        '202': {description: Deletion requeued, content: {application/json: {schema: {$ref: '#/components/schemas/UserDeletion'}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
   /repositories:
     get:
       operationId: listRepositories
@@ -287,6 +330,8 @@ components:
     ArtifactId: {name: artifactId, in: path, required: true, schema: {type: string, format: uuid}}
     ApprovalId: {name: approvalId, in: path, required: true, schema: {type: string, format: uuid}}
     SessionId: {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+    ExportId: {name: exportId, in: path, required: true, schema: {type: string, format: uuid}}
+    DeletionId: {name: deletionId, in: path, required: true, schema: {type: string, format: uuid}}
     EvalRunId: {name: evalRunId, in: path, required: true, schema: {type: string, format: uuid}}
     AgentName: {name: agent, in: path, required: true, schema: {type: string, pattern: '^[a-z][a-z0-9_-]{1,63}$'}}
     PromptVersion: {name: version, in: path, required: true, schema: {type: string, pattern: '^v[1-9][0-9]*$'}}
@@ -304,7 +349,7 @@ components:
         id: {type: string, format: uuid}
         email: {type: string, format: email}
         role: {$ref: '#/components/schemas/Role'}
-        status: {type: string, enum: [active, disabled]}
+        status: {type: string, enum: [active, disabled, deletion_pending]}
         createdAt: {type: string, format: date-time}
     Session:
       type: object
@@ -334,6 +379,35 @@ components:
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/Session'}}
         currentSessionId: {type: string, format: uuid}
+    UserDataExportTicket:
+      type: object
+      additionalProperties: false
+      required: [id, expiresAt]
+      properties:
+        id: {type: string, format: uuid}
+        expiresAt: {type: string, format: date-time}
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [password, confirmation]
+      properties:
+        password: {type: string, minLength: 1, maxLength: 1024}
+        confirmation: {type: string, const: DELETE}
+    UserDeletion:
+      type: object
+      additionalProperties: false
+      required: [id, status, artifactManifest, deletedArtifactIds, attempts, backupPurgeAfter, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [pending, processing, failed, completed]}
+        artifactManifest: {type: array, items: {$ref: '#/components/schemas/Artifact'}}
+        deletedArtifactIds: {type: array, items: {type: string, format: uuid}}
+        attempts: {type: integer, minimum: 0}
+        lastError: {type: string}
+        backupPurgeAfter: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        completedAt: {type: string, format: date-time}
     Repository:
       type: object
       additionalProperties: false
@@ -699,10 +773,10 @@ components:
         reports: {type: array, minItems: 3, maxItems: 3, items: {$ref: '#/components/schemas/EvalReport'}}
     EvalRun:
       type: object
-      required: [id, createdBy, dataset, datasetVersion, status, report, createdAt]
+      required: [id, dataset, datasetVersion, status, report, createdAt]
       properties:
         id: {type: string, format: uuid}
-        createdBy: {type: string, format: uuid}
+        createdBy: {type: string, description: Empty after the originating user is deleted}
         dataset: {type: string}
         datasetVersion: {type: string}
         status: {type: string, enum: [completed, failed]}
@@ -759,7 +833,7 @@ components:
       properties: {agent: {type: string}, version: {type: string}, sha256: {type: string}, configured: {type: boolean}}
     PromptRelease:
       type: object
-      required: [id, agent, version, promptSha256, model, evalRunId, promotedBy, comment, active, createdAt]
+      required: [id, agent, version, promptSha256, model, evalRunId, comment, active, createdAt]
       properties:
         id: {type: string, format: uuid}
         agent: {type: string}
@@ -767,7 +841,7 @@ components:
         promptSha256: {type: string}
         model: {type: string}
         evalRunId: {type: string, format: uuid}
-        promotedBy: {type: string, format: uuid}
+        promotedBy: {type: string, description: Empty after the promoting user is deleted}
         rollbackOf: {type: string, format: uuid}
         comment: {type: string}
         active: {type: boolean}
