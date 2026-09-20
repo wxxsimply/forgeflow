@@ -67,6 +67,15 @@ type Config struct {
 	PostgresConnMaxLifetime  time.Duration
 	PostgresPingTimeout      time.Duration
 	ArtifactRoot             string
+	ArtifactBackend          string
+	ArtifactS3Bucket         string
+	ArtifactS3Region         string
+	ArtifactS3Endpoint       string
+	ArtifactS3Prefix         string
+	ArtifactS3SpoolDir       string
+	ArtifactS3SSE            string
+	ArtifactS3KMSKeyID       string
+	ArtifactS3UsePathStyle   bool
 	ArtifactMaxBytes         int
 	WorkerLeaseTTL           time.Duration
 	WorkerHeartbeatInterval  time.Duration
@@ -206,6 +215,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	artifactS3UsePathStyle, err := envBool("FORGEFLOW_ARTIFACT_S3_USE_PATH_STYLE", false)
+	if err != nil {
+		return Config{}, err
+	}
 	workerLeaseTTL, err := envDuration("FORGEFLOW_WORKER_LEASE_TTL", 30*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -272,7 +285,13 @@ func Load() (Config, error) {
 		PostgresMaxOpenConns: postgresMaxOpen, PostgresMaxIdleConns: postgresMaxIdle,
 		PostgresConnMaxLifetime: postgresLifetime, PostgresPingTimeout: postgresPingTimeout,
 		ArtifactRoot: envOrDefault("FORGEFLOW_ARTIFACT_ROOT", filepath.Join(dataDirectory, "artifacts")), ArtifactMaxBytes: artifactMaxBytes,
-		WorkerLeaseTTL: workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
+		ArtifactBackend:  envOrDefault("FORGEFLOW_ARTIFACT_BACKEND", "file"),
+		ArtifactS3Bucket: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_BUCKET")), ArtifactS3Region: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_REGION")),
+		ArtifactS3Endpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_ENDPOINT")), ArtifactS3Prefix: envOrDefault("FORGEFLOW_ARTIFACT_S3_PREFIX", "forgeflow/artifacts"),
+		ArtifactS3SpoolDir: envOrDefault("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", filepath.Join(dataDirectory, "artifact-spool")),
+		ArtifactS3SSE:      envOrDefault("FORGEFLOW_ARTIFACT_S3_SSE", "AES256"), ArtifactS3KMSKeyID: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID")),
+		ArtifactS3UsePathStyle: artifactS3UsePathStyle,
+		WorkerLeaseTTL:         workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
 		WorkerMetricsAddress:  envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
 		EnforceActiveReleases: governanceEnforceActiveReleases,
 		DockerEnabled:         dockerEnabled, DockerBinary: envOrDefault("FORGEFLOW_DOCKER_BINARY", "docker"),
@@ -386,6 +405,32 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.ArtifactRoot) == "" || c.ArtifactMaxBytes <= 0 {
 		return fmt.Errorf("artifact storage configuration is invalid")
+	}
+	if !oneOf(c.ArtifactBackend, "file", "s3") {
+		return fmt.Errorf("FORGEFLOW_ARTIFACT_BACKEND must be file or s3")
+	}
+	if c.Environment == "production" && c.ArtifactBackend != "s3" {
+		return fmt.Errorf("production requires FORGEFLOW_ARTIFACT_BACKEND=s3")
+	}
+	if c.ArtifactBackend == "s3" {
+		if strings.TrimSpace(c.ArtifactS3Bucket) == "" || strings.TrimSpace(c.ArtifactS3Region) == "" || strings.TrimSpace(c.ArtifactS3Prefix) == "" || strings.TrimSpace(c.ArtifactS3SpoolDir) == "" {
+			return fmt.Errorf("S3 artifact bucket, region, prefix, and spool directory are required")
+		}
+		if strings.Contains(c.ArtifactS3Prefix, "..") || strings.IndexByte(c.ArtifactS3Prefix, 0) >= 0 || strings.ContainsAny(c.ArtifactS3Prefix, "\r\n") {
+			return fmt.Errorf("FORGEFLOW_ARTIFACT_S3_PREFIX is invalid")
+		}
+		if c.ArtifactS3Endpoint != "" && !strings.HasPrefix(c.ArtifactS3Endpoint, "https://") && c.Environment != "development" && c.Environment != "test" {
+			return fmt.Errorf("S3 artifact endpoint must use HTTPS outside development and test")
+		}
+		if !oneOf(c.ArtifactS3SSE, "AES256", "aws:kms") {
+			return fmt.Errorf("FORGEFLOW_ARTIFACT_S3_SSE must be AES256 or aws:kms")
+		}
+		if c.ArtifactS3SSE == "aws:kms" && strings.TrimSpace(c.ArtifactS3KMSKeyID) == "" {
+			return fmt.Errorf("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID is required for aws:kms")
+		}
+		if c.Environment == "production" && c.ArtifactS3SSE != "aws:kms" {
+			return fmt.Errorf("production Artifact storage requires aws:kms")
+		}
 	}
 	if c.WorkerLeaseTTL < time.Second || c.WorkerLeaseTTL > time.Hour || c.WorkerHeartbeatInterval <= 0 || c.WorkerHeartbeatInterval >= c.WorkerLeaseTTL || c.WorkerPollInterval <= 0 {
 		return fmt.Errorf("worker lease timing is invalid")

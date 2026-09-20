@@ -75,7 +75,7 @@
 
 | ID | 风险 | 严重度 | 当前控制 | Owner | 阶段 9 关闭条件 | 状态 |
 |---|---|---|---|---|---|---|
-| P8-001 | Production 对象存储后端尚未接入；当前仅本地 FileStore | High | Staging 仅使用 fixture，Artifact 有 SHA-256 | Data Owner + Service Owner | 实现适配器、迁移/一致性/权限测试通过 | Open |
+| P8-001 | S3 适配器代码已准备，真实对象存储与恢复证据未验收 | High | KMS/tenant key/完整性/删除、迁移与失败补偿单元测试；Production 配置失败关闭 | Data Owner + Service Owner | 真实 Bucket/IAM/KMS、迁移/一致性/权限/恢复测试通过 | Open |
 | P8-002 | 专用 Worker 节点池、Sandbox daemon 和网络策略尚未部署 | Critical | 单机 Staging 仅模拟网络隔离 | Platform Owner | 真实专用执行面与正/负网络测试通过 | Open |
 | P8-003 | 管理员 MFA 尚无应用内实现 | High | Session/CSRF/RBAC；可使用上游保护 | Security Owner | IAP 强制 MFA 或应用 MFA 独立评审通过 | Open |
 | P8-004 | 外部 append-only 审计和受控 Trace 后端未接入 | High | PostgreSQL 审计、结构化日志 | Security Owner + Platform Owner | 删除保护、访问审计、脱敏和查询恢复验证 | Open |

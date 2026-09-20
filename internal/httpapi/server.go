@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 
 	"forgeflow/internal/apperror"
 	"forgeflow/internal/application"
+	"forgeflow/internal/artifact"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
@@ -38,6 +40,7 @@ type Options struct {
 	Auth            *auth.Service
 	Control         *controlplane.Store
 	Runs            *application.Service
+	Artifacts       artifact.Store
 	Inspector       *repoharness.GitInspector
 	CookieSecure    bool
 	CookieDomain    string
@@ -64,7 +67,7 @@ const principalKey contextKey = "principal"
 const requestIDKey contextKey = "request-id"
 
 func New(options Options) (*Server, error) {
-	if options.Auth == nil || options.Control == nil || options.Runs == nil || options.Inspector == nil || options.Governance == nil || options.Catalog == nil {
+	if options.Auth == nil || options.Control == nil || options.Runs == nil || options.Artifacts == nil || options.Inspector == nil || options.Governance == nil || options.Catalog == nil {
 		return nil, fmt.Errorf("HTTP API dependencies are required")
 	}
 	if options.CookieMaxAge <= 0 {
@@ -116,6 +119,7 @@ func New(options Options) (*Server, error) {
 	mux.Handle("POST /api/v1/runs/{runId}/resume", s.protected(true, s.validatedID("runId", http.HandlerFunc(s.resumeRun))))
 	mux.Handle("POST /api/v1/runs/{runId}/cancel", s.protected(true, s.validatedID("runId", http.HandlerFunc(s.cancelRun))))
 	mux.Handle("GET /api/v1/runs/{runId}/artifacts", s.protected(false, s.validatedID("runId", http.HandlerFunc(s.runArtifacts))))
+	mux.Handle("GET /api/v1/runs/{runId}/artifacts/{artifactId}/content", s.protected(false, s.validatedID("runId", s.validatedID("artifactId", http.HandlerFunc(s.runArtifactContent)))))
 	mux.Handle("GET /api/v1/runs/{runId}/report", s.protected(false, s.validatedID("runId", http.HandlerFunc(s.runReport))))
 	mux.Handle("GET /api/v1/approvals", s.protected(false, http.HandlerFunc(s.listApprovals)))
 	mux.Handle("GET /api/v1/approvals/{approvalId}", s.protected(false, s.validatedID("approvalId", http.HandlerFunc(s.getApproval))))
@@ -584,6 +588,62 @@ func (s *Server) runArtifacts(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
+func (s *Server) runArtifactContent(w http.ResponseWriter, r *http.Request) {
+	p := principal(r)
+	runID := r.PathValue("runId")
+	artifactID := r.PathValue("artifactId")
+	items, err := s.options.Control.ListArtifacts(r.Context(), runID, p.User.ID, isAdmin(p))
+	if err != nil {
+		s.fail(w, r, notFound(err))
+		return
+	}
+	found := false
+	for _, item := range items {
+		if item.ID == artifactID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.fail(w, r, notFound(artifact.ErrNotFound))
+		return
+	}
+	body, meta, err := s.options.Artifacts.Open(r.Context(), artifactID)
+	if err != nil {
+		if errors.Is(err, artifact.ErrNotFound) {
+			s.fail(w, r, notFound(err))
+		} else {
+			s.fail(w, r, apperror.Wrap(err, apperror.CodeInternal, "artifact.open", "Artifact could not be read"))
+		}
+		return
+	}
+	if meta.ID != artifactID || meta.RunID != runID {
+		_ = body.Close()
+		s.fail(w, r, apperror.New(apperror.CodeInternal, "Artifact metadata changed during download"))
+		return
+	}
+	if _, _, err := mime.ParseMediaType(meta.ContentType); err != nil {
+		_ = body.Close()
+		s.fail(w, r, apperror.New(apperror.CodeInternal, "Artifact content type is invalid"))
+		return
+	}
+	content, readErr := io.ReadAll(body)
+	closeErr := body.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		s.fail(w, r, apperror.Wrap(err, apperror.CodeInternal, "artifact.read", "Artifact integrity verification failed"))
+		return
+	}
+	w.Header().Set("Content-Type", meta.ContentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(meta.Size, 10))
+	s.audit(r, p.User.ID, "artifact.download", "artifact", meta.ID, map[string]any{"runId": meta.RunID, "sha256": meta.SHA256})
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", meta.ID))
+	w.Header().Set("X-Content-SHA256", meta.SHA256)
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(content); err != nil {
+		slog.Warn("Artifact response write failed", "artifact_id", meta.ID, "error", err)
+	}
+}
+
 func (s *Server) runReport(w http.ResponseWriter, r *http.Request) {
 	state, ok := s.authorizedRun(w, r)
 	if !ok {

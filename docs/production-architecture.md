@@ -63,7 +63,7 @@ API 将 Run/Checkpoint 和事务 Outbox 写入 PostgreSQL。Worker 使用独立�
 
 Worker 从受控仓库源建立临时 worktree，通过 mTLS 调度固定 digest Sandbox。Sandbox 无网络、非 root、只读根文件系统，并受 CPU/Memory/PID/超时约束。Patch、测试和报告先计算 SHA-256，再由 Worker 写入对象存储；PostgreSQL 只保存不可猜 storage key、摘要、大小和类型。API 在 owner/RBAC 检查后读取或签发短时下载 URL。
 
-当前代码仅实现 `artifact.Store` 的本地文件后端，且 Production 对象存储适配器尚未接入进程组合。阶段 9 开始 Production 部署前必须实现并测试对象存储后端、双写/迁移或一次性导入方案；在此之前仅允许 Staging fixture，不允许 Production 用户数据。
+当前代码已实现 `artifact.Store` 的本地文件与 S3/S3-compatible 后端：API 下载和逐 Run 迁移使用配置后端，API/Worker 启动会构造后端并执行 Bucket preflight；当前 Worker 主工作流尚未持久化 Artifact，启用写入时仍须做集成验收。Production 配置失败关闭到 HTTPS + SSE-KMS，下载先做 owner/RBAC 和完整性校验，迁移保留源文件并使用 CAS 切换和失败补偿。真实 Bucket policy、IAM/KMS、版本控制、生命周期、访问审计、迁移和恢复尚待阶段二验收；在此之前 `P8-001` 保持 `Open`，不允许 Production 用户数据。
 
 ### 5.4 Telemetry 与备份
 

@@ -59,5 +59,5 @@ ForgeFlow 的主体工程实现、Git/GitHub 基线、30 个真实 Fixture、隔
 3. 按 `docs/release-images.md` 构建、扫描、签名并由发布负责人手动上传五类不可变镜像，记录 digest、SBOM、provenance 和漏洞门禁。
 4. 准备域名、DNS、TLS 邮箱、Registry、OpenAI/PostgreSQL/Alert Secret 和专用 Staging 主机，执行 Preflight 与 Release。
 5. 在 Staging 签署 HTTPS 全链路、Sandbox、告警投递、备份恢复、版本回滚和 3～5 分钟 Demo 证据。
-6. 实现 Production 对象存储适配器、完整用户导出/级联删除，并验证管理员 MFA、不可篡改审计、Provider/Region/子处理者审批及独立值班/安全评审人员。
+6. Production 对象存储适配器代码基础已准备，但仍需真实环境验收；继续实现完整用户导出/级联删除，并验证管理员 MFA、不可篡改审计、Provider/Region/子处理者审批及独立值班/安全评审人员。
 7. 只有上述结果及 Production Go/No-Go 全部通过，才允许打 `v1.0.0`、开放 Production 流量或宣传候选改进结论。

@@ -40,7 +40,7 @@
 
 ## 残余风险与生产阻断项
 
-- `P8-001`：当前 Artifact 只有本地 FileStore，Production 对象存储适配器、迁移和一致性验证尚未完成。
+- `P8-001`：S3 适配器、逐 Run 迁移和补偿恢复代码已准备；真实 Bucket/IAM/KMS、版本/生命周期、权限、迁移一致性与恢复验证尚未完成。
 - `P8-002`：Compose Worker 仍与控制面同机；Production 专用 Worker/Sandbox 节点池和网络策略尚未部署。
 - `P8-003`：应用没有内建管理员 MFA；上线前必须由批准的 IAP 强制 MFA 或实现应用 MFA。
 - `P8-004`：OTel/审计仍未接入外部 append-only、删除保护的 Production 后端。

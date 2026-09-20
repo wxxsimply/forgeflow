@@ -43,4 +43,26 @@ func (m *MemoryMetadata) List(_ context.Context, runID string) ([]Meta, error) {
 	return result, nil
 }
 
+func (m *MemoryMetadata) UpdateStorageKey(_ context.Context, id, previous, next string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	meta, exists := m.items[id]
+	if !exists {
+		return ErrNotFound
+	}
+	if meta.StorageKey != previous {
+		return ErrStorageKeyChanged
+	}
+	meta.StorageKey = next
+	m.items[id] = meta
+	return nil
+}
+
+func (m *MemoryMetadata) Delete(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.items, id)
+	return nil
+}
+
 var _ MetadataRepository = (*MemoryMetadata)(nil)

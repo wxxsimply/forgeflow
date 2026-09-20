@@ -170,6 +170,13 @@ paths:
       parameters: [{$ref: '#/components/parameters/RunId'}]
       responses:
         '200': {description: Artifact metadata, content: {application/json: {schema: {$ref: '#/components/schemas/ArtifactList'}}}}
+  /runs/{runId}/artifacts/{artifactId}/content:
+    get:
+      operationId: getRunArtifactContent
+      parameters: [{$ref: '#/components/parameters/RunId'}, {$ref: '#/components/parameters/ArtifactId'}]
+      responses:
+        '200': {description: Verified Artifact body, content: {application/octet-stream: {schema: {type: string, format: binary}}}}
+        '404': {$ref: '#/components/responses/Error'}
   /runs/{runId}/report:
     get:
       operationId: getRunReport
@@ -277,6 +284,7 @@ components:
     Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
     RunId: {name: runId, in: path, required: true, schema: {type: string, format: uuid}}
     RepositoryId: {name: repositoryId, in: path, required: true, schema: {type: string, format: uuid}}
+    ArtifactId: {name: artifactId, in: path, required: true, schema: {type: string, format: uuid}}
     ApprovalId: {name: approvalId, in: path, required: true, schema: {type: string, format: uuid}}
     SessionId: {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
     EvalRunId: {name: evalRunId, in: path, required: true, schema: {type: string, format: uuid}}

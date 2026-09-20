@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"forgeflow/internal/application"
+	"forgeflow/internal/artifact"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
@@ -35,6 +36,7 @@ type apiFixture struct {
 	auth      *auth.Service
 	authStore *auth.PostgresStore
 	runs      *application.Service
+	artifacts artifact.Store
 }
 
 func TestAuthenticationCSRFHorizontalAuthorizationAndApprovalVersion(t *testing.T) {
@@ -127,6 +129,25 @@ func TestAuthenticationCSRFHorizontalAuthorizationAndApprovalVersion(t *testing.
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("invalid admin eval import status=%d body=%s", response.StatusCode, read(response))
 	}
+	createdArtifact, err := f.artifacts.Put(context.Background(), artifact.PutRequest{
+		OwnerID: admin.userID, RunID: queued.RunID, Kind: artifact.KindLog, ContentType: "text/plain",
+	}, strings.NewReader("verified evidence"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadPath := "/api/v1/runs/" + queued.RunID + "/artifacts/" + createdArtifact.ID + "/content"
+	response = f.request(t, admin, http.MethodGet, downloadPath, "", false, nil)
+	if response.StatusCode != http.StatusOK || response.Header.Get("X-Content-SHA256") != createdArtifact.SHA256 {
+		t.Fatalf("Artifact download status=%d sha=%q body=%s", response.StatusCode, response.Header.Get("X-Content-SHA256"), read(response))
+	}
+	if content := read(response); content != "verified evidence" {
+		t.Fatalf("Artifact download body=%q", content)
+	}
+	response = f.request(t, viewer, http.MethodGet, downloadPath, "", false, nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-tenant Artifact download status=%d body=%s", response.StatusCode, read(response))
+	}
+
 	response = f.request(t, viewer, http.MethodGet, "/api/v1/runs/"+queued.RunID, "", false, nil)
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("horizontal read status=%d body=%s", response.StatusCode, read(response))
@@ -380,13 +401,18 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter) *apiFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog})
+	artifactStore, err := artifact.NewFileStore(t.TempDir(), artifact.NewPostgresMetadata(db), 1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog})
 	if err != nil {
 		t.Fatal(err)
 	}
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
-	return &apiFixture{server: httpServer, db: db, auth: authService, authStore: store, runs: runs}
+	return &apiFixture{server: httpServer, db: db, auth: authService, authStore: store, runs: runs, artifacts: artifactStore}
 }
 func testPasswordParams() auth.PasswordParams {
 	return auth.PasswordParams{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}

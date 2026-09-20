@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"forgeflow/internal/application"
+	"forgeflow/internal/artifact"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
@@ -65,6 +66,13 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err := pg.CheckSchema(ctx, db); err != nil {
 		return err
 	}
+	artifactStore, err := artifact.NewConfiguredStore(ctx, configuration, artifact.NewPostgresMetadata(db))
+	if err != nil {
+		return fmt.Errorf("configure Artifact storage: %w", err)
+	}
+	if err := artifactStore.Check(ctx); err != nil {
+		return fmt.Errorf("artifact storage preflight failed: %w", err)
+	}
 	authStore := auth.NewPostgresStore(db)
 	authService, err := auth.NewService(authStore, auth.Options{SessionTTL: configuration.SessionTTL, IdleTTL: configuration.SessionIdleTTL})
 	if err != nil {
@@ -89,7 +97,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
-	api, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runService, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog})
+	api, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog})
 	if err != nil {
 		return err
 	}
