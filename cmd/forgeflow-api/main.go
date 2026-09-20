@@ -71,7 +71,7 @@ func run(ctx context.Context, configuration config.Config) error {
 		return fmt.Errorf("configure Artifact storage: %w", err)
 	}
 	if err := artifactStore.Check(ctx); err != nil {
-		return fmt.Errorf("Artifact storage preflight failed: %w", err)
+		return fmt.Errorf("artifact storage preflight failed: %w", err)
 	}
 	authStore := auth.NewPostgresStore(db)
 	authService, err := auth.NewService(authStore, auth.Options{SessionTTL: configuration.SessionTTL, IdleTTL: configuration.SessionIdleTTL})

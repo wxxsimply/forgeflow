@@ -141,7 +141,7 @@ func (s *S3Store) Put(ctx context.Context, request PutRequest, body io.Reader) (
 		return Meta{}, err
 	}
 	if !safeKeySegment(request.OwnerID) || !safeKeySegment(request.RunID) {
-		return Meta{}, fmt.Errorf("Artifact owner and run identifiers are required for S3 isolation")
+		return Meta{}, fmt.Errorf("artifact owner and run identifiers are required for S3 isolation")
 	}
 	file, size, digest, cleanup, err := s.spool(body)
 	if err != nil {
@@ -170,10 +170,10 @@ func (s *S3Store) Open(ctx context.Context, artifactID string) (io.ReadCloser, M
 		return nil, Meta{}, err
 	}
 	if meta.Size < 0 || meta.Size > s.options.MaxBytes {
-		return nil, Meta{}, fmt.Errorf("Artifact size is outside the configured limit")
+		return nil, Meta{}, fmt.Errorf("artifact size is outside the configured limit")
 	}
 	if !s.ownsStorageKey(meta) {
-		return nil, Meta{}, fmt.Errorf("Artifact storage key is outside the configured tenant prefix")
+		return nil, Meta{}, fmt.Errorf("artifact storage key is outside the configured tenant prefix")
 	}
 	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.options.Bucket), Key: aws.String(meta.StorageKey), ChecksumMode: types.ChecksumModeEnabled,
@@ -197,7 +197,7 @@ func (s *S3Store) Delete(ctx context.Context, artifactID string) error {
 		return err
 	}
 	if !s.ownsStorageKey(meta) {
-		return fmt.Errorf("Artifact storage key is outside the configured tenant prefix")
+		return fmt.Errorf("artifact storage key is outside the configured tenant prefix")
 	}
 	if err := s.deleteObject(ctx, meta.StorageKey); err != nil {
 		return err
@@ -324,30 +324,30 @@ func (s *S3Store) verifyObject(ctx context.Context, meta Meta) error {
 
 func (s *S3Store) validateObject(output *s3.GetObjectOutput, meta Meta) error {
 	if output == nil || output.Body == nil || output.ContentLength == nil || *output.ContentLength != meta.Size {
-		return fmt.Errorf("Artifact object size does not match metadata")
+		return fmt.Errorf("artifact object size does not match metadata")
 	}
 	if aws.ToString(output.ContentType) != meta.ContentType {
-		return fmt.Errorf("Artifact object content type does not match metadata")
+		return fmt.Errorf("artifact object content type does not match metadata")
 	}
 	ownerID, ok := s.storageKeyOwner(meta)
 	if !ok {
-		return fmt.Errorf("Artifact storage key is outside the configured tenant prefix")
+		return fmt.Errorf("artifact storage key is outside the configured tenant prefix")
 	}
 	if output.Metadata["artifact-id"] != meta.ID || output.Metadata["run-id"] != meta.RunID ||
 		output.Metadata["owner-id"] != ownerID || output.Metadata["sha256"] != meta.SHA256 {
-		return fmt.Errorf("Artifact object metadata does not match PostgreSQL")
+		return fmt.Errorf("artifact object metadata does not match PostgreSQL")
 	}
 	if output.ServerSideEncryption != s.sse {
-		return fmt.Errorf("Artifact object encryption does not match configuration")
+		return fmt.Errorf("artifact object encryption does not match configuration")
 	}
 	if s.sse == types.ServerSideEncryptionAwsKms &&
 		strings.TrimSpace(aws.ToString(output.SSEKMSKeyId)) != strings.TrimSpace(s.options.KMSKeyID) {
-		return fmt.Errorf("Artifact object KMS key identity does not match configuration")
+		return fmt.Errorf("artifact object KMS key identity does not match configuration")
 	}
 	if output.ChecksumSHA256 != nil {
 		digestBytes, err := hex.DecodeString(meta.SHA256)
 		if err != nil || aws.ToString(output.ChecksumSHA256) != base64.StdEncoding.EncodeToString(digestBytes) {
-			return fmt.Errorf("Artifact object checksum header does not match metadata")
+			return fmt.Errorf("artifact object checksum header does not match metadata")
 		}
 	}
 	return nil
@@ -370,7 +370,7 @@ func (s *S3Store) spool(body io.Reader) (*os.File, int64, string, func(), error)
 	}
 	if written > s.options.MaxBytes {
 		cleanup()
-		return nil, 0, "", func() {}, fmt.Errorf("Artifact exceeds byte limit")
+		return nil, 0, "", func() {}, fmt.Errorf("artifact exceeds byte limit")
 	}
 	if err := file.Sync(); err != nil {
 		cleanup()

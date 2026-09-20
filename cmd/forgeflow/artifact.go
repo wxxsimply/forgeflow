@@ -62,7 +62,7 @@ func runArtifactMigration(ctx context.Context, args []string, configuration conf
 		return fmt.Errorf("configured Artifact destination is not S3")
 	}
 	if err := destination.Check(ctx); err != nil {
-		return fmt.Errorf("Artifact destination preflight failed: %w", err)
+		return fmt.Errorf("artifact destination preflight failed: %w", err)
 	}
 	result, err := destination.MigrateRun(ctx, source, ownerID, normalizedRunID)
 	if err != nil {

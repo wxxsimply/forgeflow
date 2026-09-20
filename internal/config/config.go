@@ -410,7 +410,7 @@ func (c Config) Validate() error {
 		return fmt.Errorf("FORGEFLOW_ARTIFACT_BACKEND must be file or s3")
 	}
 	if c.Environment == "production" && c.ArtifactBackend != "s3" {
-		return fmt.Errorf("Production requires FORGEFLOW_ARTIFACT_BACKEND=s3")
+		return fmt.Errorf("production requires FORGEFLOW_ARTIFACT_BACKEND=s3")
 	}
 	if c.ArtifactBackend == "s3" {
 		if strings.TrimSpace(c.ArtifactS3Bucket) == "" || strings.TrimSpace(c.ArtifactS3Region) == "" || strings.TrimSpace(c.ArtifactS3Prefix) == "" || strings.TrimSpace(c.ArtifactS3SpoolDir) == "" {
@@ -429,7 +429,7 @@ func (c Config) Validate() error {
 			return fmt.Errorf("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID is required for aws:kms")
 		}
 		if c.Environment == "production" && c.ArtifactS3SSE != "aws:kms" {
-			return fmt.Errorf("Production Artifact storage requires aws:kms")
+			return fmt.Errorf("production Artifact storage requires aws:kms")
 		}
 	}
 	if c.WorkerLeaseTTL < time.Second || c.WorkerLeaseTTL > time.Hour || c.WorkerHeartbeatInterval <= 0 || c.WorkerHeartbeatInterval >= c.WorkerLeaseTTL || c.WorkerPollInterval <= 0 {

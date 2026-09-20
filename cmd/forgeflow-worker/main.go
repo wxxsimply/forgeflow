@@ -82,7 +82,7 @@ func run(ctx context.Context, configuration config.Config) error {
 		return fmt.Errorf("configure Artifact storage: %w", err)
 	}
 	if err := artifactStore.Check(ctx); err != nil {
-		return fmt.Errorf("Artifact storage preflight failed: %w", err)
+		return fmt.Errorf("artifact storage preflight failed: %w", err)
 	}
 	var releaseReadiness func(context.Context) error
 	if configuration.EnforceActiveReleases {
