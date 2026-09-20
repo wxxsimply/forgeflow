@@ -138,4 +138,4 @@ jobs:
           cache: true
 
       - name: Apply migrations and run database integration tests
-        run: go test -p 1 ./internal/postgres ./internal/httpapi
+        run: go test -p 1 ./internal/postgres ./internal/userdata ./internal/httpapi

@@ -57,6 +57,19 @@ try {
         Pop-Location
     }
 
+    foreach ($validator in @(
+        "validate-staging-assets.ps1",
+        "validate-operations-assets.ps1",
+        "validate-production-readiness.ps1",
+        "validate-release-assets.ps1"
+    )) {
+        & (Join-Path $workspace "scripts\$validator")
+        if (-not $?) { throw "$validator failed" }
+    }
+
+    & (Join-Path $workspace "scripts\stage-9-acceptance-preflight.ps1") -SkipEngineeringValidators
+    if (-not $?) { throw "stage-9-acceptance-preflight.ps1 failed" }
+
     Write-Host "ForgeFlow verification passed."
 }
 finally {

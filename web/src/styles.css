@@ -369,3 +369,15 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-bottom: 56px; }
+.account-card { padding: 26px; border-top: 2px solid var(--ink); background: #fff; box-shadow: 0 12px 32px rgba(38, 43, 44, .06); }
+.account-card--danger { border-top-color: #a94432; }
+.account-card h2 { margin: 10px 0; color: var(--ink); }
+.account-card > p { min-height: 72px; color: var(--muted); font-size: .82rem; line-height: 1.65; }
+.account-delete-form { display: grid; gap: 9px; margin-top: 18px; }
+.account-delete-form label { margin-top: 7px; font-size: .76rem; font-weight: 700; }
+.account-delete-form input { width: 100%; padding: 12px 13px; color: var(--ink); border: 1px solid #c8cbc6; border-radius: 4px; background: #fff; }
+.account-delete-form .danger-button { justify-self: start; margin-top: 10px; min-height: 43px; }
+.form-success { color: #25734a; font-size: .76rem; }
+@media (max-width: 760px) { .account-grid { grid-template-columns: 1fr; } }

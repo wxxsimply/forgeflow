@@ -168,6 +168,21 @@ func (s *Service) ValidateCSRF(principal Principal, headerToken, cookieToken str
 	return nil
 }
 
+func (s *Service) VerifyCurrentPassword(ctx context.Context, userID, password string) error {
+	if len(password) == 0 || len(password) > 1024 {
+		return apperror.New(apperror.CodeUnauthorized, "password is incorrect")
+	}
+	credential, err := s.store.FindUserByID(ctx, userID)
+	if err != nil || credential.Status != "active" {
+		return apperror.New(apperror.CodeUnauthorized, "password is incorrect")
+	}
+	valid, err := VerifyPassword(credential.PasswordHash, password)
+	if err != nil || !valid {
+		return apperror.New(apperror.CodeUnauthorized, "password is incorrect")
+	}
+	return nil
+}
+
 func (s *Service) Sessions(ctx context.Context, userID string) ([]Session, error) {
 	return s.store.ListSessions(ctx, userID)
 }

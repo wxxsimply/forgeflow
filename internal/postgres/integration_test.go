@@ -211,8 +211,9 @@ func openTestDatabase(t *testing.T) *sql.DB {
 	if err := migrations.Apply(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`TRUNCATE TABLE audit_log,idempotency_keys,sessions,tool_calls,model_calls,artifacts,jobs,outbox,
-		node_executions,approvals,run_events,checkpoints,runs,repositories,users CASCADE`); err != nil {
+	if _, err := db.Exec(`TRUNCATE TABLE user_deletion_requests,user_data_exports,audit_log,idempotency_keys,sessions,
+		tool_calls,model_calls,artifacts,jobs,outbox,node_executions,approvals,run_events,checkpoints,
+		runs,repositories,users CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	return db

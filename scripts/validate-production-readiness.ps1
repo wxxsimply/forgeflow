@@ -38,9 +38,15 @@ foreach ($contract in @('99.90%', 'P95 ≤ 500 ms', '错误预算', '0.60', '30%
 Assert-Production ($slo -match 'PostgreSQL \| ≤ 15 分钟 \| ≤ 2 小时') 'Production database RPO/RTO targets are missing'
 
 $data = Read-Required 'docs/production-data-governance.md'
-foreach ($contract in @('Restricted', 'Confidential', '保留计划', '用户导出流程', '用户删除流程', '模型 Provider', 'Private Grader', '备份恢复重放清单', '自助导出端点', '用户级联删除')) {
+foreach ($contract in @('Restricted', 'Confidential', '保留计划', '用户导出流程', '用户删除流程', '模型 Provider', 'Private Grader', '备份恢复重放清单', 'owner-scoped 自助导出 API', '密码二次验证', '最后管理员保护', '数据库级联', 'backup_purge_after')) {
     Assert-Production ($data.Contains($contract)) "Production data governance is missing contract: $contract"
 }
+
+$lifecycle = Read-Required 'docs/user-data-lifecycle.md'
+foreach ($contract in @('POST /api/v1/account/exports', 'GET /api/v1/account/exports/{exportId}/content', 'DELETE /api/v1/account', 'GET /api/v1/admin/user-deletions/{deletionId}', '一次性使用', '固定确认词 `DELETE`', 'backup_purge_after')) {
+    Assert-Production ($lifecycle.Contains($contract)) "User data lifecycle runbook is missing contract: $contract"
+}
+Assert-Production ($lifecycle -match '工程实现完成.*不能关闭 Production 数据治理门禁') 'User data lifecycle runbook must preserve the real-environment evidence boundary'
 
 $operations = Read-Required 'docs/production-operations-governance.md'
 foreach ($contract in @('Primary', 'Secondary', 'P0', 'P1', 'High risk', 'Go/No-Go', 'Release Approver', 'Down Migration', '私有记录 ID')) {

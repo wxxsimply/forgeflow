@@ -33,6 +33,7 @@ import (
 	"forgeflow/internal/sandbox"
 	"forgeflow/internal/security"
 	toolruntime "forgeflow/internal/tool"
+	"forgeflow/internal/userdata"
 	"forgeflow/internal/worker"
 )
 
@@ -84,6 +85,10 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err := artifactStore.Check(ctx); err != nil {
 		return fmt.Errorf("artifact storage preflight failed: %w", err)
 	}
+	userDataService, err := userdata.New(db, artifactStore, userdata.Options{ExportTTL: configuration.UserDataExportTTL, MaxExportBytes: int64(configuration.UserDataExportMaxBytes), BackupRetention: configuration.UserDeletionBackupTTL})
+	if err != nil {
+		return err
+	}
 	var releaseReadiness func(context.Context) error
 	if configuration.EnforceActiveReleases {
 		catalog, err := governance.NewCatalog(configuration)
@@ -130,6 +135,18 @@ func run(ctx context.Context, configuration config.Config) error {
 		LeaseTTL: configuration.WorkerLeaseTTL, HeartbeatInterval: configuration.WorkerHeartbeatInterval,
 		EmptyPollInterval: configuration.WorkerPollInterval,
 		Handler: worker.HandlerFunc(func(jobContext context.Context, leased queue.LeasedJob) error {
+			if leased.Type == "user.delete" {
+				var payload struct {
+					DeletionID string `json:"deletionId"`
+				}
+				if err := json.Unmarshal(leased.Payload, &payload); err != nil || payload.DeletionID == "" {
+					return fmt.Errorf("invalid user deletion payload")
+				}
+				return userDataService.ProcessDeletion(jobContext, payload.DeletionID)
+			}
+			if leased.Type != "run.wakeup" {
+				return fmt.Errorf("unsupported job type %q", leased.Type)
+			}
 			if releaseReadiness != nil {
 				if err := releaseReadiness(jobContext); err != nil {
 					return fmt.Errorf("worker is not release-ready: %w", err)

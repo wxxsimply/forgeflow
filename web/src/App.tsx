@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { AppShell } from './components/AppShell';
 import { FullPageStatus } from './components/States';
+import { AccountPage } from './pages/AccountPage';
 import { ApprovalDetailPage } from './pages/ApprovalDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { LoginPage } from './pages/LoginPage';
@@ -27,6 +28,7 @@ export function App() {
       <Route path="/approvals" element={<ApprovalsPage />} />
       <Route path="/approvals/:approvalId" element={<ApprovalDetailPage />} />
       <Route path="/sessions" element={<SessionsPage />} />
+      <Route path="/account" element={<AccountPage />} />
       <Route path="/evals" element={<EvalsPage />} />
       <Route path="/evals/:evalRunId" element={<EvalDetailPage />} />
     </Route></Route>

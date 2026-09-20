@@ -184,4 +184,4 @@
 - 结果对应哪个提交或待提交工作区，服务器是否更新。
 - 下一步需要用户做哪一个具体操作。
 
-下一步：人工提交当前 `codex/production-object-store` 分支并创建 PR，不需要真实 Bucket、云凭据、部署、私有值或付费调用。PR #85 已合并为 `a5626d135d4e567fca89680d2f3242560c9e54f1`，Go、Web、PostgreSQL integration 和 deployment-assets 四项检查全部成功；本分支实现 S3/S3-compatible Artifact 后端、Production KMS/HTTPS 配置门禁、tenant/run key、完整性校验、幂等删除、失败补偿、逐 Run 迁移 CLI、API 下载授权和启动预检，并保留真实环境关闭清单。该 PR 合并且 CI 成功后，继续阶段一的用户导出与级联删除 PR；`P8-001` 在真实 Bucket/IAM/KMS、迁移、权限和恢复验收完成前仍保持 `Open`。
+下一步：人工提交当前 `codex/user-data-lifecycle` 分支并创建 PR，不需要真实 Bucket、备份介质、部署、私有值或付费调用。Production 对象存储 PR #86 已合并为 `de5995d265d109eb99226b091f06819fa8a39e47`；本分支实现 owner-scoped ZIP 导出、敏感字段排除、密码二次验证、最后管理员保护、Session 撤销、异步用户删除、Artifact 清单与部分失败续跑、数据库级联、治理 actor 匿名化、管理员恢复 API、Web 自助入口及 Migration 6。该 PR 合并且 CI 成功后，下一项单独处理管理员 MFA/IAP 方案；真实对象版本和备份恢复验收仍留在“3阶段任务”的阶段二。

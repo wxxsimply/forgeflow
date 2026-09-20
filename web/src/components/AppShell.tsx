@@ -16,6 +16,7 @@ export function AppShell() {
         <NavLink to="/approvals" className={navClass}><ApprovalIcon /><span>审批中心</span></NavLink>
         <NavLink to="/evals" className={navClass}><EvalIcon /><span>评测报告</span></NavLink>
         <NavLink to="/sessions" className={navClass}><SessionIcon /><span>登录设备</span></NavLink>
+        <NavLink to="/account" className={navClass}><AccountIcon /><span>数据与账户</span></NavLink>
       </nav>
       <div className="sidebar__footer"><span className="environment"><i /> 控制台已连接</span><span>交付管理控制台</span></div>
     </aside>
@@ -43,3 +44,4 @@ function RunIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d=
 function ApprovalIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zm3 5h8V6H8zm0 4h8v-2H8zm0 4h5v-2H8z" /></svg>; }
 function EvalIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16v2H4zm2-2V9h3v8zm5 0V3h3v14zm5 0v-5h3v5z" /></svg>; }
 function SessionIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5v2H5v11h14V10h-2V8a5 5 0 0 0-5-5Zm-3 7V8a3 3 0 0 1 6 0v2Z" /></svg>; }
+function AccountIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5Zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13.8a9.3 9.3 0 0 1-4.8-3.5c.8-1.6 2.7-2.3 4.8-2.3s4 .7 4.8 2.3a9.3 9.3 0 0 1-4.8 3.5Z" /></svg>; }

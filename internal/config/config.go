@@ -77,6 +77,9 @@ type Config struct {
 	ArtifactS3KMSKeyID       string
 	ArtifactS3UsePathStyle   bool
 	ArtifactMaxBytes         int
+	UserDataExportTTL        time.Duration
+	UserDataExportMaxBytes   int
+	UserDeletionBackupTTL    time.Duration
 	WorkerLeaseTTL           time.Duration
 	WorkerHeartbeatInterval  time.Duration
 	WorkerPollInterval       time.Duration
@@ -219,6 +222,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	userDataExportTTL, err := envDuration("FORGEFLOW_USER_DATA_EXPORT_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	userDataExportMaxBytes, err := envInt("FORGEFLOW_USER_DATA_EXPORT_MAX_BYTES", 512*1024*1024)
+	if err != nil {
+		return Config{}, err
+	}
+	userDeletionBackupTTL, err := envDuration("FORGEFLOW_USER_DELETION_BACKUP_TTL", 30*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
 	workerLeaseTTL, err := envDuration("FORGEFLOW_WORKER_LEASE_TTL", 30*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -291,7 +306,9 @@ func Load() (Config, error) {
 		ArtifactS3SpoolDir: envOrDefault("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", filepath.Join(dataDirectory, "artifact-spool")),
 		ArtifactS3SSE:      envOrDefault("FORGEFLOW_ARTIFACT_S3_SSE", "AES256"), ArtifactS3KMSKeyID: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID")),
 		ArtifactS3UsePathStyle: artifactS3UsePathStyle,
-		WorkerLeaseTTL:         workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
+		UserDataExportTTL:      userDataExportTTL, UserDataExportMaxBytes: userDataExportMaxBytes,
+		UserDeletionBackupTTL: userDeletionBackupTTL,
+		WorkerLeaseTTL:        workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
 		WorkerMetricsAddress:  envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
 		EnforceActiveReleases: governanceEnforceActiveReleases,
 		DockerEnabled:         dockerEnabled, DockerBinary: envOrDefault("FORGEFLOW_DOCKER_BINARY", "docker"),
@@ -431,6 +448,12 @@ func (c Config) Validate() error {
 		if c.Environment == "production" && c.ArtifactS3SSE != "aws:kms" {
 			return fmt.Errorf("production Artifact storage requires aws:kms")
 		}
+	}
+	if c.UserDataExportTTL < time.Minute || c.UserDataExportTTL > 24*time.Hour || c.UserDataExportMaxBytes < 1024*1024 || c.UserDataExportMaxBytes > 2*1024*1024*1024 {
+		return fmt.Errorf("user data export configuration is invalid")
+	}
+	if c.UserDeletionBackupTTL < 24*time.Hour || c.UserDeletionBackupTTL > 365*24*time.Hour {
+		return fmt.Errorf("user deletion backup retention must be between 24h and 8760h")
 	}
 	if c.WorkerLeaseTTL < time.Second || c.WorkerLeaseTTL > time.Hour || c.WorkerHeartbeatInterval <= 0 || c.WorkerHeartbeatInterval >= c.WorkerLeaseTTL || c.WorkerPollInterval <= 0 {
 		return fmt.Errorf("worker lease timing is invalid")

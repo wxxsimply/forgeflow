@@ -53,7 +53,7 @@ func (s *Store) ListEvalRuns(ctx context.Context, limit int) ([]EvalRun, error) 
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,created_by,dataset,dataset_version,status,report_json,created_at FROM eval_runs ORDER BY created_at DESC,id DESC LIMIT $1`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,COALESCE(created_by::text,''),dataset,dataset_version,status,report_json,created_at FROM eval_runs ORDER BY created_at DESC,id DESC LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *Store) ListEvalRuns(ctx context.Context, limit int) ([]EvalRun, error) 
 }
 
 func (s *Store) GetEvalRun(ctx context.Context, id string) (EvalRun, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id,created_by,dataset,dataset_version,status,report_json,created_at FROM eval_runs WHERE id=$1`, id)
+	row := s.db.QueryRowContext(ctx, `SELECT id,COALESCE(created_by::text,''),dataset,dataset_version,status,report_json,created_at FROM eval_runs WHERE id=$1`, id)
 	run, err := scanEvalRun(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return EvalRun{}, checkpoint.ErrNotFound
@@ -109,7 +109,7 @@ func InitialPromotionAllowed(report fulleval.Report) error {
 }
 
 func (s *Store) ActiveRelease(ctx context.Context, agent string) (PromptRelease, error) {
-	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE agent=$1 AND active`, agent))
+	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,COALESCE(promoted_by::text,''),COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE agent=$1 AND active`, agent))
 	if errors.Is(err, sql.ErrNoRows) {
 		return PromptRelease{}, checkpoint.ErrNotFound
 	}
@@ -117,7 +117,7 @@ func (s *Store) ActiveRelease(ctx context.Context, agent string) (PromptRelease,
 }
 
 func (s *Store) ListReleases(ctx context.Context) ([]PromptRelease, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases ORDER BY created_at DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,COALESCE(promoted_by::text,''),COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (s *Store) ListReleases(ctx context.Context) ([]PromptRelease, error) {
 }
 
 func (s *Store) GetRelease(ctx context.Context, id string) (PromptRelease, error) {
-	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,promoted_by,COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE id=$1`, id))
+	release, err := scanRelease(s.db.QueryRowContext(ctx, `SELECT id,agent,version,prompt_sha256,model,eval_run_id,COALESCE(promoted_by::text,''),COALESCE(rollback_of::text,''),comment,active,created_at FROM prompt_releases WHERE id=$1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return PromptRelease{}, checkpoint.ErrNotFound
 	}
