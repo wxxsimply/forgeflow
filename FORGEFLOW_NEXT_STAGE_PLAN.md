@@ -184,4 +184,4 @@
 - 结果对应哪个提交或待提交工作区，服务器是否更新。
 - 下一步需要用户做哪一个具体操作。
 
-下一步：人工提交当前 `codex/three-stage-task-plan` 分支并创建 PR，不需要部署、私有值或付费调用。PR #84 已合并为 `38a10120e0e365c984fe72885c85aa4b6594b4e6`，四项必需 CI 全部成功；重新审查确认个人预览和主体工程已完成，但 `v1.0.0` / Production 尚未完成。新增 `3阶段任务.md` 将剩余工作按原 11 个串行门禁压缩为“发布代码收口、候选冻结与正式 Eval”“不可变镜像与真实 Staging”“运维恢复、Go/No-Go 与发布”三个阶段，不降低既有验收标准。该 PR 合并且 CI 成功后，先从 Production 对象存储适配器开始阶段一的仓库能力收口；所有计划内代码 PR 合并后才能重新生成并预检私有 Freeze 计划，未完成预检和单独付费授权前不得启动候选 smoke。
+下一步：人工提交当前 `codex/production-object-store` 分支并创建 PR，不需要真实 Bucket、云凭据、部署、私有值或付费调用。PR #85 已合并为 `a5626d135d4e567fca89680d2f3242560c9e54f1`，Go、Web、PostgreSQL integration 和 deployment-assets 四项检查全部成功；本分支实现 S3/S3-compatible Artifact 后端、Production KMS/HTTPS 配置门禁、tenant/run key、完整性校验、幂等删除、失败补偿、逐 Run 迁移 CLI、API 下载授权和启动预检，并保留真实环境关闭清单。该 PR 合并且 CI 成功后，继续阶段一的用户导出与级联删除 PR；`P8-001` 在真实 Bucket/IAM/KMS、迁移、权限和恢复验收完成前仍保持 `Open`。

@@ -260,6 +260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{runId}/artifacts/{artifactId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRunArtifactContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs/{runId}/report": {
         parameters: {
             query?: never;
@@ -963,6 +979,7 @@ export interface components {
         Limit: number;
         RunId: string;
         RepositoryId: string;
+        ArtifactId: string;
         ApprovalId: string;
         SessionId: string;
         EvalRunId: string;
@@ -1433,6 +1450,30 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactList"];
                 };
             };
+        };
+    };
+    getRunArtifactContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["RunId"];
+                artifactId: components["parameters"]["ArtifactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified Artifact body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["Error"];
         };
     };
     getRunReport: {

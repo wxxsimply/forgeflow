@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"forgeflow/internal/application"
+	"forgeflow/internal/artifact"
 	"forgeflow/internal/assessment"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
@@ -75,6 +76,13 @@ func run(ctx context.Context, configuration config.Config) error {
 	defer db.Close()
 	if err := pg.CheckSchema(ctx, db); err != nil {
 		return err
+	}
+	artifactStore, err := artifact.NewConfiguredStore(ctx, configuration, artifact.NewPostgresMetadata(db))
+	if err != nil {
+		return fmt.Errorf("configure Artifact storage: %w", err)
+	}
+	if err := artifactStore.Check(ctx); err != nil {
+		return fmt.Errorf("Artifact storage preflight failed: %w", err)
 	}
 	var releaseReadiness func(context.Context) error
 	if configuration.EnforceActiveReleases {

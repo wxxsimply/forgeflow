@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +40,7 @@ type Meta struct {
 }
 
 type PutRequest struct {
+	OwnerID     string
 	RunID       string
 	Kind        Kind
 	ContentType string
@@ -48,11 +51,15 @@ type MetadataRepository interface {
 	Insert(context.Context, Meta) error
 	Get(context.Context, string) (Meta, error)
 	List(context.Context, string) ([]Meta, error)
+	UpdateStorageKey(context.Context, string, string, string) error
+	Delete(context.Context, string) error
 }
 
 type Store interface {
 	Put(context.Context, PutRequest, io.Reader) (Meta, error)
 	Open(context.Context, string) (io.ReadCloser, Meta, error)
+	Delete(context.Context, string) error
+	Check(context.Context) error
 }
 
 type FileStore struct {
@@ -79,16 +86,8 @@ func NewFileStore(root string, metadata MetadataRepository, maxBytes int64) (*Fi
 }
 
 func (s *FileStore) Put(ctx context.Context, request PutRequest, body io.Reader) (Meta, error) {
-	if body == nil || strings.TrimSpace(request.RunID) == "" || !validKind(request.Kind) {
-		return Meta{}, fmt.Errorf("artifact run, kind, and body are required")
-	}
-	if request.ContentType == "" || len(request.ContentType) > 255 || len(request.Attributes) > 64 {
-		return Meta{}, fmt.Errorf("artifact content type or attributes are invalid")
-	}
-	for key, value := range request.Attributes {
-		if strings.TrimSpace(key) == "" || len(key) > 128 || len(value) > 2_000 {
-			return Meta{}, fmt.Errorf("artifact attribute is invalid")
-		}
+	if err := validatePutRequest(request, body); err != nil {
+		return Meta{}, err
 	}
 	id := domain.NewID()
 	temporary, err := os.CreateTemp(s.root, ".artifact-*.tmp")
@@ -142,6 +141,9 @@ func (s *FileStore) Open(ctx context.Context, artifactID string) (io.ReadCloser,
 	if err != nil {
 		return nil, Meta{}, err
 	}
+	if meta.Size < 0 || meta.Size > s.maxBytes {
+		return nil, Meta{}, fmt.Errorf("artifact size is outside the configured limit")
+	}
 	path, err := s.resolveStorageKey(meta.StorageKey)
 	if err != nil {
 		return nil, Meta{}, err
@@ -158,23 +160,65 @@ func (s *FileStore) Open(ctx context.Context, artifactID string) (io.ReadCloser,
 	if err != nil {
 		return nil, Meta{}, fmt.Errorf("open artifact body: %w", err)
 	}
-	return &verifyingReadCloser{file: file, digest: sha256.New(), expected: meta.SHA256}, meta, nil
+	return newVerifyingReadCloser(file, meta), meta, nil
+}
+
+func (s *FileStore) Delete(ctx context.Context, artifactID string) error {
+	meta, err := s.metadata.Get(ctx, artifactID)
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	path, err := s.resolveStorageKey(meta.StorageKey)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("delete artifact body: %w", err)
+	}
+	if err := s.metadata.Delete(ctx, artifactID); err != nil {
+		return fmt.Errorf("delete artifact metadata: %w", err)
+	}
+	return nil
+}
+
+func (s *FileStore) Check(context.Context) error {
+	info, err := os.Stat(s.root)
+	if err != nil || !info.IsDir() {
+		return fmt.Errorf("artifact root is unavailable")
+	}
+	return nil
 }
 
 type verifyingReadCloser struct {
-	file     *os.File
+	body     io.ReadCloser
 	digest   hash.Hash
 	expected string
+	size     int64
+	read     int64
 	verified bool
 }
 
+func newVerifyingReadCloser(body io.ReadCloser, meta Meta) *verifyingReadCloser {
+	return &verifyingReadCloser{body: body, digest: sha256.New(), expected: meta.SHA256, size: meta.Size}
+}
+
 func (r *verifyingReadCloser) Read(buffer []byte) (int, error) {
-	n, err := r.file.Read(buffer)
+	n, err := r.body.Read(buffer)
 	if n > 0 {
 		_, _ = r.digest.Write(buffer[:n])
+		r.read += int64(n)
+		if r.read > r.size {
+			return n, fmt.Errorf("artifact size exceeds metadata")
+		}
 	}
 	if err == io.EOF && !r.verified {
 		r.verified = true
+		if r.read != r.size {
+			return n, fmt.Errorf("artifact size does not match metadata")
+		}
 		actual := hex.EncodeToString(r.digest.Sum(nil))
 		if actual != r.expected {
 			return n, fmt.Errorf("artifact checksum mismatch")
@@ -183,7 +227,23 @@ func (r *verifyingReadCloser) Read(buffer []byte) (int, error) {
 	return n, err
 }
 
-func (r *verifyingReadCloser) Close() error { return r.file.Close() }
+func (r *verifyingReadCloser) Close() error { return r.body.Close() }
+
+func validatePutRequest(request PutRequest, body io.Reader) error {
+	if body == nil || strings.TrimSpace(request.RunID) == "" || !validKind(request.Kind) {
+		return fmt.Errorf("artifact run, kind, and body are required")
+	}
+	if _, _, err := mime.ParseMediaType(request.ContentType); err != nil ||
+		len(request.ContentType) > 255 || len(request.Attributes) > 64 {
+		return fmt.Errorf("artifact content type or attributes are invalid")
+	}
+	for key, value := range request.Attributes {
+		if strings.TrimSpace(key) == "" || len(key) > 128 || len(value) > 2_000 {
+			return fmt.Errorf("artifact attribute is invalid")
+		}
+	}
+	return nil
+}
 
 func withinRoot(root, candidate string) bool {
 	relative, err := filepath.Rel(root, candidate)

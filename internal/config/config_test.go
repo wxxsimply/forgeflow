@@ -50,6 +50,15 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_POSTGRES_PING_TIMEOUT",
 		"FORGEFLOW_ARTIFACT_ROOT",
 		"FORGEFLOW_ARTIFACT_MAX_BYTES",
+		"FORGEFLOW_ARTIFACT_BACKEND",
+		"FORGEFLOW_ARTIFACT_S3_BUCKET",
+		"FORGEFLOW_ARTIFACT_S3_REGION",
+		"FORGEFLOW_ARTIFACT_S3_ENDPOINT",
+		"FORGEFLOW_ARTIFACT_S3_PREFIX",
+		"FORGEFLOW_ARTIFACT_S3_SPOOL_DIR",
+		"FORGEFLOW_ARTIFACT_S3_SSE",
+		"FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID",
+		"FORGEFLOW_ARTIFACT_S3_USE_PATH_STYLE",
 		"FORGEFLOW_WORKER_LEASE_TTL",
 		"FORGEFLOW_WORKER_HEARTBEAT_INTERVAL",
 		"FORGEFLOW_WORKER_POLL_INTERVAL",
@@ -101,6 +110,9 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	}
 	if configuration.PostgresEnabled || configuration.PostgresMaxOpenConns != 20 || configuration.WorkerLeaseTTL != 30*time.Second {
 		t.Fatalf("stage seven defaults = %+v", configuration)
+	}
+	if configuration.ArtifactBackend != "file" || configuration.ArtifactS3Prefix != "forgeflow/artifacts" {
+		t.Fatalf("artifact defaults = %+v", configuration)
 	}
 	if configuration.EnforceActiveReleases {
 		t.Fatal("active release governance must be opt-in outside controlled deployment")
@@ -211,5 +223,53 @@ func TestLoadRejectsInvalidLogLevel(t *testing.T) {
 	t.Setenv("FORGEFLOW_LOG_LEVEL", "verbose")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() accepted an invalid log level")
+	}
+}
+func TestLoadRejectsFileArtifactBackendInProduction(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS", "https://forgeflow.example.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_BACKEND", "file")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted file Artifact storage in production")
+	}
+}
+
+func TestLoadAcceptsKMSBackedS3ArtifactsInProduction(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS", "https://forgeflow.example.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_BUCKET", "forgeflow-production")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_ENDPOINT", "https://s3.ap-southeast-1.amazonaws.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_PREFIX", "production/artifacts")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", t.TempDir())
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_SSE", "aws:kms")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID", "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+	configuration, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.ArtifactBackend != "s3" || configuration.ArtifactS3SSE != "aws:kms" || configuration.ArtifactS3KMSKeyID == "" {
+		t.Fatalf("artifact configuration = %+v", configuration)
+	}
+}
+
+func TestLoadRejectsInsecureOrIncompleteS3Artifacts(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "staging")
+	t.Setenv("FORGEFLOW_ARTIFACT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_BUCKET", "forgeflow-staging")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_ENDPOINT", "http://object-store.example.com")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted an insecure S3 endpoint")
+	}
+
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS", "https://forgeflow.example.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_ENDPOINT", "https://object-store.example.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_SSE", "aws:kms")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted aws:kms without a KMS key")
 	}
 }

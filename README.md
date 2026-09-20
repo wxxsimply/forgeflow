@@ -121,6 +121,14 @@ Linux/macOS 也可以执行 `make verify`。两者都会检查格式、运行测
 | `FORGEFLOW_REPOSITORY_ROOTS` | `.` | 允许登记的仓库根目录，逗号分隔 |
 | `FORGEFLOW_SESSION_TTL` | `24h` | Session 绝对有效期 |
 | `FORGEFLOW_ARTIFACT_ROOT` | `.forgeflow/artifacts` | Artifact 大对象目录 |
+| `FORGEFLOW_ARTIFACT_BACKEND` | `file` | `file` 或 `s3`；Production 强制为 `s3` |
+| `FORGEFLOW_ARTIFACT_S3_BUCKET` | 无 | S3/S3-compatible Bucket |
+| `FORGEFLOW_ARTIFACT_S3_REGION` | 无 | Bucket Region，必须与数据驻留记录一致 |
+| `FORGEFLOW_ARTIFACT_S3_ENDPOINT` | 无 | 自定义兼容端点；非开发环境必须为 HTTPS |
+| `FORGEFLOW_ARTIFACT_S3_PREFIX` | `forgeflow/artifacts` | 环境隔离对象前缀 |
+| `FORGEFLOW_ARTIFACT_S3_SPOOL_DIR` | `.forgeflow/artifact-spool` | 上传前限额与 SHA-256 临时目录 |
+| `FORGEFLOW_ARTIFACT_S3_SSE` | `AES256` | Production 强制为 `aws:kms` |
+| `FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID` | 无 | `aws:kms` 使用的稳定 KMS key 标识；AWS 推荐 key ARN，读取时精确核对 |
 | `FORGEFLOW_WORKER_LEASE_TTL` | `30s` | Worker Job 租约时长 |
 | `FORGEFLOW_WORKER_METRICS_ADDRESS` | `127.0.0.1:9091` | Worker 内部健康与 Metrics 地址 |
 | `FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES` | `false` | 启用后 Worker 启动、接 Job 和 `/readyz` 都要求数据库 Active Prompt/模型 Release 与镜像完全一致；受控 Staging/Production 必须设为 `true` |
@@ -128,6 +136,8 @@ Linux/macOS 也可以执行 `make verify`。两者都会检查格式、运行测
 | `FORGEFLOW_DOCKER_ENABLED` | `false` | 是否允许真实 Docker 沙箱执行 |
 | `FORGEFLOW_SANDBOX_IMAGE` | 无 | 启用 Docker 时必须是固定 sha256 digest 的镜像 |
 | `FORGEFLOW_SANDBOX_WORKSPACE_ROOT` | `.forgeflow/workspaces` | Docker 唯一允许挂载的受管工作区根目录 |
+
+Production Artifact 配置、最小权限、逐 Run 迁移、回退和真实验收要求见 [对象存储 Runbook](docs/production-object-storage.md)。
 
 创建计划：
 

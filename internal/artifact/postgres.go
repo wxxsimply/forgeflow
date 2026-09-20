@@ -9,6 +9,7 @@ import (
 )
 
 var ErrNotFound = errors.New("artifact not found")
+var ErrStorageKeyChanged = errors.New("artifact storage key changed")
 
 type PostgresMetadata struct{ db *sql.DB }
 
@@ -70,6 +71,28 @@ func (r *PostgresMetadata) List(ctx context.Context, runID string) ([]Meta, erro
 		result = append(result, meta)
 	}
 	return result, rows.Err()
+}
+
+func (r *PostgresMetadata) UpdateStorageKey(ctx context.Context, id, previous, next string) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE artifacts SET storage_key=$1 WHERE id=$2 AND storage_key=$3`, next, id, previous)
+	if err != nil {
+		return fmt.Errorf("update artifact storage key: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read artifact storage key update result: %w", err)
+	}
+	if affected != 1 {
+		return ErrStorageKeyChanged
+	}
+	return nil
+}
+
+func (r *PostgresMetadata) Delete(ctx context.Context, id string) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM artifacts WHERE id=$1`, id); err != nil {
+		return fmt.Errorf("delete artifact metadata: %w", err)
+	}
+	return nil
 }
 
 var _ MetadataRepository = (*PostgresMetadata)(nil)

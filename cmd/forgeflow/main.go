@@ -78,6 +78,8 @@ func run(ctx context.Context, args []string, configuration config.Config) error 
 		return runResume(ctx, args[1:], configuration)
 	case "db":
 		return runDatabase(ctx, args[1:], configuration)
+	case "artifact":
+		return runArtifactMigration(ctx, args[1:], configuration)
 	default:
 		return apperror.New(apperror.CodeValidation, fmt.Sprintf("unknown command %q", args[0]))
 	}
@@ -801,5 +803,6 @@ Commands:
   pause   --run <runId> [--reason <text>]
   resume  --run <runId>
   db      migrate|check
+  artifact migrate --run <runId>
 `)
 }
