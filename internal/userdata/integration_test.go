@@ -80,7 +80,7 @@ func TestExportAndResumableDeletion(t *testing.T) {
 	for index, id := range []string{firstArtifact, secondArtifact} {
 		createdAt := time.Date(2026, 9, 20, 0, index, 0, 0, time.UTC)
 		if _, err := db.ExecContext(ctx, `INSERT INTO artifacts(id,run_id,kind,storage_key,sha256,size_bytes,content_type,metadata,created_at)
-			VALUES($1,$2,'log',$1::text,repeat('a',64),1,'text/plain','{}',$3)`, id, runID, createdAt); err != nil {
+			VALUES($1,$2,'log',$4,repeat('a',64),1,'text/plain','{}',$3)`, id, runID, createdAt, id); err != nil {
 			t.Fatal(err)
 		}
 	}
