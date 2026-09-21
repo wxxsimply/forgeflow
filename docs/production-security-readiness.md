@@ -79,7 +79,7 @@
 | P8-002 | 专用 Worker 节点池、Sandbox daemon 和网络策略尚未部署 | Critical | 单机 Staging 仅模拟网络隔离 | Platform Owner | 真实专用执行面与正/负网络测试通过 | Open |
 | P8-003 | 管理员 TOTP 工程基础已实现；Operator、真实 Staging、密钥轮换和 break-glass 尚未验收 | High | AES-GCM 密钥密文、恢复码摘要、时间片防重放、受限 Session、旧 Session 撤销和 Production 失败关闭 | Security Owner | 管理员应用 MFA 与 Operator 上游/应用 MFA 均独立评审，并通过 HTTPS、旁路拒绝、密钥轮换和 break-glass 演练 | Open |
 | P8-004 | 外部 append-only 审计与受控 Trace 工程适配器已实现；真实后端尚未验收 | High | Object Lock Compliance、KMS、条件创建、HMAC 信封、前置失败关闭、受限 OTLP/HTTP 和只读查询恢复命令 | Security Owner + Platform Owner | 真实 Bucket/IAM/KMS/HTTPS Trace 完成删除保护、访问审计、脱敏、失败关闭、查询和恢复验证 | Open |
-| P8-005 | 云厂商、Region、数据驻留和子处理者尚未批准 | High | Provider-neutral 边界已定义 | Product Owner + Data Owner | 私有决策记录与用户告知材料批准 | Open |
+| P8-005 | 云厂商、Region、数据驻留和子处理者尚未批准 | High | Production SHA-256 绑定的治理 Policy 会拒绝未登记 Provider/端点/Region/子处理者或缺失的告知版本；真实审批仍未完成 | Product Owner + Data Owner | 私有决策记录、公开生效的用户告知及接受记录批准，并在最终环境验证 | Open |
 | P8-006 | Production 负载、RPO/RTO 和故障切换未实测 | High | 目标和测试矩阵已固定 | Platform Owner + Data Owner | 阶段 9 实测达到 `production-slo-capacity.md` | Open |
 | P8-007 | 独立安全评审人尚未在私有系统登记 | High | 评审范围与独立性规则已固定 | Release Approver | 指派非作者审核人并签署报告 | Open |
 
