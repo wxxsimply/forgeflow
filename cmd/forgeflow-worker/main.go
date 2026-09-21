@@ -61,7 +61,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	if !configuration.PostgresEnabled {
 		return fmt.Errorf("FORGEFLOW_POSTGRES_ENABLED=true is required for the worker")
 	}
-	telemetry, err := observability.NewTelemetry(ctx, observability.Options{ServiceName: "forgeflow-worker", Version: configuration.ServiceVersion, Environment: configuration.Environment, OTLPEndpoint: configuration.OTLPEndpoint, SampleRatio: configuration.OTELSampleRatio, Metrics: configuration.MetricsEnabled})
+	telemetry, err := observability.NewTelemetry(ctx, observability.Options{ServiceName: "forgeflow-worker", Version: configuration.ServiceVersion, Environment: configuration.Environment, OTLPEndpoint: configuration.OTLPEndpoint, OTLPHeaders: configuration.OTLPHeaders, SampleRatio: configuration.OTELSampleRatio, Metrics: configuration.MetricsEnabled})
 	if err != nil {
 		return err
 	}

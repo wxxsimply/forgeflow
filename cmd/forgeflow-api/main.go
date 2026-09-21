@@ -13,6 +13,7 @@ import (
 
 	"forgeflow/internal/application"
 	"forgeflow/internal/artifact"
+	"forgeflow/internal/audit"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
@@ -57,7 +58,11 @@ func run(ctx context.Context, configuration config.Config) error {
 	if strings.TrimSpace(configuration.OpenAIAPIKey) != "" {
 		return fmt.Errorf("OPENAI_API_KEY must not be present in the API process; configure it only for workers")
 	}
-	telemetry, err := observability.NewTelemetry(ctx, observability.Options{ServiceName: "forgeflow-api", Version: configuration.ServiceVersion, Environment: configuration.Environment, OTLPEndpoint: configuration.OTLPEndpoint, SampleRatio: configuration.OTELSampleRatio, Metrics: configuration.MetricsEnabled})
+	externalAudit, err := configuredExternalAudit(ctx, configuration)
+	if err != nil {
+		return err
+	}
+	telemetry, err := observability.NewTelemetry(ctx, observability.Options{ServiceName: "forgeflow-api", Version: configuration.ServiceVersion, Environment: configuration.Environment, OTLPEndpoint: configuration.OTLPEndpoint, OTLPHeaders: configuration.OTLPHeaders, SampleRatio: configuration.OTELSampleRatio, Metrics: configuration.MetricsEnabled})
 	if err != nil {
 		return err
 	}
@@ -105,7 +110,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
-	api, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService})
+	api, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: externalAudit, AuditIntegrityKey: configuration.AuditIntegrityKey})
 	if err != nil {
 		return err
 	}
@@ -135,7 +140,31 @@ func validateAPISecurityConfig(configuration config.Config) error {
 	if configuration.AdminMFARequired && len(configuration.MFAEncryptionKey) != 32 {
 		return fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY must contain exactly 32 bytes when administrator MFA is required")
 	}
+	if configuration.Environment == "production" && configuration.AuditBackend != "s3" {
+		return fmt.Errorf("FORGEFLOW_AUDIT_BACKEND=s3 is required for the production API")
+	}
+	if configuration.AuditBackend == "s3" && len(configuration.AuditIntegrityKey) != 32 {
+		return fmt.Errorf("FORGEFLOW_AUDIT_INTEGRITY_KEY must contain exactly 32 bytes for S3 audit storage")
+	}
 	return nil
+}
+
+func configuredExternalAudit(ctx context.Context, configuration config.Config) (audit.Appender, error) {
+	if configuration.AuditBackend != "s3" {
+		return nil, nil
+	}
+	store, err := audit.NewS3Store(ctx, audit.S3Options{
+		Bucket: configuration.AuditS3Bucket, Region: configuration.AuditS3Region, Endpoint: configuration.AuditS3Endpoint,
+		Prefix: configuration.AuditS3Prefix, KMSKeyID: configuration.AuditS3KMSKeyID, UsePathStyle: configuration.AuditS3UsePathStyle,
+		Retention: configuration.AuditRetention, IntegrityKey: configuration.AuditIntegrityKey,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := store.Check(ctx); err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 func shutdownTelemetry(telemetry *observability.Telemetry) {

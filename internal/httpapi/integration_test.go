@@ -9,6 +9,7 @@ import (
 	"encoding/base32"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 
 	"forgeflow/internal/application"
 	"forgeflow/internal/artifact"
+	"forgeflow/internal/audit"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
@@ -265,6 +267,34 @@ func TestLoginRateLimitAndUniformFailure(t *testing.T) {
 	}
 }
 
+func TestExternalAuditFailsClosedBeforeLoginAndMutation(t *testing.T) {
+	sink := &toggleAudit{}
+	f := newFixtureWithOptions(t, auth.NewMemoryLimiter(20, time.Minute), fixtureOptions{externalAudit: sink})
+	sink.setError(errors.New("audit backend unavailable"))
+	response := f.rawLogin(t, "admin@example.com", "correct horse battery staple", "")
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("login audit failure status=%d body=%s", response.StatusCode, read(response))
+	}
+	_ = read(response)
+
+	sink.setError(nil)
+	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
+	events := sink.snapshot()
+	if len(events) == 0 || events[0].Action != "auth.login.attempt" {
+		t.Fatalf("login access audit=%+v", events)
+	}
+	sink.setError(errors.New("audit backend unavailable"))
+	response = f.request(t, admin, http.MethodPost, "/api/v1/repositories", `{"name":"must-not-exist","localPath":"."}`, true, nil)
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("mutation audit failure status=%d body=%s", response.StatusCode, read(response))
+	}
+	_ = read(response)
+	var repositories int
+	if err := f.db.QueryRow(`SELECT count(*) FROM repositories`).Scan(&repositories); err != nil || repositories != 0 {
+		t.Fatalf("failed-closed request changed repositories: count=%d err=%v", repositories, err)
+	}
+}
+
 func TestAdministratorMFAEnrollmentAndLogin(t *testing.T) {
 	f := newFixture(t, auth.NewMemoryLimiter(20, time.Minute), true)
 	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
@@ -490,7 +520,46 @@ func (f *apiFixture) request(t *testing.T, state loginState, method, path, body 
 	}
 	return response
 }
+
+type fixtureOptions struct {
+	requireAdminMFA bool
+	externalAudit   audit.Appender
+}
+
+type toggleAudit struct {
+	mu     sync.Mutex
+	events []audit.Event
+	err    error
+}
+
+func (s *toggleAudit) Append(_ context.Context, event audit.Event) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return s.err
+	}
+	s.events = append(s.events, event)
+	return nil
+}
+
+func (s *toggleAudit) setError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.err = err
+}
+
+func (s *toggleAudit) snapshot() []audit.Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]audit.Event(nil), s.events...)
+}
+
 func newFixture(t *testing.T, accountLimiter auth.Limiter, requireAdminMFA ...bool) *apiFixture {
+	options := fixtureOptions{requireAdminMFA: len(requireAdminMFA) > 0 && requireAdminMFA[0]}
+	return newFixtureWithOptions(t, accountLimiter, options)
+}
+
+func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fixtureOptions) *apiFixture {
 	t.Helper()
 	dsn := strings.TrimSpace(os.Getenv("FORGEFLOW_TEST_POSTGRES_DSN"))
 	if dsn == "" {
@@ -524,8 +593,7 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter, requireAdminMFA ...bo
 		t.Fatal(err)
 	}
 	store := auth.NewPostgresStore(db)
-	adminMFARequired := len(requireAdminMFA) > 0 && requireAdminMFA[0]
-	authService, err := auth.NewService(store, auth.Options{PasswordParams: testPasswordParams(), SessionTTL: time.Hour, IdleTTL: time.Hour, AdminMFARequired: adminMFARequired, MFAEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), AccountLimiter: accountLimiter, SourceLimiter: auth.NewMemoryLimiter(100, time.Minute)})
+	authService, err := auth.NewService(store, auth.Options{PasswordParams: testPasswordParams(), SessionTTL: time.Hour, IdleTTL: time.Hour, AdminMFARequired: options.requireAdminMFA, MFAEncryptionKey: []byte("0123456789abcdef0123456789abcdef"), AccountLimiter: accountLimiter, SourceLimiter: auth.NewMemoryLimiter(100, time.Minute)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +620,7 @@ func newFixture(t *testing.T, accountLimiter auth.Limiter, requireAdminMFA ...bo
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService})
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef")})
 	if err != nil {
 		t.Fatal(err)
 	}
