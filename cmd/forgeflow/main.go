@@ -80,6 +80,8 @@ func run(ctx context.Context, args []string, configuration config.Config) error 
 		return runDatabase(ctx, args[1:], configuration)
 	case "artifact":
 		return runArtifactMigration(ctx, args[1:], configuration)
+	case "audit":
+		return runAudit(ctx, args[1:], configuration)
 	default:
 		return apperror.New(apperror.CodeValidation, fmt.Sprintf("unknown command %q", args[0]))
 	}
@@ -804,5 +806,7 @@ Commands:
   resume  --run <runId>
   db      migrate|check
   artifact migrate --run <runId>
+  audit   verify [--max-events 10000]
+  audit   query [--action <action>] [--request-id <id>] [--resource-id <id>] [--max-events 10000] [--max-results 200]
 `)
 }

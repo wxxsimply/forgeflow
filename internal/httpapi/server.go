@@ -20,6 +20,7 @@ import (
 	"forgeflow/internal/apperror"
 	"forgeflow/internal/application"
 	"forgeflow/internal/artifact"
+	"forgeflow/internal/audit"
 	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
@@ -38,23 +39,25 @@ const CSRFCookie = "forgeflow_csrf"
 var specFS embed.FS
 
 type Options struct {
-	Auth            *auth.Service
-	Control         *controlplane.Store
-	Runs            *application.Service
-	Artifacts       artifact.Store
-	Inspector       *repoharness.GitInspector
-	CookieSecure    bool
-	CookieDomain    string
-	CookieMaxAge    time.Duration
-	AllowedOrigins  []string
-	RepositoryRoots []string
-	MutationLimiter auth.Limiter
-	MetricsEnabled  bool
-	ServiceVersion  string
-	GitCommit       string
-	Governance      *governance.Store
-	Catalog         *governance.Catalog
-	UserData        *userdata.Service
+	Auth              *auth.Service
+	Control           *controlplane.Store
+	Runs              *application.Service
+	Artifacts         artifact.Store
+	Inspector         *repoharness.GitInspector
+	CookieSecure      bool
+	CookieDomain      string
+	CookieMaxAge      time.Duration
+	AllowedOrigins    []string
+	RepositoryRoots   []string
+	MutationLimiter   auth.Limiter
+	MetricsEnabled    bool
+	ServiceVersion    string
+	GitCommit         string
+	Governance        *governance.Store
+	Catalog           *governance.Catalog
+	UserData          *userdata.Service
+	ExternalAudit     audit.Appender
+	AuditIntegrityKey []byte
 }
 
 type Server struct {
@@ -71,6 +74,9 @@ const requestIDKey contextKey = "request-id"
 func New(options Options) (*Server, error) {
 	if options.Auth == nil || options.Control == nil || options.Runs == nil || options.Artifacts == nil || options.Inspector == nil || options.Governance == nil || options.Catalog == nil || options.UserData == nil {
 		return nil, fmt.Errorf("HTTP API dependencies are required")
+	}
+	if options.ExternalAudit != nil && len(options.AuditIntegrityKey) != 32 {
+		return nil, fmt.Errorf("external audit integrity key must contain exactly 32 bytes")
 	}
 	if options.CookieMaxAge <= 0 {
 		options.CookieMaxAge = 24 * time.Hour
@@ -238,6 +244,10 @@ func (s *Server) protectedMFA(csrf, allowUnverifiedMFA bool, next http.Handler) 
 			s.fail(w, r, apperror.New(apperror.CodeForbidden, "administrator MFA enrollment or verification is required"))
 			return
 		}
+		if err := s.appendExternalAudit(r, principal.User.ID, "access."+strings.ToLower(r.Method), "http_route", r.URL.Path, map[string]any{"method": r.Method, "route": r.Pattern}); err != nil {
+			s.fail(w, r, apperror.Wrap(err, apperror.CodeTransient, "audit.access", "external audit backend is unavailable"))
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, principal)))
 	})
 }
@@ -253,6 +263,10 @@ func (s *Server) validatedID(name string, next http.Handler) http.Handler {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	if err := s.appendExternalAudit(r, "", "auth.login.attempt", "http_route", r.URL.Path, map[string]any{"method": r.Method, "route": r.Pattern}); err != nil {
+		s.fail(w, r, apperror.Wrap(err, apperror.CodeTransient, "audit.login", "external audit backend is unavailable"))
+		return
+	}
 	if !s.originAllowed(r) {
 		s.fail(w, r, apperror.New(apperror.CodeForbidden, "request origin is not allowed"))
 		return
@@ -935,6 +949,20 @@ func (s *Server) audit(r *http.Request, actor, action, kind, id string, details 
 	if err := s.options.Control.Audit(r.Context(), controlplane.AuditEntry{ActorID: actor, Action: action, ResourceType: kind, ResourceID: id, RequestID: requestID(r), SourceIP: sourceIP(r), Details: details}); err != nil {
 		slog.Error("write audit log", "error", err, "request_id", requestID(r))
 	}
+	if err := s.appendExternalAudit(r, actor, action, kind, id, details); err != nil {
+		slog.Error("append external audit event", "error", err, "request_id", requestID(r))
+	}
+}
+
+func (s *Server) appendExternalAudit(r *http.Request, actor, action, kind, id string, details map[string]any) error {
+	if s.options.ExternalAudit == nil {
+		return nil
+	}
+	event, err := audit.NewEvent(actor, action, kind, id, requestID(r), sourceIP(r), details, s.options.AuditIntegrityKey, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	return s.options.ExternalAudit.Append(r.Context(), event)
 }
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	code := apperror.CodeOf(err)

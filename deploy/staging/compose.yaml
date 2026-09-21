@@ -95,9 +95,22 @@ services:
       FORGEFLOW_HTTP_ALLOWED_ORIGINS: https://${FORGEFLOW_DOMAIN:?FORGEFLOW_DOMAIN is required}
       FORGEFLOW_ADMIN_MFA_REQUIRED: ${FORGEFLOW_ADMIN_MFA_REQUIRED:-true}
       FORGEFLOW_MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
+      FORGEFLOW_OTEL_ENDPOINT: ${FORGEFLOW_OTEL_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      FORGEFLOW_OTEL_HEADERS_FILE: /run/secrets/otel_headers
+      FORGEFLOW_AUDIT_BACKEND: ${FORGEFLOW_AUDIT_BACKEND:-s3}
+      FORGEFLOW_AUDIT_S3_BUCKET: ${FORGEFLOW_AUDIT_S3_BUCKET:?FORGEFLOW_AUDIT_S3_BUCKET is required}
+      FORGEFLOW_AUDIT_S3_REGION: ${FORGEFLOW_AUDIT_S3_REGION:?FORGEFLOW_AUDIT_S3_REGION is required}
+      FORGEFLOW_AUDIT_S3_ENDPOINT: ${FORGEFLOW_AUDIT_S3_ENDPOINT:-}
+      FORGEFLOW_AUDIT_S3_PREFIX: ${FORGEFLOW_AUDIT_S3_PREFIX:-forgeflow/staging/audit}
+      FORGEFLOW_AUDIT_S3_KMS_KEY_ID: ${FORGEFLOW_AUDIT_S3_KMS_KEY_ID:?FORGEFLOW_AUDIT_S3_KMS_KEY_ID is required}
+      FORGEFLOW_AUDIT_S3_USE_PATH_STYLE: ${FORGEFLOW_AUDIT_S3_USE_PATH_STYLE:-false}
+      FORGEFLOW_AUDIT_RETENTION: ${FORGEFLOW_AUDIT_RETENTION:-8760h}
+      FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE: /run/secrets/audit_integrity_key
     secrets:
       - postgres_dsn
       - mfa_encryption_key
+      - audit_integrity_key
+      - otel_headers
     volumes:
       - type: bind
         source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
@@ -131,12 +144,15 @@ services:
     environment:
       <<: *app-environment
       FORGEFLOW_WORKER_METRICS_ADDRESS: 0.0.0.0:9091
+      FORGEFLOW_OTEL_ENDPOINT: ${FORGEFLOW_OTEL_ENDPOINT:-http://otel-collector:4318/v1/traces}
+      FORGEFLOW_OTEL_HEADERS_FILE: /run/secrets/otel_headers
       FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES: ${FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEASES:-true}
       FORGEFLOW_SANDBOX_WORKSPACE_ROOT: /var/lib/forgeflow/workspaces
       FORGEFLOW_DOCKER_ENABLED: ${FORGEFLOW_DOCKER_ENABLED:-false}
       FORGEFLOW_SANDBOX_IMAGE: ${FORGEFLOW_SANDBOX_IMAGE:-}
     secrets:
       - postgres_dsn
+      - otel_headers
     volumes:
       - type: bind
         source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
@@ -313,6 +329,10 @@ secrets:
     file: ./secrets/postgres_dsn
   mfa_encryption_key:
     file: ./secrets/mfa_encryption_key
+  audit_integrity_key:
+    file: ./secrets/audit_integrity_key
+  otel_headers:
+    file: ./secrets/otel_headers
   alert_webhook_url:
     file: ./secrets/alert_webhook_url
 

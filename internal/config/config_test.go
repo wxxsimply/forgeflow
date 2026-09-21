@@ -49,6 +49,8 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_POSTGRES_MAX_IDLE_CONNS",
 		"FORGEFLOW_POSTGRES_CONN_MAX_LIFETIME",
 		"FORGEFLOW_POSTGRES_PING_TIMEOUT",
+		"FORGEFLOW_OTEL_HEADERS",
+		"FORGEFLOW_OTEL_HEADERS_FILE",
 		"FORGEFLOW_ARTIFACT_ROOT",
 		"FORGEFLOW_ARTIFACT_MAX_BYTES",
 		"FORGEFLOW_ARTIFACT_BACKEND",
@@ -60,6 +62,16 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_ARTIFACT_S3_SSE",
 		"FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID",
 		"FORGEFLOW_ARTIFACT_S3_USE_PATH_STYLE",
+		"FORGEFLOW_AUDIT_BACKEND",
+		"FORGEFLOW_AUDIT_S3_BUCKET",
+		"FORGEFLOW_AUDIT_S3_REGION",
+		"FORGEFLOW_AUDIT_S3_ENDPOINT",
+		"FORGEFLOW_AUDIT_S3_PREFIX",
+		"FORGEFLOW_AUDIT_S3_KMS_KEY_ID",
+		"FORGEFLOW_AUDIT_S3_USE_PATH_STYLE",
+		"FORGEFLOW_AUDIT_RETENTION",
+		"FORGEFLOW_AUDIT_INTEGRITY_KEY",
+		"FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE",
 		"FORGEFLOW_WORKER_LEASE_TTL",
 		"FORGEFLOW_WORKER_HEARTBEAT_INTERVAL",
 		"FORGEFLOW_WORKER_POLL_INTERVAL",
@@ -99,6 +111,9 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	}
 	if configuration.DockerEnabled {
 		t.Fatal("Docker must be disabled by default")
+	}
+	if configuration.AuditBackend != "postgres" || configuration.AuditRetention != 365*24*time.Hour {
+		t.Fatalf("audit defaults = backend %q retention %s", configuration.AuditBackend, configuration.AuditRetention)
 	}
 	if configuration.DeveloperPromptVersion != "developer/v1" || configuration.DeveloperTimeout != 5*time.Minute {
 		t.Fatalf("developer defaults = prompt %q timeout %s", configuration.DeveloperPromptVersion, configuration.DeveloperTimeout)
@@ -267,6 +282,58 @@ func TestLoadRejectsDirectMFAKeyInProduction(t *testing.T) {
 	t.Setenv("FORGEFLOW_MFA_ENCRYPTION_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "MFA_ENCRYPTION_KEY_FILE") {
 		t.Fatalf("Load accepted a direct Production MFA key: %v", err)
+	}
+}
+
+func TestLoadReadsAuditAndOTLPSecretsFromFiles(t *testing.T) {
+	directory := t.TempDir()
+	integrityPath := filepath.Join(directory, "audit_integrity_key")
+	headersPath := filepath.Join(directory, "otel_headers")
+	if err := os.WriteFile(integrityPath, []byte("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(headersPath, []byte(`{"Authorization":"Bearer test-only"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FORGEFLOW_AUDIT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_AUDIT_S3_BUCKET", "forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_AUDIT_S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID", "alias/forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE", integrityPath)
+	t.Setenv("FORGEFLOW_OTEL_HEADERS_FILE", headersPath)
+	configuration, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(configuration.AuditIntegrityKey) != 32 || configuration.OTLPHeaders["Authorization"] != "Bearer test-only" {
+		t.Fatalf("secret-backed configuration was not loaded")
+	}
+}
+
+func TestLoadRejectsDirectProductionAuditSecrets(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_AUDIT_INTEGRITY_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "AUDIT_INTEGRITY_KEY_FILE") {
+		t.Fatalf("Load accepted a direct Production audit key: %v", err)
+	}
+	t.Setenv("FORGEFLOW_AUDIT_INTEGRITY_KEY", "")
+	t.Setenv("FORGEFLOW_OTEL_HEADERS", `{"Authorization":"Bearer secret"}`)
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OTEL_HEADERS_FILE") {
+		t.Fatalf("Load accepted direct Production OTLP headers: %v", err)
+	}
+}
+
+func TestLoadRejectsInsecureAuditEndpointOutsideDevelopment(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "staging")
+	t.Setenv("FORGEFLOW_AUDIT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_AUDIT_S3_BUCKET", "forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_S3_REGION", "test-1")
+	t.Setenv("FORGEFLOW_AUDIT_S3_ENDPOINT", "http://audit.example.com")
+	t.Setenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID", "alias/forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_INTEGRITY_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted an insecure audit endpoint")
 	}
 }
 

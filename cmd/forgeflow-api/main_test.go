@@ -8,6 +8,7 @@ import (
 
 func TestValidateAPISecurityConfig(t *testing.T) {
 	validKey := []byte("0123456789abcdef0123456789abcdef")
+	production := config.Config{Environment: "production", AdminMFARequired: true, MFAEncryptionKey: validKey, AuditBackend: "s3", AuditIntegrityKey: validKey}
 	tests := []struct {
 		name    string
 		config  config.Config
@@ -16,7 +17,8 @@ func TestValidateAPISecurityConfig(t *testing.T) {
 		{name: "development without enforcement", config: config.Config{Environment: "development"}},
 		{name: "production without enforcement", config: config.Config{Environment: "production"}, wantErr: true},
 		{name: "required without key", config: config.Config{Environment: "staging", AdminMFARequired: true}, wantErr: true},
-		{name: "production with API-only key", config: config.Config{Environment: "production", AdminMFARequired: true, MFAEncryptionKey: validKey}},
+		{name: "production without append-only audit", config: config.Config{Environment: "production", AdminMFARequired: true, MFAEncryptionKey: validKey, AuditBackend: "postgres"}, wantErr: true},
+		{name: "production with API-only keys", config: production},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

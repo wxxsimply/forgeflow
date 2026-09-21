@@ -9,9 +9,25 @@ import (
 	"time"
 
 	"forgeflow/internal/apperror"
+	"forgeflow/internal/audit"
+	"forgeflow/internal/config"
 	fulleval "forgeflow/internal/eval"
 	"forgeflow/internal/evalexec"
 )
+
+func TestAuditCommandFiltersAndRequiresExternalBackend(t *testing.T) {
+	event := audit.Event{Action: "approval.approve", RequestID: "request-1", ResourceID: "approval-1"}
+	if !auditMatches(event, "approval.approve", "request-1", "approval-1") || auditMatches(event, "approval.reject", "", "") {
+		t.Fatal("audit query filters did not use exact matches")
+	}
+	if _, err := auditOptions(config.Config{AuditBackend: "postgres"}); err == nil {
+		t.Fatal("audit command accepted the mutable PostgreSQL backend")
+	}
+	options, err := auditOptions(config.Config{AuditBackend: "s3", AuditS3Bucket: "bucket", AuditRetention: 24 * time.Hour})
+	if err != nil || options.Bucket != "bucket" || options.Retention != 24*time.Hour {
+		t.Fatalf("audit options=%+v err=%v", options, err)
+	}
+}
 
 func TestEvalConfigurationBindsProductionDeveloperPrompt(t *testing.T) {
 	pricing := evalexec.UsagePricing{}

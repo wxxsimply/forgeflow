@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ type Config struct {
 	LogLevel                 string
 	ServiceVersion           string
 	OTLPEndpoint             string
+	OTLPHeaders              map[string]string
 	OTELSampleRatio          float64
 	MetricsEnabled           bool
 	HTTPAddress              string
@@ -80,6 +82,15 @@ type Config struct {
 	ArtifactS3KMSKeyID       string
 	ArtifactS3UsePathStyle   bool
 	ArtifactMaxBytes         int
+	AuditBackend             string
+	AuditS3Bucket            string
+	AuditS3Region            string
+	AuditS3Endpoint          string
+	AuditS3Prefix            string
+	AuditS3KMSKeyID          string
+	AuditS3UsePathStyle      bool
+	AuditRetention           time.Duration
+	AuditIntegrityKey        []byte
 	UserDataExportTTL        time.Duration
 	UserDataExportMaxBytes   int
 	UserDeletionBackupTTL    time.Duration
@@ -102,6 +113,19 @@ type Config struct {
 
 func Load() (Config, error) {
 	environment := envOrDefault("FORGEFLOW_ENV", "development")
+	otlpHeadersEncoded, err := envOrFile("FORGEFLOW_OTEL_HEADERS")
+	if err != nil {
+		return Config{}, err
+	}
+	otlpHeaders := map[string]string{}
+	if strings.TrimSpace(otlpHeadersEncoded) != "" {
+		if err := json.Unmarshal([]byte(otlpHeadersEncoded), &otlpHeaders); err != nil {
+			return Config{}, fmt.Errorf("FORGEFLOW_OTEL_HEADERS must be a JSON object of string values: %w", err)
+		}
+	}
+	if direct, directSet := os.LookupEnv("FORGEFLOW_OTEL_HEADERS"); environment == "production" && directSet && strings.TrimSpace(direct) != "" {
+		return Config{}, fmt.Errorf("FORGEFLOW_OTEL_HEADERS must be provided through FORGEFLOW_OTEL_HEADERS_FILE in production")
+	}
 	otelSampleRatio, err := envFloat("FORGEFLOW_OTEL_SAMPLE_RATIO", 0.1)
 	if err != nil {
 		return Config{}, err
@@ -244,6 +268,28 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	auditS3UsePathStyle, err := envBool("FORGEFLOW_AUDIT_S3_USE_PATH_STYLE", false)
+	if err != nil {
+		return Config{}, err
+	}
+	auditRetention, err := envDuration("FORGEFLOW_AUDIT_RETENTION", 365*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	auditIntegrityKeyEncoded, err := envOrFile("FORGEFLOW_AUDIT_INTEGRITY_KEY")
+	if err != nil {
+		return Config{}, err
+	}
+	var auditIntegrityKey []byte
+	if strings.TrimSpace(auditIntegrityKeyEncoded) != "" {
+		auditIntegrityKey, err = base64.StdEncoding.DecodeString(strings.TrimSpace(auditIntegrityKeyEncoded))
+		if err != nil || len(auditIntegrityKey) != 32 {
+			return Config{}, fmt.Errorf("FORGEFLOW_AUDIT_INTEGRITY_KEY must be standard base64 encoding exactly 32 bytes")
+		}
+	}
+	if direct, directSet := os.LookupEnv("FORGEFLOW_AUDIT_INTEGRITY_KEY"); environment == "production" && directSet && strings.TrimSpace(direct) != "" {
+		return Config{}, fmt.Errorf("FORGEFLOW_AUDIT_INTEGRITY_KEY must be provided through FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE in production")
+	}
 	userDataExportTTL, err := envDuration("FORGEFLOW_USER_DATA_EXPORT_TTL", 15*time.Minute)
 	if err != nil {
 		return Config{}, err
@@ -287,7 +333,7 @@ func Load() (Config, error) {
 	}
 	configuration := Config{
 		Environment: environment, LogLevel: envOrDefault("FORGEFLOW_LOG_LEVEL", "info"),
-		ServiceVersion: strings.TrimSpace(os.Getenv("FORGEFLOW_SERVICE_VERSION")), OTLPEndpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_OTEL_ENDPOINT")),
+		ServiceVersion: strings.TrimSpace(os.Getenv("FORGEFLOW_SERVICE_VERSION")), OTLPEndpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_OTEL_ENDPOINT")), OTLPHeaders: otlpHeaders,
 		OTELSampleRatio: otelSampleRatio, MetricsEnabled: metricsEnabled,
 		HTTPAddress:      envOrDefault("FORGEFLOW_HTTP_ADDRESS", "127.0.0.1:8080"),
 		HTTPCookieSecure: httpCookieSecure, HTTPCookieDomain: strings.TrimSpace(os.Getenv("FORGEFLOW_HTTP_COOKIE_DOMAIN")),
@@ -329,7 +375,12 @@ func Load() (Config, error) {
 		ArtifactS3SpoolDir: envOrDefault("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", filepath.Join(dataDirectory, "artifact-spool")),
 		ArtifactS3SSE:      envOrDefault("FORGEFLOW_ARTIFACT_S3_SSE", "AES256"), ArtifactS3KMSKeyID: strings.TrimSpace(os.Getenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID")),
 		ArtifactS3UsePathStyle: artifactS3UsePathStyle,
-		UserDataExportTTL:      userDataExportTTL, UserDataExportMaxBytes: userDataExportMaxBytes,
+		AuditBackend:           envOrDefault("FORGEFLOW_AUDIT_BACKEND", "postgres"),
+		AuditS3Bucket:          strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_BUCKET")), AuditS3Region: strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_REGION")),
+		AuditS3Endpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_ENDPOINT")), AuditS3Prefix: envOrDefault("FORGEFLOW_AUDIT_S3_PREFIX", "forgeflow/audit"),
+		AuditS3KMSKeyID: strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID")), AuditS3UsePathStyle: auditS3UsePathStyle,
+		AuditRetention: auditRetention, AuditIntegrityKey: auditIntegrityKey,
+		UserDataExportTTL: userDataExportTTL, UserDataExportMaxBytes: userDataExportMaxBytes,
 		UserDeletionBackupTTL: userDeletionBackupTTL,
 		WorkerLeaseTTL:        workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
 		WorkerMetricsAddress:  envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
@@ -355,6 +406,11 @@ func (c Config) Validate() error {
 	}
 	if c.OTELSampleRatio < 0 || c.OTELSampleRatio > 1 {
 		return fmt.Errorf("FORGEFLOW_OTEL_SAMPLE_RATIO must be between 0 and 1")
+	}
+	for key, value := range c.OTLPHeaders {
+		if strings.TrimSpace(key) == "" || len(key) > 128 || strings.ContainsAny(key+value, "\x00\r\n") || len(value) > 4096 {
+			return fmt.Errorf("FORGEFLOW_OTEL_HEADERS contains an invalid header")
+		}
 	}
 	if strings.TrimSpace(c.HTTPAddress) == "" {
 		return fmt.Errorf("FORGEFLOW_HTTP_ADDRESS cannot be empty")
@@ -473,6 +529,23 @@ func (c Config) Validate() error {
 		}
 		if c.Environment == "production" && c.ArtifactS3SSE != "aws:kms" {
 			return fmt.Errorf("production Artifact storage requires aws:kms")
+		}
+	}
+	if !oneOf(c.AuditBackend, "postgres", "s3") {
+		return fmt.Errorf("FORGEFLOW_AUDIT_BACKEND must be postgres or s3")
+	}
+	if c.AuditBackend == "s3" {
+		if strings.TrimSpace(c.AuditS3Bucket) == "" || strings.TrimSpace(c.AuditS3Region) == "" || strings.TrimSpace(c.AuditS3Prefix) == "" || strings.TrimSpace(c.AuditS3KMSKeyID) == "" || len(c.AuditIntegrityKey) != 32 {
+			return fmt.Errorf("S3 audit bucket, region, prefix, KMS key, and integrity key are required")
+		}
+		if strings.Contains(c.AuditS3Prefix, "..") || strings.ContainsAny(c.AuditS3Prefix, "\x00\r\n") {
+			return fmt.Errorf("FORGEFLOW_AUDIT_S3_PREFIX is invalid")
+		}
+		if c.AuditS3Endpoint != "" && !strings.HasPrefix(c.AuditS3Endpoint, "https://") && c.Environment != "development" && c.Environment != "test" {
+			return fmt.Errorf("S3 audit endpoint must use HTTPS outside development and test")
+		}
+		if c.AuditRetention < 24*time.Hour || c.AuditRetention > 10*365*24*time.Hour {
+			return fmt.Errorf("FORGEFLOW_AUDIT_RETENTION must be between 24h and 87600h")
 		}
 	}
 	if c.UserDataExportTTL < time.Minute || c.UserDataExportTTL > 24*time.Hour || c.UserDataExportMaxBytes < 1024*1024 || c.UserDataExportMaxBytes > 2*1024*1024*1024 {

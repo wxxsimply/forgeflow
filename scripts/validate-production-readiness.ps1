@@ -32,6 +32,10 @@ $adminMFA = Read-Required 'docs/admin-mfa.md'
 foreach ($contract in @('Migration 7', 'AES-256-GCM', '恢复码', '时间片', '受限会话', 'FORGEFLOW_ADMIN_MFA_REQUIRED=true', 'Operator', 'P8-003', 'No-Go')) {
     Assert-Production ($adminMFA.Contains($contract)) "Administrator MFA runbook is missing contract: $contract"
 }
+$appendOnlyAudit = Read-Required 'docs/append-only-audit.md'
+foreach ($contract in @('Object Lock', 'COMPLIANCE', 'KMS', 'HMAC-SHA-256', '503', 'FORGEFLOW_OTEL_HEADERS_FILE', 'audit verify', 'audit query', 'P8-004', 'No-Go')) {
+    Assert-Production ($appendOnlyAudit.Contains($contract)) "Append-only audit runbook is missing contract: $contract"
+}
 foreach ($contract in @('Independent reviewer', 'Critical', 'High', 'MFA', 'append-only', 'Risk Accepted', '默认 No-Go')) {
     Assert-Production ($security.Contains($contract)) "Production security review is missing contract: $contract"
 }

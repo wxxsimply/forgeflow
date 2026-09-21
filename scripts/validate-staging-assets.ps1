@@ -34,6 +34,9 @@ Assert-StagingAsset ($compose -match 'FORGEFLOW_GOVERNANCE_ENFORCE_ACTIVE_RELEAS
 foreach ($contract in @('FORGEFLOW_ADMIN_MFA_REQUIRED', 'FORGEFLOW_MFA_ENCRYPTION_KEY_FILE', 'mfa_encryption_key')) {
     Assert-StagingAsset ($compose.Contains($contract)) "Staging Compose is missing administrator MFA contract: $contract"
 }
+foreach ($contract in @('FORGEFLOW_AUDIT_BACKEND', 'FORGEFLOW_AUDIT_S3_BUCKET', 'FORGEFLOW_AUDIT_S3_KMS_KEY_ID', 'FORGEFLOW_AUDIT_RETENTION', 'FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE', 'audit_integrity_key', 'FORGEFLOW_OTEL_HEADERS_FILE', 'otel_headers')) {
+    Assert-StagingAsset ($compose.Contains($contract)) "Staging Compose is missing external audit/Trace contract: $contract"
+}
 
 $openAICompose = Get-Content -Raw -LiteralPath (Join-Path $workspace 'deploy/staging/compose.openai.yaml')
 Assert-StagingAsset ($openAICompose.Contains('${DOCKER_DIND_IMAGE:?DOCKER_DIND_IMAGE is required}')) 'OpenAI overlay must require a digest-pinned DIND image'
@@ -47,6 +50,8 @@ foreach ($variable in @('FORGEFLOW_API_IMAGE', 'FORGEFLOW_WORKER_IMAGE', 'FORGEF
 Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_GIT_COMMIT=<approved-40-character-git-sha>$') 'Staging template must bind the approved Git SHA'
 Assert-StagingAsset ($environmentTemplate -match 'FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL') 'Staging template must document the one-time bootstrap email'
 Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_ADMIN_MFA_REQUIRED=true$') 'Staging template must fail closed on administrator MFA'
+Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_AUDIT_BACKEND=s3$') 'Staging template must use external append-only audit storage'
+Assert-StagingAsset ($environmentTemplate -match '(?m)^FORGEFLOW_AUDIT_RETENTION=8760h$') 'Staging template must declare the audit retention window'
 
 $releaseScript = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'staging-release.ps1')
 foreach ($contract in @('$Manifest', '-RequireDigests', '--no-build', 'staging-preflight.ps1', 'FORGEFLOW_SANDBOX_IMAGE')) {

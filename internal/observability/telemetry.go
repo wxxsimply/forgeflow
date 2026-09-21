@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -25,6 +26,7 @@ type Options struct {
 	Version      string
 	Environment  string
 	OTLPEndpoint string
+	OTLPHeaders  map[string]string
 	SampleRatio  float64
 	Metrics      bool
 }
@@ -50,12 +52,23 @@ func NewTelemetry(ctx context.Context, options Options) (*Telemetry, error) {
 	metrics := NewMetrics(options.Metrics)
 	telemetry := &Telemetry{metrics: metrics}
 	endpoint := strings.TrimSpace(options.OTLPEndpoint)
+	if options.Environment == "production" {
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			return nil, fmt.Errorf("production OTLP endpoint must use HTTPS")
+		}
+	}
+	for key, value := range options.OTLPHeaders {
+		if strings.TrimSpace(key) == "" || len(key) > 128 || len(value) > 4096 || strings.ContainsAny(key+value, "\x00\r\n") {
+			return nil, fmt.Errorf("OTLP headers contain an invalid value")
+		}
+	}
 	if endpoint == "" {
 		otel.SetTracerProvider(noop.NewTracerProvider())
 		setDefaultMetrics(metrics)
 		return telemetry, nil
 	}
-	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
+	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint), otlptracehttp.WithHeaders(options.OTLPHeaders))
 	if err != nil {
 		return nil, fmt.Errorf("create OTLP trace exporter: %w", err)
 	}
