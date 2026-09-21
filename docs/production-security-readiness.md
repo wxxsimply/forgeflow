@@ -76,7 +76,7 @@
 | ID | 风险 | 严重度 | 当前控制 | Owner | 阶段 9 关闭条件 | 状态 |
 |---|---|---|---|---|---|---|
 | P8-001 | S3 适配器代码已准备，真实对象存储与恢复证据未验收 | High | KMS/tenant key/完整性/删除、迁移与失败补偿单元测试；Production 配置失败关闭 | Data Owner + Service Owner | 真实 Bucket/IAM/KMS、迁移/一致性/权限/恢复测试通过 | Open |
-| P8-002 | 专用 Worker 节点池、Sandbox daemon 和网络策略尚未部署 | Critical | 单机 Staging 仅模拟网络隔离 | Platform Owner | 真实专用执行面与正/负网络测试通过 | Open |
+| P8-002 | 专用 Worker 节点池、Sandbox daemon 和网络策略尚未部署 | Critical | 已固定独立 ServiceAccount、CSI Secret Manager、专用节点、默认拒绝 NetworkPolicy、mTLS daemon 与正/负测试契约；单机 Staging 仅模拟网络隔离 | Platform Owner | 私有 IaC 渲染并部署真实专用执行面，正/负网络、身份、Secret、Sandbox 和节点测试均经独立复核通过 | Open |
 | P8-003 | 管理员 TOTP 工程基础已实现；Operator、真实 Staging、密钥轮换和 break-glass 尚未验收 | High | AES-GCM 密钥密文、恢复码摘要、时间片防重放、受限 Session、旧 Session 撤销和 Production 失败关闭 | Security Owner | 管理员应用 MFA 与 Operator 上游/应用 MFA 均独立评审，并通过 HTTPS、旁路拒绝、密钥轮换和 break-glass 演练 | Open |
 | P8-004 | 外部 append-only 审计与受控 Trace 工程适配器已实现；真实后端尚未验收 | High | Object Lock Compliance、KMS、条件创建、HMAC 信封、前置失败关闭、受限 OTLP/HTTP 和只读查询恢复命令 | Security Owner + Platform Owner | 真实 Bucket/IAM/KMS/HTTPS Trace 完成删除保护、访问审计、脱敏、失败关闭、查询和恢复验证 | Open |
 | P8-005 | 云厂商、Region、数据驻留和子处理者尚未批准 | High | Production SHA-256 绑定的治理 Policy 会拒绝未登记 Provider/端点/Region/子处理者或缺失的告知版本；真实审批仍未完成 | Product Owner + Data Owner | 私有决策记录、公开生效的用户告知及接受记录批准，并在最终环境验证 | Open |
