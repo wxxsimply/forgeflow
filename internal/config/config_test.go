@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,6 +75,12 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_AUDIT_RETENTION",
 		"FORGEFLOW_AUDIT_INTEGRITY_KEY",
 		"FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE",
+		"FORGEFLOW_DATA_GOVERNANCE_POLICY",
+		"FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE",
+		"FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256",
+		"FORGEFLOW_DATA_GOVERNANCE_ARTIFACT_SUBPROCESSOR_ID",
+		"FORGEFLOW_DATA_GOVERNANCE_AUDIT_SUBPROCESSOR_ID",
+		"FORGEFLOW_DATA_GOVERNANCE_TELEMETRY_SUBPROCESSOR_ID",
 		"FORGEFLOW_WORKER_LEASE_TTL",
 		"FORGEFLOW_WORKER_HEARTBEAT_INTERVAL",
 		"FORGEFLOW_WORKER_POLL_INTERVAL",
@@ -267,6 +276,7 @@ func TestLoadAcceptsKMSBackedS3ArtifactsInProduction(t *testing.T) {
 	t.Setenv("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", t.TempDir())
 	t.Setenv("FORGEFLOW_ARTIFACT_S3_SSE", "aws:kms")
 	t.Setenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID", "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+	configureProductionDataGovernance(t)
 	configuration, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -274,6 +284,88 @@ func TestLoadAcceptsKMSBackedS3ArtifactsInProduction(t *testing.T) {
 	if configuration.ArtifactBackend != "s3" || configuration.ArtifactS3SSE != "aws:kms" || configuration.ArtifactS3KMSKeyID == "" {
 		t.Fatalf("artifact configuration = %+v", configuration)
 	}
+}
+
+func TestLoadRejectsProductionWithoutDataGovernancePolicy(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "production")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DATA_GOVERNANCE_POLICY_FILE") {
+		t.Fatalf("Load accepted Production without a data governance policy: %v", err)
+	}
+}
+
+func TestLoadRejectsProductionDataGovernanceDigestMismatch(t *testing.T) {
+	configureProductionDataGovernance(t)
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256", strings.Repeat("0", 64))
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "does not match the policy file") {
+		t.Fatalf("Load accepted a policy with the wrong digest: %v", err)
+	}
+}
+
+func TestLoadRejectsUnapprovedProductionModelEndpoint(t *testing.T) {
+	configureProductionDataGovernance(t)
+	t.Setenv("FORGEFLOW_ENV", "production")
+	t.Setenv("FORGEFLOW_HTTP_ALLOWED_ORIGINS", "https://forgeflow.example.com")
+	t.Setenv("FORGEFLOW_ARTIFACT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_BUCKET", "forgeflow-production")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_PREFIX", "production/artifacts")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_SPOOL_DIR", t.TempDir())
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_SSE", "aws:kms")
+	t.Setenv("FORGEFLOW_ARTIFACT_S3_KMS_KEY_ID", "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+	t.Setenv("FORGEFLOW_AUDIT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_AUDIT_S3_BUCKET", "forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID", "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+	t.Setenv("FORGEFLOW_OPENAI_BASE_URL", "https://unapproved.example.com/v1")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "not approved") {
+		t.Fatalf("Load accepted an unapproved model endpoint: %v", err)
+	}
+}
+
+func configureProductionDataGovernance(t *testing.T) {
+	t.Helper()
+	policy := DataGovernancePolicy{
+		SchemaVersion: dataGovernanceSchemaVersion, PolicyVersion: "2026.09.22", ApprovedAt: time.Now().UTC().Add(-time.Hour), ApprovalRecordID: "private-record-001",
+		Residency: DataResidency{PrimaryRegion: "ap-southeast-1", AllowedRegions: []string{"ap-southeast-1"}},
+		Providers: []ApprovedModelProvider{{ID: "openai", SubprocessorID: "model-provider", EndpointHosts: []string{"api.openai.com"}, ProcessingRegions: []string{"ap-southeast-1"}, DataCategories: []string{"model_inference"}}},
+		Subprocessors: []ApprovedSubprocessor{
+			{ID: "model-provider", Purpose: "model inference", EndpointHosts: []string{"api.openai.com"}, ProcessingRegions: []string{"ap-southeast-1"}, DataCategories: []string{"model_inference"}},
+			{ID: "object-storage", Purpose: "artifact and audit storage", EndpointHosts: []string{"s3.ap-southeast-1.amazonaws.com"}, ProcessingRegions: []string{"ap-southeast-1"}, DataCategories: []string{"artifact_storage", "audit_storage"}},
+			{ID: "observability", Purpose: "trace export", EndpointHosts: []string{"otel.example.com"}, ProcessingRegions: []string{"ap-southeast-1"}, DataCategories: []string{"observability"}},
+		},
+		UserNotice: DataGovernanceUserNotice{PrivacyPolicyVersion: "privacy-2026.09.22", PrivacyPolicyURL: "https://forgeflow.example.com/privacy", TermsOfServiceVersion: "terms-2026.09.22", TermsOfServiceURL: "https://forgeflow.example.com/terms", PublishedAt: time.Now().UTC().Add(-time.Hour), ExplicitAcceptance: true},
+	}
+	canonical, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(canonical)
+	path := filepath.Join(t.TempDir(), "data_governance_policy.json")
+	if err := os.WriteFile(path, canonical, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	integrityPath := filepath.Join(t.TempDir(), "audit_integrity_key")
+	if err := os.WriteFile(integrityPath, []byte("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	headersPath := filepath.Join(t.TempDir(), "otel_headers")
+	if err := os.WriteFile(headersPath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE", path)
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256", hex.EncodeToString(digest[:]))
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_ARTIFACT_SUBPROCESSOR_ID", "object-storage")
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_AUDIT_SUBPROCESSOR_ID", "object-storage")
+	t.Setenv("FORGEFLOW_DATA_GOVERNANCE_TELEMETRY_SUBPROCESSOR_ID", "observability")
+	t.Setenv("FORGEFLOW_AUDIT_BACKEND", "s3")
+	t.Setenv("FORGEFLOW_AUDIT_S3_BUCKET", "forgeflow-audit")
+	t.Setenv("FORGEFLOW_AUDIT_S3_REGION", "ap-southeast-1")
+	t.Setenv("FORGEFLOW_AUDIT_S3_PREFIX", "production/audit")
+	t.Setenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID", "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000")
+	t.Setenv("FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE", integrityPath)
+	t.Setenv("FORGEFLOW_OTEL_ENDPOINT", "https://otel.example.com/v1/traces")
+	t.Setenv("FORGEFLOW_OTEL_HEADERS_FILE", headersPath)
 }
 
 func TestLoadRejectsDirectMFAKeyInProduction(t *testing.T) {

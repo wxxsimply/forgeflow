@@ -50,6 +50,14 @@ $data = Read-Required 'docs/production-data-governance.md'
 foreach ($contract in @('Restricted', 'Confidential', '保留计划', '用户导出流程', '用户删除流程', '模型 Provider', 'Private Grader', '备份恢复重放清单', 'owner-scoped 自助导出 API', '密码二次验证', '最后管理员保护', '数据库级联', 'backup_purge_after')) {
     Assert-Production ($data.Contains($contract)) "Production data governance is missing contract: $contract"
 }
+$dataGovernanceGate = Read-Required 'docs/production-data-governance-gate.md'
+foreach ($contract in @('forgeflow.data-governance/v1', 'SHA-256', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256', 'model_inference', 'artifact_storage', 'audit_storage', 'observability', 'explicitAcceptance', 'P8-005', 'Open')) {
+    Assert-Production ($dataGovernanceGate.Contains($contract)) "Data-governance gate runbook is missing contract: $contract"
+}
+$environmentTemplate = Read-Required '.env.example'
+foreach ($contract in @('FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256', 'FORGEFLOW_DATA_GOVERNANCE_ARTIFACT_SUBPROCESSOR_ID', 'FORGEFLOW_DATA_GOVERNANCE_AUDIT_SUBPROCESSOR_ID', 'FORGEFLOW_DATA_GOVERNANCE_TELEMETRY_SUBPROCESSOR_ID')) {
+    Assert-Production ($environmentTemplate.Contains($contract)) "Environment template is missing data-governance contract: $contract"
+}
 
 $lifecycle = Read-Required 'docs/user-data-lifecycle.md'
 foreach ($contract in @('POST /api/v1/account/exports', 'GET /api/v1/account/exports/{exportId}/content', 'DELETE /api/v1/account', 'GET /api/v1/admin/user-deletions/{deletionId}', '一次性使用', '固定确认词 `DELETE`', 'backup_purge_after')) {
