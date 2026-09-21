@@ -28,6 +28,11 @@ foreach ($id in 1..7) {
     Assert-Production ($security.Contains($riskID)) "Production risk register is missing $riskID"
 }
 
+$executionPlane = Read-Required 'deploy/production/execution-plane/README.md'
+foreach ($contract in @('P8-002', 'Critical / Open', 'NetworkPolicy', 'Secret Manager', '不可直接部署')) {
+    Assert-Production ($executionPlane.Contains($contract)) "Execution-plane deployment contract is missing: $contract"
+}
+
 $adminMFA = Read-Required 'docs/admin-mfa.md'
 foreach ($contract in @('Migration 7', 'AES-256-GCM', '恢复码', '时间片', '受限会话', 'FORGEFLOW_ADMIN_MFA_REQUIRED=true', 'Operator', 'P8-003', 'No-Go')) {
     Assert-Production ($adminMFA.Contains($contract)) "Administrator MFA runbook is missing contract: $contract"
@@ -49,6 +54,14 @@ Assert-Production ($slo -match 'PostgreSQL \| ≤ 15 分钟 \| ≤ 2 小时') 'P
 $data = Read-Required 'docs/production-data-governance.md'
 foreach ($contract in @('Restricted', 'Confidential', '保留计划', '用户导出流程', '用户删除流程', '模型 Provider', 'Private Grader', '备份恢复重放清单', 'owner-scoped 自助导出 API', '密码二次验证', '最后管理员保护', '数据库级联', 'backup_purge_after')) {
     Assert-Production ($data.Contains($contract)) "Production data governance is missing contract: $contract"
+}
+$dataGovernanceGate = Read-Required 'docs/production-data-governance-gate.md'
+foreach ($contract in @('forgeflow.data-governance/v1', 'SHA-256', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256', 'model_inference', 'artifact_storage', 'audit_storage', 'observability', 'explicitAcceptance', 'P8-005', 'Open')) {
+    Assert-Production ($dataGovernanceGate.Contains($contract)) "Data-governance gate runbook is missing contract: $contract"
+}
+$environmentTemplate = Read-Required '.env.example'
+foreach ($contract in @('FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE', 'FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256', 'FORGEFLOW_DATA_GOVERNANCE_ARTIFACT_SUBPROCESSOR_ID', 'FORGEFLOW_DATA_GOVERNANCE_AUDIT_SUBPROCESSOR_ID', 'FORGEFLOW_DATA_GOVERNANCE_TELEMETRY_SUBPROCESSOR_ID')) {
+    Assert-Production ($environmentTemplate.Contains($contract)) "Environment template is missing data-governance contract: $contract"
 }
 
 $lifecycle = Read-Required 'docs/user-data-lifecycle.md'

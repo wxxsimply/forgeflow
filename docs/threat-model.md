@@ -41,10 +41,10 @@
 ## 残余风险与生产阻断项
 
 - `P8-001`：S3 适配器、逐 Run 迁移和补偿恢复代码已准备；真实 Bucket/IAM/KMS、版本/生命周期、权限、迁移一致性与恢复验证尚未完成。
-- `P8-002`：Compose Worker 仍与控制面同机；Production 专用 Worker/Sandbox 节点池和网络策略尚未部署。
+- `P8-002`：独立 ServiceAccount、CSI Secret Manager、专用节点、默认拒绝 NetworkPolicy、mTLS Sandbox daemon 和正/负测试契约已固定；Compose Worker 仍与控制面同机，真实 Production 专用执行面尚未部署。
 - `P8-003`：应用内管理员 TOTP 工程基础已实现；Operator MFA、真实 HTTPS Staging、独立安全评审、密钥轮换和 break-glass 尚未验收。
 - `P8-004`：append-only 审计与受控 OTLP 工程适配器已实现；真实 Bucket/IAM/KMS、删除保护、访问日志、脱敏与查询恢复尚未验收。
-- `P8-005`：云厂商、Region、数据驻留和子处理者尚未批准。
+- `P8-005`：SHA-256 绑定的 Production 数据治理配置门禁已实现；云厂商、Region、数据驻留、子处理者、公开告知和接受记录尚未批准。
 - `P8-006`：阶段 3 三基线已完成并获签署，但候选正式 Eval、完整镜像证据、Production 负载/RPO/RTO 和故障切换仍未执行。
 - `P8-007`：独立安全评审人和私有值班表尚未登记。
 - PostgreSQL 容器内网络未启用 TLS；其风险仅限单机 Staging，跨主机 Production 必须使用受管 TLS 数据库。

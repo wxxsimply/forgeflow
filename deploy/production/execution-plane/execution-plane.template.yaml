@@ -1,0 +1,469 @@
+# This is a non-deployable Production contract template. Render it only in
+# private IaC after release images, workload identities, Secret Manager paths,
+# and the egress gateway have been approved. The validator rejects applying it directly.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forgeflow-control
+  labels:
+    forgeflow.io/plane: control
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forgeflow-execution
+  labels:
+    forgeflow.io/plane: execution
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: control-api
+  namespace: forgeflow-control
+  labels:
+    forgeflow.io/workload-identity-role: control-api
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: execution-worker
+  namespace: forgeflow-execution
+  labels:
+    forgeflow.io/workload-identity-role: execution-worker
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-daemon
+  namespace: forgeflow-execution
+  labels:
+    forgeflow.io/workload-identity-role: sandbox-daemon
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: execution-workspaces
+  namespace: forgeflow-execution
+  labels:
+    forgeflow.io/data-classification: restricted
+    forgeflow.io/lifecycle: task-ephemeral
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  # Private IaC must set an encrypted, execution-plane-only StorageClass.
+  storageClassName: PRIVATE_EXECUTION_RWX_STORAGE_CLASS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-daemon
+  namespace: forgeflow-execution
+  labels:
+    app.kubernetes.io/name: forgeflow-sandbox-daemon
+spec:
+  selector:
+    app.kubernetes.io/name: forgeflow-sandbox-daemon
+  ports:
+    - name: docker-tls
+      port: 2376
+      targetPort: docker-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgeflow-api
+  namespace: forgeflow-control
+  labels:
+    app.kubernetes.io/name: forgeflow-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: forgeflow-api
+        forgeflow.io/plane: control
+    spec:
+      serviceAccountName: control-api
+      automountServiceAccountToken: false
+      nodeSelector:
+        forgeflow.io/plane: control
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: PRIVATE_APPROVED_API_IMAGE_AT_SHA256_DIGEST
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FORGEFLOW_ENV
+              value: production
+            - name: FORGEFLOW_POSTGRES_DSN_FILE
+              value: /mnt/forgeflow/secrets/postgres/dsn
+            - name: FORGEFLOW_MFA_ENCRYPTION_KEY_FILE
+              value: /mnt/forgeflow/secrets/mfa/encryption-key
+            - name: FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE
+              value: /mnt/forgeflow/secrets/audit/integrity-key
+          volumeMounts:
+            - name: api-runtime-secrets
+              mountPath: /mnt/forgeflow/secrets
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: api-runtime-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: forgeflow-api-production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgeflow-worker
+  namespace: forgeflow-execution
+  labels:
+    app.kubernetes.io/name: forgeflow-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: forgeflow-worker
+        forgeflow.io/plane: execution
+    spec:
+      serviceAccountName: execution-worker
+      automountServiceAccountToken: false
+      nodeSelector:
+        forgeflow.io/plane: execution
+      tolerations:
+        - key: forgeflow.io/execution
+          operator: Equal
+          value: dedicated
+          effect: NoSchedule
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: PRIVATE_APPROVED_WORKER_IMAGE_AT_SHA256_DIGEST
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FORGEFLOW_ENV
+              value: production
+            - name: FORGEFLOW_DOCKER_ENABLED
+              value: "true"
+            - name: DOCKER_HOST
+              value: tcp://sandbox-daemon.forgeflow-execution.svc.cluster.local:2376
+            - name: DOCKER_TLS_VERIFY
+              value: "1"
+            - name: DOCKER_CERT_PATH
+              value: /mnt/forgeflow/sandbox-client-tls
+            - name: OPENAI_API_KEY_FILE
+              value: /mnt/forgeflow/secrets/model-provider/api-key
+            - name: FORGEFLOW_POSTGRES_DSN_FILE
+              value: /mnt/forgeflow/secrets/postgres/worker-dsn
+            - name: FORGEFLOW_SANDBOX_WORKSPACE_ROOT
+              value: /var/lib/forgeflow/workspaces
+          volumeMounts:
+            - name: execution-workspaces
+              mountPath: /var/lib/forgeflow/workspaces
+            - name: worker-runtime-secrets
+              mountPath: /mnt/forgeflow/secrets
+              readOnly: true
+            - name: sandbox-client-tls
+              mountPath: /mnt/forgeflow/sandbox-client-tls
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: execution-workspaces
+          persistentVolumeClaim:
+            claimName: execution-workspaces
+        - name: worker-runtime-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: forgeflow-worker-production
+        - name: sandbox-client-tls
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: forgeflow-sandbox-client-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgeflow-sandbox-daemon
+  namespace: forgeflow-execution
+  labels:
+    app.kubernetes.io/name: forgeflow-sandbox-daemon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-sandbox-daemon
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: forgeflow-sandbox-daemon
+        forgeflow.io/plane: execution
+    spec:
+      serviceAccountName: sandbox-daemon
+      automountServiceAccountToken: false
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      nodeSelector:
+        forgeflow.io/plane: execution
+        forgeflow.io/sandbox: dedicated
+      tolerations:
+        - key: forgeflow.io/sandbox
+          operator: Equal
+          value: dedicated
+          effect: NoSchedule
+      containers:
+        - name: sandbox-daemon
+          image: PRIVATE_APPROVED_SANDBOX_DAEMON_IMAGE_AT_SHA256_DIGEST
+          imagePullPolicy: IfNotPresent
+          args:
+            - dockerd
+            - --host=tcp://0.0.0.0:2376
+            - --tlsverify
+            - --tlscacert=/mnt/forgeflow/sandbox-server-tls/ca.pem
+            - --tlscert=/mnt/forgeflow/sandbox-server-tls/cert.pem
+            - --tlskey=/mnt/forgeflow/sandbox-server-tls/key.pem
+          ports:
+            - name: docker-tls
+              containerPort: 2376
+          volumeMounts:
+            - name: execution-workspaces
+              mountPath: /var/lib/forgeflow/workspaces
+            - name: sandbox-server-tls
+              mountPath: /mnt/forgeflow/sandbox-server-tls
+              readOnly: true
+          securityContext:
+            # The daemon is the sole documented privileged exception. It runs
+            # only on tainted execution nodes and never mounts a host socket.
+            privileged: true
+            allowPrivilegeEscalation: true
+      volumes:
+        - name: execution-workspaces
+          persistentVolumeClaim:
+            claimName: execution-workspaces
+        - name: sandbox-server-tls
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: forgeflow-sandbox-server-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: control-default-deny
+  namespace: forgeflow-control
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: execution-default-deny
+  namespace: forgeflow-execution
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: control-dns-egress
+  namespace: forgeflow-control
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: execution-dns-egress
+  namespace: forgeflow-execution
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-egress-only
+  namespace: forgeflow-execution
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-worker
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: execution
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: forgeflow-sandbox-daemon
+      ports:
+        - protocol: TCP
+          port: 2376
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: data
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: egress
+          podSelector:
+            matchLabels:
+              forgeflow.io/component: approved-egress-gateway
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress-from-gateway
+  namespace: forgeflow-control
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: edge
+          podSelector:
+            matchLabels:
+              forgeflow.io/component: approved-ingress-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-daemon-ingress-and-egress
+  namespace: forgeflow-execution
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-sandbox-daemon
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: forgeflow-worker
+      ports:
+        - protocol: TCP
+          port: 2376
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: egress
+          podSelector:
+            matchLabels:
+              forgeflow.io/component: approved-egress-gateway
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-control-plane-only
+  namespace: forgeflow-control
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: forgeflow-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              forgeflow.io/plane: data
+      ports:
+        - protocol: TCP
+          port: 5432

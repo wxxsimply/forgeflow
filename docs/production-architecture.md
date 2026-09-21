@@ -49,6 +49,8 @@
 
 默认拒绝矩阵之外的连接。生产防火墙、Security Group 或 NetworkPolicy 必须从本表生成并在阶段 9 做连通性/拒绝测试。
 
+执行面 Kubernetes 部署契约见 deploy/production/execution-plane/README.md。该模板固定身份、CSI Secret、节点和网络边界，但不含可部署的私有云参数；真实环境验收仍是 P8-002 的关闭条件。
+
 ## 5. 关键数据流
 
 ### 5.1 登录与控制
