@@ -13,102 +13,107 @@ import (
 )
 
 type Config struct {
-	Environment              string
-	LogLevel                 string
-	ServiceVersion           string
-	OTLPEndpoint             string
-	OTLPHeaders              map[string]string
-	OTELSampleRatio          float64
-	MetricsEnabled           bool
-	HTTPAddress              string
-	HTTPCookieSecure         bool
-	HTTPCookieDomain         string
-	HTTPAllowedOrigins       []string
-	RepositoryRoots          []string
-	SessionTTL               time.Duration
-	SessionIdleTTL           time.Duration
-	AdminMFARequired         bool
-	MFAEncryptionKey         []byte
-	BootstrapAdminEmail      string
-	BootstrapAdminPassword   string
-	DataDir                  string
-	WorkflowMode             string
-	PlannerMode              string
-	ModelProvider            string
-	OpenAIAPIKey             string
-	OpenAIBaseURL            string
-	OpenAIOrganization       string
-	OpenAIProject            string
-	OpenAIMaxRetries         int
-	PlannerModel             string
-	PlannerPromptVersion     string
-	PlannerReasoningEffort   string
-	PlannerMaxOutputTokens   int
-	PlannerTimeout           time.Duration
-	PlannerInputUSDPerMTok   float64
-	PlannerOutputUSDPerMTok  float64
-	DeveloperModel           string
-	DeveloperPromptVersion   string
-	DeveloperReasoningEffort string
-	DeveloperMaxOutputTokens int
-	DeveloperTimeout         time.Duration
-	DeveloperContextMaxBytes int
-	ReviewerModel            string
-	ReviewerPromptVersion    string
-	ReviewerReasoningEffort  string
-	ReviewerMaxOutputTokens  int
-	ReviewerTimeout          time.Duration
-	ReviewerContextMaxBytes  int
-	SecurityModel            string
-	SecurityPromptVersion    string
-	SecurityReasoningEffort  string
-	SecurityMaxOutputTokens  int
-	SecurityTimeout          time.Duration
-	SecurityContextMaxBytes  int
-	PostgresEnabled          bool
-	PostgresDSN              string
-	PostgresMaxOpenConns     int
-	PostgresMaxIdleConns     int
-	PostgresConnMaxLifetime  time.Duration
-	PostgresPingTimeout      time.Duration
-	ArtifactRoot             string
-	ArtifactBackend          string
-	ArtifactS3Bucket         string
-	ArtifactS3Region         string
-	ArtifactS3Endpoint       string
-	ArtifactS3Prefix         string
-	ArtifactS3SpoolDir       string
-	ArtifactS3SSE            string
-	ArtifactS3KMSKeyID       string
-	ArtifactS3UsePathStyle   bool
-	ArtifactMaxBytes         int
-	AuditBackend             string
-	AuditS3Bucket            string
-	AuditS3Region            string
-	AuditS3Endpoint          string
-	AuditS3Prefix            string
-	AuditS3KMSKeyID          string
-	AuditS3UsePathStyle      bool
-	AuditRetention           time.Duration
-	AuditIntegrityKey        []byte
-	UserDataExportTTL        time.Duration
-	UserDataExportMaxBytes   int
-	UserDeletionBackupTTL    time.Duration
-	WorkerLeaseTTL           time.Duration
-	WorkerHeartbeatInterval  time.Duration
-	WorkerPollInterval       time.Duration
-	WorkerMetricsAddress     string
-	EnforceActiveReleases    bool
-	DockerEnabled            bool
-	DockerBinary             string
-	SandboxWorkspaceRoot     string
-	SandboxImage             string
-	SandboxCPUs              string
-	SandboxMemory            string
-	SandboxPIDsLimit         int
-	SandboxTmpfsBytes        int
-	SandboxMaxOutputBytes    int
-	SandboxTimeout           time.Duration
+	Environment                           string
+	LogLevel                              string
+	ServiceVersion                        string
+	OTLPEndpoint                          string
+	OTLPHeaders                           map[string]string
+	OTELSampleRatio                       float64
+	MetricsEnabled                        bool
+	HTTPAddress                           string
+	HTTPCookieSecure                      bool
+	HTTPCookieDomain                      string
+	HTTPAllowedOrigins                    []string
+	RepositoryRoots                       []string
+	SessionTTL                            time.Duration
+	SessionIdleTTL                        time.Duration
+	AdminMFARequired                      bool
+	MFAEncryptionKey                      []byte
+	BootstrapAdminEmail                   string
+	BootstrapAdminPassword                string
+	DataDir                               string
+	WorkflowMode                          string
+	PlannerMode                           string
+	ModelProvider                         string
+	OpenAIAPIKey                          string
+	OpenAIBaseURL                         string
+	OpenAIOrganization                    string
+	OpenAIProject                         string
+	OpenAIMaxRetries                      int
+	PlannerModel                          string
+	PlannerPromptVersion                  string
+	PlannerReasoningEffort                string
+	PlannerMaxOutputTokens                int
+	PlannerTimeout                        time.Duration
+	PlannerInputUSDPerMTok                float64
+	PlannerOutputUSDPerMTok               float64
+	DeveloperModel                        string
+	DeveloperPromptVersion                string
+	DeveloperReasoningEffort              string
+	DeveloperMaxOutputTokens              int
+	DeveloperTimeout                      time.Duration
+	DeveloperContextMaxBytes              int
+	ReviewerModel                         string
+	ReviewerPromptVersion                 string
+	ReviewerReasoningEffort               string
+	ReviewerMaxOutputTokens               int
+	ReviewerTimeout                       time.Duration
+	ReviewerContextMaxBytes               int
+	SecurityModel                         string
+	SecurityPromptVersion                 string
+	SecurityReasoningEffort               string
+	SecurityMaxOutputTokens               int
+	SecurityTimeout                       time.Duration
+	SecurityContextMaxBytes               int
+	PostgresEnabled                       bool
+	PostgresDSN                           string
+	PostgresMaxOpenConns                  int
+	PostgresMaxIdleConns                  int
+	PostgresConnMaxLifetime               time.Duration
+	PostgresPingTimeout                   time.Duration
+	ArtifactRoot                          string
+	ArtifactBackend                       string
+	ArtifactS3Bucket                      string
+	ArtifactS3Region                      string
+	ArtifactS3Endpoint                    string
+	ArtifactS3Prefix                      string
+	ArtifactS3SpoolDir                    string
+	ArtifactS3SSE                         string
+	ArtifactS3KMSKeyID                    string
+	ArtifactS3UsePathStyle                bool
+	ArtifactMaxBytes                      int
+	AuditBackend                          string
+	AuditS3Bucket                         string
+	AuditS3Region                         string
+	AuditS3Endpoint                       string
+	AuditS3Prefix                         string
+	AuditS3KMSKeyID                       string
+	AuditS3UsePathStyle                   bool
+	AuditRetention                        time.Duration
+	AuditIntegrityKey                     []byte
+	DataGovernancePolicy                  DataGovernancePolicy
+	DataGovernancePolicyDigest            string
+	DataGovernanceArtifactSubprocessorID  string
+	DataGovernanceAuditSubprocessorID     string
+	DataGovernanceTelemetrySubprocessorID string
+	UserDataExportTTL                     time.Duration
+	UserDataExportMaxBytes                int
+	UserDeletionBackupTTL                 time.Duration
+	WorkerLeaseTTL                        time.Duration
+	WorkerHeartbeatInterval               time.Duration
+	WorkerPollInterval                    time.Duration
+	WorkerMetricsAddress                  string
+	EnforceActiveReleases                 bool
+	DockerEnabled                         bool
+	DockerBinary                          string
+	SandboxWorkspaceRoot                  string
+	SandboxImage                          string
+	SandboxCPUs                           string
+	SandboxMemory                         string
+	SandboxPIDsLimit                      int
+	SandboxTmpfsBytes                     int
+	SandboxMaxOutputBytes                 int
+	SandboxTimeout                        time.Duration
 }
 
 func Load() (Config, error) {
@@ -331,6 +336,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dataGovernancePolicy, dataGovernancePolicyDigest, err := loadDataGovernancePolicy(environment)
+	if err != nil {
+		return Config{}, err
+	}
 	configuration := Config{
 		Environment: environment, LogLevel: envOrDefault("FORGEFLOW_LOG_LEVEL", "info"),
 		ServiceVersion: strings.TrimSpace(os.Getenv("FORGEFLOW_SERVICE_VERSION")), OTLPEndpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_OTEL_ENDPOINT")), OTLPHeaders: otlpHeaders,
@@ -380,7 +389,11 @@ func Load() (Config, error) {
 		AuditS3Endpoint: strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_ENDPOINT")), AuditS3Prefix: envOrDefault("FORGEFLOW_AUDIT_S3_PREFIX", "forgeflow/audit"),
 		AuditS3KMSKeyID: strings.TrimSpace(os.Getenv("FORGEFLOW_AUDIT_S3_KMS_KEY_ID")), AuditS3UsePathStyle: auditS3UsePathStyle,
 		AuditRetention: auditRetention, AuditIntegrityKey: auditIntegrityKey,
-		UserDataExportTTL: userDataExportTTL, UserDataExportMaxBytes: userDataExportMaxBytes,
+		DataGovernancePolicy: dataGovernancePolicy, DataGovernancePolicyDigest: dataGovernancePolicyDigest,
+		DataGovernanceArtifactSubprocessorID:  strings.TrimSpace(os.Getenv("FORGEFLOW_DATA_GOVERNANCE_ARTIFACT_SUBPROCESSOR_ID")),
+		DataGovernanceAuditSubprocessorID:     strings.TrimSpace(os.Getenv("FORGEFLOW_DATA_GOVERNANCE_AUDIT_SUBPROCESSOR_ID")),
+		DataGovernanceTelemetrySubprocessorID: strings.TrimSpace(os.Getenv("FORGEFLOW_DATA_GOVERNANCE_TELEMETRY_SUBPROCESSOR_ID")),
+		UserDataExportTTL:                     userDataExportTTL, UserDataExportMaxBytes: userDataExportMaxBytes,
 		UserDeletionBackupTTL: userDeletionBackupTTL,
 		WorkerLeaseTTL:        workerLeaseTTL, WorkerHeartbeatInterval: workerHeartbeat, WorkerPollInterval: workerPoll,
 		WorkerMetricsAddress:  envOrDefault("FORGEFLOW_WORKER_METRICS_ADDRESS", "127.0.0.1:9091"),
@@ -574,6 +587,9 @@ func (c Config) Validate() error {
 	}
 	if c.SandboxTimeout < time.Second || c.SandboxTimeout > 10*time.Minute {
 		return fmt.Errorf("FORGEFLOW_SANDBOX_TIMEOUT must be between 1s and 10m")
+	}
+	if err := validateProductionDataGovernance(c); err != nil {
+		return err
 	}
 	return nil
 }
