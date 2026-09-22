@@ -177,6 +177,7 @@ func validateProductionDataGovernance(c Config) error {
 		return nil
 	}
 	if c.DataGovernancePolicyDigest == "" {
+ codex/append-only-audit
 		return fmt.Errorf("Production data governance policy is required")
 	}
 	if c.AuditBackend != "s3" {
@@ -184,13 +185,26 @@ func validateProductionDataGovernance(c Config) error {
 	}
 	if strings.TrimSpace(c.OTLPEndpoint) == "" {
 		return fmt.Errorf("Production data governance requires FORGEFLOW_OTEL_ENDPOINT")
+
+		return fmt.Errorf("production data governance policy is required")
+	}
+	if c.AuditBackend != "s3" {
+		return fmt.Errorf("production data governance requires FORGEFLOW_AUDIT_BACKEND=s3")
+	}
+	if strings.TrimSpace(c.OTLPEndpoint) == "" {
+		return fmt.Errorf("production data governance requires FORGEFLOW_OTEL_ENDPOINT")
+ main
 	}
 	provider, ok := findProvider(policy.Providers, c.ModelProvider)
 	if !ok || !containsString(provider.DataCategories, "model_inference") || !containsHost(provider.EndpointHosts, c.OpenAIBaseURL) {
 		return fmt.Errorf("configured model provider or endpoint is not approved by the data governance policy")
 	}
 	if !httpsURL(c.OpenAIBaseURL) {
+ codex/append-only-audit
 		return fmt.Errorf("Production model provider endpoint must use HTTPS")
+
+		return fmt.Errorf("production model provider endpoint must use HTTPS")
+ main
 	}
 	if err := validateSubprocessorUse(policy, c.DataGovernanceArtifactSubprocessorID, "artifact_storage", c.ArtifactS3Region, c.ArtifactS3Endpoint); err != nil {
 		return fmt.Errorf("artifact storage data governance: %w", err)
