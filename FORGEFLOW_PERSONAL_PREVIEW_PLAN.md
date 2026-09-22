@@ -1,6 +1,6 @@
 # ForgeFlow 个人预览执行计划
 
-> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)。受邀者身份和部署私有记录不得提交 Git。
+> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)；HTTPS 与 Secret 证据见 [个人预览就绪记录](docs/personal-preview-readiness.md)。受邀者身份和部署私有记录不得提交 Git。
 >
 > 最新人工验收：用户已在本轮会话回复“全部成功了”，确认阶段 C 网页模拟流程与安全组核查。以 [人工确认记录](docs/preview-rollout-result.md) 为准；下文“待人工验收”为部署时历史状态。服务器无需重部署，真实模型任务仍未执行。
 

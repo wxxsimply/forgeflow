@@ -57,4 +57,4 @@
 - scripts/preview_rollout_preflight.py：真实运行时的只读边界检查。
 - scripts/validate-personal-preview-scope.ps1：仓库级边界防漂移检查。
 
-本记录关闭 PERSONAL-001。它不关闭 HTTPS、Secret、备份恢复、可观测性、候选 smoke 或不可信执行边界等后续工作项。
+本记录关闭 PERSONAL-001。HTTPS 与 Secret 状态由 docs/personal-preview-readiness.md 单独记录；备份恢复、可观测性、候选 smoke 和不可信执行边界仍是后续工作项。

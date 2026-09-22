@@ -43,8 +43,8 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 | ID | 状态 | 待完成项 | 优先级 | 完成证据 |
 |---|---|---|---|---|
 | PERSONAL-001 | 已完成 | 确定受限公开预览范围 | P0 | docs/personal-preview-scope.md 固化最多 5 个账号、受控仓库、禁止数据、零模型调用/费用和停止条件；validate 防止部署边界漂移 |
-| PERSONAL-002 | 待完成 | 真实 HTTPS 部署 | P0 | 可访问的真实域名、有效 TLS、非开发模式配置和健康检查 |
-| PERSONAL-003 | 待完成 | 生产配置与密钥隔离 | P0 | 仅由部署平台的 Secret 或环境变量提供密钥；仓库、镜像和日志均不含凭据 |
+| PERSONAL-002 | 已完成 | 真实 HTTPS 部署 | P0 | docs/personal-preview-readiness.md 记录可信 IP HTTPS、Secure Cookie/Origin、健康检查和浏览器人工确认；validate 防止配置漂移 |
+| PERSONAL-003 | 已完成 | 预览配置与密钥隔离 | P0 | PostgreSQL 与 Bootstrap 使用被 Git 忽略的 Secret 文件；服务器无模型 Key；仓库、镜像参数和公开文档不含真实凭据 |
 | PERSONAL-004 | 待完成 | PostgreSQL 备份与恢复 | P0 | 自动备份已启用，并在隔离实例完成一次恢复验证 |
 | PERSONAL-005 | 待完成 | 最小可观测性与回滚 | P0 | 错误日志、健康检查、成本观察、部署版本记录，以及可验证的回滚步骤 |
 | PERSONAL-006 | 待完成 | 候选功能 smoke | P1 | 一个固定 Fixture 在基线 Prompt 与候选 Prompt 上完成 JSON、diff、apply 和测试；结果记录为成功或 No-Go |
@@ -69,8 +69,8 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 | 工作项 | 最低要求 | 通过条件 |
 |---|---|---|
 | 选择托管方式 | 选择一个自己能维护的平台；先部署受限预览 | 记录部署平台、区域、费用和访问入口 |
-| HTTPS 与域名 | 使用托管平台提供或自行配置的有效 TLS | 浏览器无证书警告；HTTP 正确跳转或关闭 |
-| 应用配置 | 使用平台 Secret 或环境变量注入；开发默认值不得用于公开环境 | 不在 Git、镜像层、前端包或日志中发现密钥 |
+| HTTPS 入口 | 使用托管平台、可信域名证书或可信 IP 证书提供有效 TLS | 浏览器无证书警告；除必要 HTTPS 端口外不公开应用和数据库端口 |
+| 应用配置 | 使用文件型 Secret 或部署平台 Secret；个人预览必须显式保持 Planning/Mock、关闭 Docker 与模型 Key | 不在 Git、镜像层、前端包或公开日志中发现密钥 |
 | PostgreSQL | 使用独立数据库与非管理员应用账号 | 应用只能访问其所需数据库或 Schema；公网访问按平台能力限制 |
 | 数据存储 | 若启用对象存储，使用独立 Bucket 或前缀和最小权限 | 不同用户或租户的对象不可互相读取 |
 | 备份恢复 | 启用托管备份或定期加密导出；先在隔离环境恢复 | 完成一次恢复后可登录并读取预期的测试数据 |
@@ -135,10 +135,10 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 ## 11. 第一轮执行顺序
 
 1. PERSONAL-001 已完成：受限公开预览范围、零运行时模型费用和停止条件已固化并接入 validate。
-2. 选定托管平台并部署真实 HTTPS 预览环境（PERSONAL-002、PERSONAL-003）。
+2. PERSONAL-002、PERSONAL-003 已完成：可信 IP HTTPS、预览安全配置和文件型 Secret 已有真实证据并接入 validate。
 3. 配置数据库备份，并完成隔离恢复演练（PERSONAL-004）。
 4. 用受控数据完成候选 smoke 和端到端验收（PERSONAL-006、PERSONAL-007）。
 5. 开放 1–5 位受邀测试者；每天检查错误和费用（阶段 D）。
 6. 当需要处理任意不可信仓库时，先完成独立执行面验证（PERSONAL-008）。
 
-在 PERSONAL-002 至 PERSONAL-005 未完成前，不应对外宣称 ForgeFlow 已稳定上线；在 PERSONAL-008 未完成前，不应开放任意仓库或含敏感数据的执行任务。
+在 PERSONAL-004、PERSONAL-005 未完成前，不应对外宣称 ForgeFlow 已稳定上线；在 PERSONAL-008 未完成前，不应开放任意仓库或含敏感数据的执行任务。
