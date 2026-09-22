@@ -1,6 +1,6 @@
 # ForgeFlow 个人预览执行计划
 
-> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)；HTTPS 与 Secret 证据见 [个人预览就绪记录](docs/personal-preview-readiness.md)。受邀者身份和部署私有记录不得提交 Git。
+> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)；HTTPS 与 Secret 证据见 [个人预览就绪记录](docs/personal-preview-readiness.md)；备份与隔离恢复步骤见 [个人预览备份恢复手册](docs/personal-preview-backup-restore.md)。受邀者身份、备份内容和部署私有记录不得提交 Git。
 >
 > 最新人工验收：用户已在本轮会话回复“全部成功了”，确认阶段 C 网页模拟流程与安全组核查。以 [人工确认记录](docs/preview-rollout-result.md) 为准；下文“待人工验收”为部署时历史状态。服务器无需重部署，真实模型任务仍未执行。
 
@@ -68,6 +68,7 @@ ssh -L 8080:127.0.0.1:8080 <ssh-user>@39.102.136.31
 - [x] 服务器使用 SSH 密钥认证、专用 `forgeflow` 部署用户，且已禁用 root SSH 登录。
 - [x] 个人预览已部署到 `d5d5f5311bd812f511f009cfbc458f52ccbc6a17`，Migration schema version 为 `5`。
 - [x] PostgreSQL、API、Worker、Web 和 Caddy 均通过健康检查，原有 TTS 服务未受影响。
+- [x] 个人预览备份、每日定时器和隔离恢复工具已准备并接入 CI；真实定时器启用和恢复演练仍待所有者单独授权，不计为 PERSONAL-004 完成。
 
 ## 5. 部署执行记录
 

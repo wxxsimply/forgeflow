@@ -61,6 +61,7 @@ try {
         "validate-staging-assets.ps1",
         "validate-personal-preview-scope.ps1",
         "validate-personal-preview-readiness.ps1",
+        "validate-personal-preview-backup.ps1",
         "validate-operations-assets.ps1",
         "validate-execution-plane-contract.ps1",
         "validate-production-readiness.ps1",
