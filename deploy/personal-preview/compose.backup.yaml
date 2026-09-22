@@ -1,0 +1,63 @@
+services:
+  backup:
+    profiles: ["ops"]
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    user: "${FORGEFLOW_BACKUP_UID:?FORGEFLOW_BACKUP_UID is required}:${FORGEFLOW_BACKUP_GID:?FORGEFLOW_BACKUP_GID is required}"
+    entrypoint: ["/bin/sh", "/ops/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: forgeflow
+      PGDATABASE: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    secrets:
+      - postgres_password
+    volumes:
+      - ./ops:/ops:ro
+      - ${FORGEFLOW_BACKUP_PATH:-./backups}:/backups
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+
+  restore-drill:
+    profiles: ["ops"]
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    user: "${FORGEFLOW_BACKUP_UID:?FORGEFLOW_BACKUP_UID is required}:${FORGEFLOW_BACKUP_GID:?FORGEFLOW_BACKUP_GID is required}"
+    entrypoint: ["/bin/sh", "/ops/restore-drill.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      BACKUP_FILE: ${FORGEFLOW_PREVIEW_BACKUP_FILE:-}
+      RESTORE_DATABASE: ${FORGEFLOW_PREVIEW_RESTORE_DATABASE:-forgeflow_preview_restore_drill}
+      CONFIRM_RESTORE: ${FORGEFLOW_PREVIEW_CONFIRM_RESTORE:-}
+    secrets:
+      - postgres_password
+    volumes:
+      - ./ops:/ops:ro
+      - ${FORGEFLOW_BACKUP_PATH:-./backups}:/backups:ro
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev

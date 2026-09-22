@@ -1,0 +1,11 @@
+[Unit]
+Description=Run ForgeFlow personal preview PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=forgeflow-preview-backup.service
+
+[Install]
+WantedBy=timers.target

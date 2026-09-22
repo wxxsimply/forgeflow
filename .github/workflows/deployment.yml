@@ -27,6 +27,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-personal-preview-readiness.ps1
 
+      - name: Validate personal preview backup and isolated restore contract
+        shell: pwsh
+        run: ./scripts/validate-personal-preview-backup.ps1
+
       - name: Validate operations and security asset contract
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1
@@ -52,6 +56,8 @@ jobs:
         run: |
           bash -n deploy/staging/ops/backup.sh
           bash -n deploy/staging/ops/restore-drill.sh
+          bash -n deploy/personal-preview/ops/backup.sh
+          bash -n deploy/personal-preview/ops/restore-drill.sh
 
       - name: Prepare non-sensitive validation inputs
         shell: bash
@@ -104,6 +110,8 @@ jobs:
           ./scripts/staging-alert-test.ps1 -DryRun
           ./scripts/staging-backup.ps1 -EnvFile .cache/staging-ci.env -DryRun
           ./scripts/staging-restore-drill.ps1 -EnvFile .cache/staging-ci.env -BackupFile /backups/forgeflow-20260908T000000Z.dump -ConfirmRestore -DryRun
+          ./scripts/personal-preview-backup.ps1 -EnvFile deploy/personal-preview/preview.env.example -DryRun
+          ./scripts/personal-preview-restore-drill.ps1 -EnvFile deploy/personal-preview/preview.env.example -BackupFile /backups/forgeflow-preview-20260922T000000Z.dump -ConfirmRestore -DryRun
 
       - name: Validate Caddy configuration
         run: |
