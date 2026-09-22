@@ -19,6 +19,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-staging-assets.ps1
 
+      - name: Validate personal preview scope contract
+        shell: pwsh
+        run: ./scripts/validate-personal-preview-scope.ps1
+
       - name: Validate operations and security asset contract
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1
@@ -155,6 +159,13 @@ jobs:
               and (.services.caddy.healthcheck.test | index("http://127.0.0.1:8080/healthz") != null)
               and (.services.caddy.tmpfs | index("/data:size=32m,noexec,nosuid,nodev") != null)
               and (.services.caddy.tmpfs | index("/config:size=8m,noexec,nosuid,nodev") != null)
+              and .services.api.environment.FORGEFLOW_WORKFLOW_MODE == "planning"
+              and .services.api.environment.FORGEFLOW_PLANNER_MODE == "mock"
+              and .services.worker.environment.FORGEFLOW_WORKFLOW_MODE == "planning"
+              and .services.worker.environment.FORGEFLOW_PLANNER_MODE == "mock"
+              and .services.worker.environment.FORGEFLOW_DOCKER_ENABLED == "false"
+              and ((.services.api.environment | has("OPENAI_API_KEY")) | not)
+              and ((.services.worker.environment | has("OPENAI_API_KEY")) | not)
             ' > /dev/null
 
           docker compose \
