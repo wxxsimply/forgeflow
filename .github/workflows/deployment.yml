@@ -31,6 +31,13 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-personal-preview-backup.ps1
 
+      - name: Validate personal preview observability and rollback contract
+        shell: pwsh
+        run: ./scripts/validate-personal-preview-operations.ps1
+
+      - name: Test personal preview operations guards
+        run: python3 -B -m unittest discover -s scripts -p test_personal_preview_operations.py -v
+
       - name: Validate operations and security asset contract
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1

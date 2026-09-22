@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect ForgeFlow personal preview operations snapshot every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=2m
+Unit=forgeflow-preview-observe.service
+
+[Install]
+WantedBy=timers.target
