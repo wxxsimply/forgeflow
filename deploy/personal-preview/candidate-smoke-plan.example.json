@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "forgeflow.personal-candidate-smoke-plan/v1",
+  "candidateGitCommit": "0000000000000000000000000000000000000000",
+  "campaignId": "personal-preview-YYYYMMDD-01",
+  "baselinePromptVersion": "developer/v1",
+  "candidatePromptVersion": "developer/v4",
+  "caseId": "feature-01",
+  "mode": "planner_developer",
+  "fixture": {
+    "repository": "D:\\fixtures\\forgeflow-eval-fixtures",
+    "commit": "6ebdc5d14c69d7867b569cf0e19d34c7b60f3a4f"
+  },
+  "grader": {
+    "repository": "D:\\fixtures\\forgeflow-eval-grader",
+    "commit": "5942ec84d403e37385203b4c7851d1b92573548a"
+  },
+  "provider": {
+    "name": "deepseek",
+    "model": "deepseek-v4-flash",
+    "reasoningEffort": "low",
+    "keyFile": "D:\\forgeflow-secrets\\deepseek_api_key"
+  },
+  "pricing": {
+    "inputUsdPerMillion": "REPLACE_WITH_CURRENT_PRICE",
+    "cachedInputUsdPerMillion": "REPLACE_WITH_CURRENT_PRICE",
+    "outputUsdPerMillion": "REPLACE_WITH_CURRENT_PRICE",
+    "source": "https://api-docs.deepseek.com/quick_start/pricing/",
+    "validFrom": "REPLACE_WITH_RFC3339_TIME",
+    "validUntil": "REPLACE_WITH_RFC3339_TIME"
+  },
+  "maxCampaignUsd": "0.10"
+}
