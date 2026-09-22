@@ -23,6 +23,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-personal-preview-scope.ps1
 
+      - name: Validate personal preview HTTPS and Secret readiness
+        shell: pwsh
+        run: ./scripts/validate-personal-preview-readiness.ps1
+
       - name: Validate operations and security asset contract
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1
