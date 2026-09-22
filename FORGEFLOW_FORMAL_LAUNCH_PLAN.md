@@ -1,180 +1,149 @@
-# ForgeFlow 正式上线执行计划
+# ForgeFlow 个人项目上线方案
 
-> 审查日期：2026-09-22
+> 更新日期：2026-09-22
 >
-> 审查基线：origin/main，8e5082d4ff64115906689576699f302a980550a7
+> 审查基线：origin/main，45805569f1a9f64a500c83203042cc62b334dad9
 >
-> 定位：本计划替代零散的“下一步”描述，用于把现有工程基线推进到可审计的封闭试点和正式发布。它不替代安全评审、法务批准、云账号配置或最终 Go/No-Go。
+> 适用范围：由个人开发者维护的 ForgeFlow 公开预览与稳定版发布。本文件保留原文件名以避免已有链接失效；内容已不再要求企业内部审批、OIDC、KMS、值班轮值或子处理者流程。
 
-## 1. 审查结论
+## 1. 当前结论
 
-ForgeFlow 的主体产品、数据库、Web、治理、对象存储适配器、管理员 MFA、append-only 审计、数据治理门禁和执行面部署契约已经进入 main。最近的执行面 PR 已通过 Go verification、PostgreSQL integration、deployment-assets validate 和 Web verification。
+ForgeFlow 的 Go 服务、PostgreSQL、Web、治理控制、对象存储适配器、管理员 MFA、审计和执行面部署契约已进入 main。最近合并的变更已经通过以下 GitHub 检查：
 
-项目现在适合继续进行正式上线准备，但还不适合向真实用户开放 Production 流量。原因不是缺少普通功能页面，而是以下真实环境证据尚未产生：
+- Go verification
+- PostgreSQL integration
+- validate
+- Web verification
 
-1. 最终候选尚未 Freeze，新的候选 smoke 也尚未证明补丁协议修复有效。
-2. 五类镜像尚未完成真实构建、扫描、签名、上传和 digest 拉取验证。
-3. 公网 HTTPS Staging、独立执行面、真实 Secret Manager、对象存储、审计后端和数据驻留尚未验收。
-4. 备份恢复、故障切换、容量、负载、安全边界和告警投递没有真实证据。
-5. 独立安全评审、值班、Release Approver、用户告知、子处理者和最终法律文本尚未批准。
+main 现已启用 GitHub 规则集：必须经 Pull Request、至少一名其他协作者批准、解决审查讨论、保持线性历史、禁止强推和删除，并要求上述四项检查成功。
 
-此外，本次只读核对发现 GitHub main 当前未启用分支保护。尽管 CI 工作流存在，未受保护的 main 允许绕过必需检查，是正式上线前的 P0 治理缺口。
+项目可以开始准备个人项目的受限公开预览，但尚不能宣称为“生产级托管平台”。尚缺的不是企业签署文件，而是真实部署、备份恢复、最小安全边界、可观测性和小范围用户验证的证据。
 
-## 2. 上线目标与边界
+## 2. 适合个人项目的发布目标
 
-本计划分为两个可审计目标，不能把前者误称为后者：
-
-| 目标 | 可以做什么 | 不可以做什么 | 必须完成的门禁 |
+| 阶段 | 目标 | 允许范围 | 不能声称或执行的事项 |
 |---|---|---|---|
-| 封闭试点 | 仅允许批准的内部或签约测试用户，使用专用测试数据和受控仓库 | 不对外宣传为 Production Ready；不处理未批准真实用户数据；不跳过安全、数据或恢复证据 | Freeze、候选 smoke、供应链、真实 Staging、核心安全与数据控制通过；每项例外均有书面批准 |
-| 正式发布 v1.0.0 | 依据批准 Region 和合同范围接入真实用户，发布签名 Tag 与 GitHub Release | 不存在 Open Critical、未批准 High、未验证数据/恢复/身份边界或缺失签署 | 本计划全部阶段与 11 个阶段 9 门禁均通过；P8-002 必须 Verified Closed，其余 P8 项必须 Verified Closed 或具备政策允许的、未过期的独立风险接受 |
+| 受限公开预览 | 让少量受邀用户验证真实工作流 | 使用独立测试账号、受控仓库、明确的费用上限和可回滚部署 | 不承诺 SLA；不处理敏感生产数据；不把不可信仓库任务交给未验证的执行环境 |
+| 稳定版 | 在连续稳定运行后向更多用户开放 | 真实 HTTPS 域名、备份、监控、限流和支持入口已可用 | 不把“个人项目”包装成具备企业合规、24/7 值班或高可用保证的服务 |
 
-当前状态是工程准备完成、真实验收未开始。任何文档、演示或市场文案在最终 Go 前只能使用“受限预览”或“正式上线准备中”。
+建议先完成受限公开预览。只有在真实环境连续稳定并完成恢复演练后，才将其描述为稳定版。
 
-## 3. 固定推进规则
+## 3. 个人项目的固定规则
 
-1. 每个工作项必须有一个 Owner、一名非作者 Reviewer、一个可复核的证据位置和明确的停止条件。
-2. 代码、Prompt、Policy、Tool、Fixture、Grader、Migration、镜像或运行配置改变时，受影响的候选和验收证据立即失效。
-3. 付费模型调用、Registry 写入、部署、真实告警投递、恢复、Promotion、rollback、Tag 和 Release 始终需要单独人工确认。
-4. 原始模型输出、隐藏测试、Private Grader、真实仓库、凭据、数据库 dump、私有审批和内部网络地址不得提交到 Git。
-5. main 只能通过 Pull Request 更新；GitHub 必需检查、至少一名非作者审批、线性历史或受控 merge queue、管理员绕过限制和推送限制必须在 GitHub 中启用。
-6. 每个 PR 在提交前必须运行与修改范围匹配的检查；合并前必须保持 Go verification、PostgreSQL integration、validate 和 Web verification 全绿。
-7. Freeze 后不再创建功能 PR。发现问题时创建独立修复 PR，合并后生成新候选并从 Freeze 重新开始。
+1. 不伪造审批记录、值班记录、OIDC、KMS 签名身份、Staging 地址或安全验收。没有真实环境时，如实保持未发布。
+2. 密钥、令牌、真实用户数据、数据库导出、私有仓库地址、模型原始输出和 .forgeflow/ 内容不得提交到 Git。
+3. 付费模型调用、容器镜像上传、云部署、域名或 DNS 修改、真实邮件或告警发送、备份恢复和回滚，均由项目所有者单独确认后执行。
+4. 每次代码、Prompt、Policy、Migration、镜像或部署配置变更都必须通过独立 PR；合并后重新从候选验证开始。
+5. main 只通过 PR 更新。推送前和合并前保持 Go verification、PostgreSQL integration、validate、Web verification 全绿。
+6. 本项目不使用企业版 Stage 9 Freeze 初始化器。不要运行 scripts/initialize-stage-9-acceptance-plan.ps1，更不要用示例值填充其企业字段。
+7. 在独立执行面、网络隔离与权限边界未实际验证前，不接收或执行来源不明、包含机密或不可信的仓库任务。
 
-## 4. 当前阻断项
+## 4. 当前待完成项
 
-| ID | 阻断项 | 严重度 | 当前事实 | 关闭证据 |
-|---|---|---|---|---|
-| LAUNCH-001 | main 未受 GitHub 分支保护 | P0 | REST 分支保护查询返回未受保护 | 必需检查、审批、管理员限制和直接推送限制截图或配置导出 |
-| LAUNCH-002 | 最终候选 Freeze 未完成 | P0 | 私有输入、候选 SHA、责任人和审批记录未冻结 | 通过的私有 acceptance plan 预检及 Evidence 哈希 |
-| LAUNCH-003 | 候选补丁 smoke 未重新执行 | P0 | 2026-09-09 的两个 Observation 在 patch_check 失败 | 新候选上 1 Case x 2 Prompt 的成功或明确 No-Go 记录 |
-| P8-001 | 对象存储、导出/删除与恢复未在真实环境验证 | High | 代码和单元测试已存在 | Bucket/IAM/KMS、迁移、恢复、一致性和权限证据 |
-| P8-002 | 独立执行面未部署 | Critical | Kubernetes 契约存在，但真实节点、身份和网络不存在 | 专用节点、mTLS、Secret Manager、正反网络与 Sandbox 证据 |
-| P8-003 | MFA 和 break-glass 未在真实身份入口验证 | High | 应用内 TOTP 工程基础已存在 | HTTPS、上游 Operator MFA、轮换、旁路拒绝与演练证据 |
-| P8-004 | append-only 审计与受控 Trace 未在真实后端验证 | High | 适配器和失败关闭已存在 | Object Lock、KMS、删除拒绝、查询恢复和脱敏证据 |
-| P8-005 | Region、子处理者、数据告知与接受未批准 | High | Production 配置门禁已存在 | 私有决策、公开生效告知、接受记录和环境验证 |
-| P8-006 | SLO、容量、RPO/RTO、故障切换未实测 | High | 目标与矩阵已定义 | 脱敏负载、恢复、故障切换和容量报告 |
-| P8-007 | 独立安全评审和值班未固化 | High | 角色模型已定义 | 私有 on-call、独立 Reviewer 和最终签署记录 |
-
-## 5. 阶段 A：发布治理与候选冻结
-
-目标：建立不能绕过的代码治理，并生成唯一、可追溯的候选。
-
-| 工作项 | Owner | 完成条件 | 停止条件 |
+| ID | 待完成项 | 优先级 | 完成证据 |
 |---|---|---|---|
-| LAUNCH-001，保护 main | Repository Owner | 启用 PR 必需、四项必需检查、非作者审批、管理员限制与直接推送限制 | 任一项无法启用时，不进入真实 Staging |
-| LAUNCH-002，收集私有 Freeze 输入 | Release Approver | 数据范围、预算、Registry、签名、OIDC、HTTPS Staging、值班、独立安全评审和审批记录均有效 | 缺任何输入、输入过期或候选 SHA 不一致 |
-| LAUNCH-003，生成并预检私有计划 | Release Approver | 初始化器在干净 main 绑定完整 SHA，填充计划预检通过 | 占位符、脏工作区、非忽略路径、短 SHA 或计划覆盖 |
-| LAUNCH-004，重新运行候选 smoke | Eval Owner + Security Reviewer | developer/v1 与候选 Prompt 均完成 JSON、diff、apply、显式测试和隐藏测试，无协议或基础设施错误 | 费用/数据授权无效、Fixture 变更、补丁协议失败、未知调用结果 |
-| LAUNCH-005，决定候选 | Release Approver | 记录 Promotion、保留基线或 No-Go 的签署结论 | 未获签署时不得运行正式 Eval 或构建发布镜像 |
+| PERSONAL-001 | 确定受限公开预览范围 | P0 | 目标用户数量、允许仓库范围、禁止数据类型、模型费用上限和停止条件写入个人发布记录 |
+| PERSONAL-002 | 真实 HTTPS 部署 | P0 | 可访问的真实域名、有效 TLS、非开发模式配置和健康检查 |
+| PERSONAL-003 | 生产配置与密钥隔离 | P0 | 仅由部署平台的 Secret 或环境变量提供密钥；仓库、镜像和日志均不含凭据 |
+| PERSONAL-004 | PostgreSQL 备份与恢复 | P0 | 自动备份已启用，并在隔离实例完成一次恢复验证 |
+| PERSONAL-005 | 最小可观测性与回滚 | P0 | 错误日志、健康检查、成本观察、部署版本记录，以及可验证的回滚步骤 |
+| PERSONAL-006 | 候选功能 smoke | P1 | 一个固定 Fixture 在基线 Prompt 与候选 Prompt 上完成 JSON、diff、apply 和测试；结果记录为成功或 No-Go |
+| PERSONAL-007 | 受限用户端到端验收 | P1 | 登录、仓库选择、批准或拒绝、刷新恢复、注销保护和失败提示均由至少一名真实测试者验证 |
+| PERSONAL-008 | 不可信执行边界 | P0（开放任意仓库前） | 独立执行面、最小权限、无外网 Sandbox 与拒绝测试均在真实环境验证；未完成前仅允许受控仓库 |
 
-必须人工执行：生成私有计划、付费调用、候选结论签署。仓库只提交脱敏汇总和 Evidence 哈希。
+## 5. 阶段 A：确定预览边界和候选
 
-## 6. 阶段 B：正式 Eval 与不可变供应链
+目标：明确要发布什么、允许谁使用，以及出现问题时立即停止。
 
-目标：证明候选质量，并将同一 SHA 制造成可验证的部署资产。
+1. 建立一份不提交 Git 的个人发布记录，至少写明：
+   - 候选 Git SHA、部署版本和日期；
+   - 受邀用户范围（建议 1–5 人）和允许测试的仓库；
+   - 禁止上传的数据类型，例如密码、生产密钥、客户数据和受保密协议约束的代码；
+   - 单次、每日和总模型费用上限；
+   - 发现数据泄露、越权、异常扣费、无法回滚或服务不可用时的停止条件。
+2. 在干净的最新 main 上创建候选；记录完整 SHA，禁止只记录短 SHA 或浮动分支名。
+3. 若候选涉及模型输出或补丁执行，在获得明确费用授权后运行一个固定 Fixture 的小型 smoke。出现格式、diff、apply、测试、费用或基础设施错误时记录 No-Go，不继续扩大测试。
+4. 对外测试前，确认 GitHub Ruleset 仍要求四项 CI 检查和非作者审核。
 
-| 工作项 | Owner | 完成条件 | 停止条件 |
-|---|---|---|---|
-| LAUNCH-006，正式 Eval | Eval Owner | 30 Fixture x 3 模式 x 2 Prompt，共 180 Observation 均有终态；成本、P95、回归与人工介入已汇总 | smoke 未通过、预算耗尽、数据范围变化、Fixture 或 Grader 变化 |
-| LAUNCH-007，人工评审正式 Eval | Release Approver + Independent Reviewer | 候选结论、例外、失败样本和下一步均已签署 | 自动 Gate 不能代替人工签署 |
-| LAUNCH-008，构建五类镜像 | Release Owner | API、Worker、Web、Caddy、Sandbox 均从批准 SHA 产出 linux/amd64 digest | 任一镜像使用 tag、构建上下文漂移或 SHA 不一致 |
-| LAUNCH-009，SBOM、provenance、签名和漏洞扫描 | Security Owner | 每个 digest 有可验证 SBOM、provenance、OIDC 签名和扫描；Critical=0、High=0 或合规例外 | 可达 Critical 或未批准 High |
-| LAUNCH-010，干净主机拉取与 Release manifest | Release Owner | 五个 digest 在干净 Linux 主机拉取并检查；manifest 校验通过 | digest、签名、架构或 metadata 不一致 |
+通过条件：候选 SHA、测试范围、费用上限和停止条件明确；任何未知费用或未知执行结果均为 No-Go。
 
-必须人工执行：Registry 登录与上传、OIDC 签名身份确认、风险接受、镜像拉取验证。
+## 6. 阶段 B：部署基础与数据安全
 
-## 7. 阶段 C：真实 Staging 与 Production 控制验证
+目标：以低复杂度建立可恢复、可诊断的真实部署，而不是模拟企业架构。
 
-目标：在不开放 Production 用户流量前关闭 P8-001 至 P8-005 的真实环境证据缺口。
-
-### C.1 基础设施与身份
-
-1. 创建隔离的 control、execution、data、edge 和 egress 网络边界；为 API、Worker、Sandbox daemon、数据库、对象存储、审计和监控使用不同身份、KMS 范围和最小权限。
-2. 将 main 的执行面模板渲染到私有 IaC。实际值必须来自批准的 Release manifest、Secret Manager、工作负载身份和真实 Region，不能把私有值回写仓库。
-3. 确认 CNI 实际执行 NetworkPolicy；Worker 到 Sandbox daemon 使用 mTLS；Sandbox 子容器保持无网络、非 root、只读根、零 capability、固定 digest 与资源上限。
-4. 部署生产级 Secret Manager、KMS、Managed PostgreSQL TLS、对象存储版本和 Object Lock Compliance。应用不得使用长期明文环境变量或主机文件 Secret。
-
-### C.2 必须通过的真实验证
-
-| 范围 | 必须证明 | 关联风险 |
+| 工作项 | 最低要求 | 通过条件 |
 |---|---|---|
-| 网络与 Sandbox | API 无 Docker/模型出口；Worker 只能访问数据库、daemon 和批准 egress；Sandbox 无 DNS、外网、metadata 或数据面访问 | P8-002 |
-| 数据与对象存储 | tenant 前缀隔离、KMS、完整性、迁移补偿、导出/删除、版本恢复与备份删除清单 | P8-001 |
-| MFA 与入口 | HTTPS、Cookie、CSRF、管理员 TOTP、Operator MFA、旁路拒绝、break-glass、轮换和撤销 | P8-003 |
-| 审计与遥测 | Object Lock 删除拒绝、审计访问记录、Trace 脱敏、查询和恢复、后端不可用时失败关闭 | P8-004 |
-| 数据治理 | Provider、Region、端点、子处理者、保留、隐私告知与显式接受均与批准 Policy 一致 | P8-005 |
+| 选择托管方式 | 选择一个自己能维护的平台；先部署受限预览 | 记录部署平台、区域、费用和访问入口 |
+| HTTPS 与域名 | 使用托管平台提供或自行配置的有效 TLS | 浏览器无证书警告；HTTP 正确跳转或关闭 |
+| 应用配置 | 使用平台 Secret 或环境变量注入；开发默认值不得用于公开环境 | 不在 Git、镜像层、前端包或日志中发现密钥 |
+| PostgreSQL | 使用独立数据库与非管理员应用账号 | 应用只能访问其所需数据库或 Schema；公网访问按平台能力限制 |
+| 数据存储 | 若启用对象存储，使用独立 Bucket 或前缀和最小权限 | 不同用户或租户的对象不可互相读取 |
+| 备份恢复 | 启用托管备份或定期加密导出；先在隔离环境恢复 | 完成一次恢复后可登录并读取预期的测试数据 |
 
-每项验证均记录 UTC、批准 SHA、环境、角色、命令摘要、退出码、脱敏 Evidence SHA-256 和独立复核人。任意拒绝测试意外成功、Secret 可跨平面读取、Sandbox 可联网、审计可删除或 MFA 可绕过时，立即停止并保持 No-Go。
+部署前不得把真实域名、数据库连接串、访问令牌或私有基础设施文件提交进仓库。
 
-## 8. 阶段 D：Staging 业务验收与可运维性
+## 7. 阶段 C：上线前验收
 
-目标：证明真实用户路径、治理路径和故障路径在同一 digest 下可重复。
+目标：使用同一候选版本完成最小用户路径、安全路径和故障路径验证。
 
-| 工作项 | 通过条件 |
+| 场景 | 验收内容 |
 |---|---|
-| LAUNCH-011，digest-only Staging 部署 | HTTPS 公开入口；数据库、Worker、OTLP、监控和 daemon 不公开；Migration、API、Worker、Web、Prompt、Policy、manifest 和 Git SHA 一致 |
-| LAUNCH-012，端到端业务验收 | 登录、Session、RBAC、创建 Run、审批、Sandbox、重试、报告、Artifact 下载、导出和删除均通过；Fixture 保持不变 |
-| LAUNCH-013，治理演练 | Worker drain 后完成 Eval import、Promotion、Readiness 不匹配拒绝、rollback 和旧 Run 绑定验证 |
-| LAUNCH-014，告警与事件响应 | 九类合成告警实际送达主/备值班渠道；告警脱敏、Runbook、确认与升级路径有效 |
-| LAUNCH-015，备份与恢复 | 创建真实备份及异地副本，在隔离数据库恢复，完成登录到报告的验收；不覆盖在线库 |
-| LAUNCH-016，安全演练与 Demo | 路径、链接、命令、Secret、RBAC、mTLS、网络与日志脱敏测试通过；另一名 Operator 复现 Demo |
+| 访问与登录 | HTTPS、登录、会话过期、注销、管理员 MFA（如已启用）和错误提示 |
+| 正常工作流 | 仓库选择、创建 Run、批准、拒绝（包括 cancelled 或 rejected）、刷新恢复、报告和 Artifact 下载 |
+| 权限与数据 | 用户不能访问他人的 Run、Artifact、Token 或管理操作；不在界面、URL、日志中显示密钥 |
+| 失败处理 | 无效输入、模型超时、网络错误、任务失败与重试均有可理解提示，且不会无限重试或无限扣费 |
+| 回滚 | 保留上一个可用部署版本；在不破坏数据库数据的前提下完成一次回滚演练 |
+| 备份恢复 | 按阶段 B 的方式在隔离环境恢复，不覆盖在线数据库 |
 
-封闭试点前必须完成 LAUNCH-011 至 LAUNCH-016，并由 Security Owner、Platform Owner、Data Owner 和 Release Approver 联合确认风险范围。
+通过条件：每项均有日期、候选 SHA、简短结果和截图或日志位置。出现越权、泄密、数据损坏、无法停止的费用或无法回滚时，立即下线并修复。
 
-## 9. 阶段 E：容量、正式发布与发布后观察
+## 8. 阶段 D：受限公开预览
 
-目标：将封闭试点提升为正式发布，或以证据明确维持 No-Go。
+目标：以可控制的风险获得真实反馈，而不是一次性开放给所有人。
 
-1. 按 production-slo-capacity.md 的稳态、突发、Worker 故障、API 滚动、Provider 限速和 PostgreSQL 故障切换矩阵执行实测。
-2. 回填 API 可用性/延迟、入队、平台开销、Artifact 完整性、容量、RPO、RTO 和错误预算；任何待实测字段都阻止正式发布。
-3. 在私有系统登记独立安全评审人、Primary/Secondary、Platform/Data/Service Owner 与 Release Approver。
-4. 由独立安全评审确认 Open Critical=0、未接受 High=0；对允许的例外记录 Owner、补偿控制、到期和撤销条件。
-5. 审批隐私政策、服务条款、子处理者、Region、保留、删除和导出流程的生效版本。
-6. 汇总脱敏证据，填充 Go/No-Go 模板；只有所有必需角色签署 GO 后才创建签名 v1.0.0 Tag 和 GitHub Release。
-7. 发布后持续观察健康、错误预算、告警和安全信号；达到预先批准的回滚阈值时，按 digest-only manifest 回滚，不执行 Down Migration。
+1. 先邀请 1–5 位测试者，并明确这是“预览版”，说明数据限制和反馈渠道。
+2. 为模型调用设置平台侧或应用侧费用上限、超时和并发限制；每天查看实际调用次数与费用。
+3. 每天检查部署错误、健康状态、数据库容量和异常登录；没有 24/7 值班承诺时，应在产品页面如实说明。
+4. 保留可操作的停用方案：暂停入口、关闭模型调用或回滚至上一个部署版本。
+5. 收集并分类反馈：功能阻断、数据或权限问题、成本问题、易用性问题。安全或数据问题优先于新功能。
+
+预览退出条件：连续稳定运行一段明确的观察期（建议至少 7 天），无未处理的严重安全、数据、费用或稳定性问题；备份恢复与回滚均已验证。
+
+## 9. 阶段 E：稳定版发布
+
+只有在阶段 A–D 的证据齐全后，才考虑扩大用户范围。
+
+1. 汇总候选 SHA、部署版本、验收结果、已知限制、备份恢复日期和回滚方式。
+2. 处理或公开说明所有已知限制，尤其是不可信仓库执行范围、数据保留、费用限制和支持响应时间。
+3. 创建符合 GitHub 规则的发布 PR；合并后从已验证 SHA 创建 GitHub Release 和 Tag。
+4. 发布后持续观察错误、成本、数据库容量和用户反馈。达到预设停止条件时优先暂停或回滚，不在故障中继续扩容功能。
 
 ## 10. GitHub 与本地质量门禁
 
-每个仓库 PR 至少执行下表所列检查；不以“文档改动”作为跳过安全检查的理由。
+每个 PR 都只暂存本次变更文件。个人文档、PDF、output/、.forgeflow/、.env、Secret 和构建产物保持未跟踪或被忽略。
 
-| GitHub 检查 | 本地等价入口 | 典型阻断 |
-|---|---|---|
-| Go verification | scripts/verify.ps1，go test，go vet，Staticcheck，govulncheck，构建 | 格式、ST1005、race、漏洞、Migration 或构建失败 |
-| PostgreSQL integration | go test -p 1 ./internal/postgres ./internal/userdata ./internal/httpapi，并使用 PostgreSQL 17 | Migration、SQL、租户或级联删除回归 |
-| validate | validate-staging-assets、validate-operations-assets、validate-execution-plane-contract、validate-production-readiness、stage-9 acceptance preflight | Compose、Secret、部署契约、Release 或文档状态漂移 |
-| Web verification | web 的 npm ci、npm run check、OpenAPI 生成差异、Playwright E2E | 类型、单元测试、构建、浏览器或 API schema 漂移 |
+| GitHub 检查 | 应覆盖的本地验证 |
+|---|---|
+| Go verification | 格式、单元测试、race、vet、Staticcheck、govulncheck 和构建 |
+| PostgreSQL integration | go test -p 1 ./internal/postgres ./internal/userdata ./internal/httpapi |
+| validate | 部署资产、Compose、生产就绪与执行面契约验证 |
+| Web verification | web 中的依赖安装、类型或单元检查、构建、OpenAPI 一致性和 Playwright E2E |
 
-提交前的最小人工复核顺序：
+提交前按以下顺序检查：
 
-1. 确认只暂存本 PR 文件，个人文档、PDF、output、.forgeflow、.env、Secret 和构建产物保持未跟踪或被忽略。
-2. 运行 git diff --cached --check，并扫描冲突标记。
-3. 运行与改动范围对应的本地检查；涉及 Go、数据库、部署或 Web 时分别执行上表检查。
-4. 推送后确认四项 GitHub 检查均成功，再请求非作者审阅。
-5. 合并前再次确认目标分支为最新 main；发生冲突时重放到 main，保留双方有效配置，不在 GitHub 冲突编辑器中删除安全门禁。
+1. git status --short：确认没有暂存个人文件或私有内容。
+2. git diff --cached --check：确认没有空白错误。
+3. 扫描冲突标记：rg -n "^(<<<<<<<|=======|>>>>>>>)" --glob "!output/**" .
+4. 运行与改动范围匹配的本地验证；任何 Go、数据库、部署或 Web 改动必须覆盖对应检查。
+5. 推送后确认四项 GitHub 检查均为绿色，再由另一位协作者批准 PR。
 
-## 11. 11 个最终门禁映射
+## 11. 第一轮执行顺序
 
-| 门禁 | 本计划对应阶段 | 不可替代的通过证据 |
-|---|---|---|
-| freeze | A | 私有计划绑定干净候选 SHA 且预检通过 |
-| candidate-smoke | A | 1 Case x 2 Prompt 无协议/基础设施错误 |
-| formal-eval | B | 180 Observation、成本、质量与人工结论 |
-| image-supply-chain | B | 五个 digest、SBOM、provenance、签名、扫描和干净拉取 |
-| staging-deploy | C/D | 私有 IaC、digest-only HTTPS Staging 与一致性 |
-| governance-drill | D | Promotion、Readiness、rollback、drain 的受控证据 |
-| staging-e2e | D | 从登录到报告、导出/删除、Sandbox 和 Fixture 不变性 |
-| operations-security | D | 告警、恢复、安全、审计、MFA、Demo 和独立复核 |
-| load-recovery | E | SLO、容量、RPO/RTO、故障切换实测 |
-| final-go-no-go | E | 角色签署、风险处理、公开文档批准 |
-| github-release | E | 签名 Tag、Release、资产和批准 SHA/digest 一致 |
+1. 选择受限公开预览范围，写下费用上限与停止条件（PERSONAL-001）。
+2. 选定托管平台并部署真实 HTTPS 预览环境（PERSONAL-002、PERSONAL-003）。
+3. 配置数据库备份，并完成隔离恢复演练（PERSONAL-004）。
+4. 用受控数据完成候选 smoke 和端到端验收（PERSONAL-006、PERSONAL-007）。
+5. 开放 1–5 位受邀测试者；每天检查错误和费用（阶段 D）。
+6. 当需要处理任意不可信仓库时，先完成独立执行面验证（PERSONAL-008）。
 
-## 12. 首个执行顺序
-
-1. Repository Owner 先修复 LAUNCH-001，启用 main 分支保护。
-2. Release Approver 准备 LAUNCH-002 的九项私有 Freeze 输入，并确认候选范围和预算。
-3. 从干净 main 运行 Freeze 预检；通过后单独授权候选 smoke。
-4. smoke 成功才进入正式 Eval；正式 Eval 获批才进入镜像和真实 Staging。
-5. 所有阶段必须按顺序推进。任何代码修复先走独立 PR、四项 GitHub 检查和审阅，再回到新的 Freeze。
-
-在 LAUNCH-001 至 LAUNCH-005 完成前，不应采购或部署面向真实用户的 Production 流量；在 P8-002 未 Verified Closed 前，不应运行不可信仓库的真实执行任务。
+在 PERSONAL-002 至 PERSONAL-005 未完成前，不应对外宣称 ForgeFlow 已稳定上线；在 PERSONAL-008 未完成前，不应开放任意仓库或含敏感数据的执行任务。
