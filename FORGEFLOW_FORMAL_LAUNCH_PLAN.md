@@ -1,8 +1,8 @@
 # ForgeFlow 个人项目上线方案
 
-> 更新日期：2026-09-22
+> 更新日期：2026-09-23
 >
-> 审查基线：origin/main，5d505f5ec393ca701286dc60326f0f2d55225780（PR #97）
+> 审查基线：origin/main，df15659d586698a48ca7f7fb62f687e2a02c3a88（PR #98）
 >
 > 适用范围：由个人开发者维护的 ForgeFlow 公开预览与稳定版发布。本文件保留原文件名以避免已有链接失效；内容已不再要求企业内部审批、OIDC、KMS、值班轮值或子处理者流程。
 
@@ -47,7 +47,7 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 | PERSONAL-003 | 已完成 | 预览配置与密钥隔离 | P0 | PostgreSQL 与 Bootstrap 使用被 Git 忽略的 Secret 文件；服务器无模型 Key；仓库、镜像参数和公开文档不含真实凭据 |
 | PERSONAL-004 | 实施就绪，待实测 | PostgreSQL 备份与恢复 | P0 | 备份、定时器和隔离恢复工具已准备；仍需所有者授权后在服务器启用自动备份，并完成一次真实隔离恢复验证 |
 | PERSONAL-005 | 实施就绪，待实测 | 最小可观测性与回滚 | P0 | 脱敏观测、15 分钟定时器、私有版本记录和只读回滚计划已准备；仍需所有者授权后连续观测并完成真实应用回滚演练 |
-| PERSONAL-006 | 待完成 | 候选功能 smoke | P1 | 一个固定 Fixture 在基线 Prompt 与候选 Prompt 上完成 JSON、diff、apply 和测试；结果记录为成功或 No-Go |
+| PERSONAL-006 | 实施就绪，待付费实测 | 候选功能 smoke | P1 | 私有计划、双重付费确认、固定 feature-01、基线/候选严格 GO/NO-GO 判定和离线测试已准备；仍需所有者按 docs/personal-preview-candidate-smoke.md 明确授权后运行新 Campaign |
 | PERSONAL-007 | 待完成 | 受限用户端到端验收 | P1 | 登录、仓库选择、批准或拒绝、刷新恢复、注销保护和失败提示均由至少一名真实测试者验证 |
 | PERSONAL-008 | 待完成 | 不可信执行边界 | P0（开放任意仓库前） | 独立执行面、最小权限、无外网 Sandbox 与拒绝测试均在真实环境验证；未完成前仅允许受控仓库 |
 
@@ -138,8 +138,9 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 2. PERSONAL-002、PERSONAL-003 已完成：可信 IP HTTPS、预览安全配置和文件型 Secret 已有真实证据并接入 validate。
 3. PERSONAL-004 的仓库工具已就绪；按 docs/personal-preview-backup-restore.md 在所有者明确授权后启用真实自动备份并完成隔离恢复，未实测前不得标记完成。
 4. PERSONAL-005 的仓库工具已就绪；按 docs/personal-preview-operations.md 在所有者明确授权后启用脱敏观测，并完成一次不降级数据库的应用回滚演练。
-5. 用受控数据完成候选 smoke 和端到端验收（PERSONAL-006、PERSONAL-007）。
-6. 开放 1–5 位受邀测试者；每天检查错误和费用（阶段 D）。
-7. 当需要处理任意不可信仓库时，先完成独立执行面验证（PERSONAL-008）。
+5. PERSONAL-006 的仓库工具已就绪；按 docs/personal-preview-candidate-smoke.md 从干净的新 main SHA 完成一次受控付费 smoke。任何 JSON、diff、apply、测试、费用或基础设施错误均为 NO-GO。
+6. 用同一候选完成受限用户端到端验收（PERSONAL-007）。
+7. 开放 1–5 位受邀测试者；每天检查错误和费用（阶段 D）。
+8. 当需要处理任意不可信仓库时，先完成独立执行面验证（PERSONAL-008）。
 
 在 PERSONAL-004、PERSONAL-005 未完成前，不应对外宣称 ForgeFlow 已稳定上线；在 PERSONAL-008 未完成前，不应开放任意仓库或含敏感数据的执行任务。

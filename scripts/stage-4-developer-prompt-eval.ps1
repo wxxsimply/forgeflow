@@ -130,10 +130,6 @@ $null = Get-CleanCommit -Repository $RepositoryRoot -ExpectedCommit $expectedGit
 $null = Get-CleanCommit -Repository $FixtureRepository -ExpectedCommit $expectedFixture -Label 'Fixture'
 $null = Get-CleanCommit -Repository $GraderRepository -ExpectedCommit $expectedGrader -Label 'Private Grader'
 
-if (-not (Test-Path -LiteralPath $KeyFile -PathType Leaf)) {
-    throw "DeepSeek API key file does not exist: $KeyFile"
-}
-
 $now = [datetimeoffset]::UtcNow
 $pricingStart = $PricingValidFrom.ToUniversalTime()
 $pricingEnd = $PricingValidUntil.ToUniversalTime()
@@ -209,6 +205,9 @@ if ($PreflightOnly) {
 }
 if (-not $ConfirmPaidEval) {
     throw 'Paid Eval is disabled. Re-run with -ConfirmPaidEval after reviewing the preflight output.'
+}
+if (-not (Test-Path -LiteralPath $KeyFile -PathType Leaf)) {
+    throw "DeepSeek API key file does not exist: $KeyFile"
 }
 
 New-Item -ItemType Directory -Force -Path $evidenceDirectory, $workspaceDirectory | Out-Null

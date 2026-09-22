@@ -38,6 +38,13 @@ jobs:
       - name: Test personal preview operations guards
         run: python3 -B -m unittest discover -s scripts -p test_personal_preview_operations.py -v
 
+      - name: Validate personal preview candidate smoke contract
+        shell: pwsh
+        run: ./scripts/validate-personal-preview-candidate-smoke.ps1
+
+      - name: Test personal preview candidate smoke decision guards
+        run: python3 -B -m unittest discover -s scripts -p test_personal_candidate_smoke.py -v
+
       - name: Validate operations and security asset contract
         shell: pwsh
         run: ./scripts/validate-operations-assets.ps1
