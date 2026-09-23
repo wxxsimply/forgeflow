@@ -2,7 +2,7 @@
 
 > 更新日期：2026-09-23
 >
-> 审查基线：origin/main，c13e10465b0a866f2851d07becc47bc092808bfe（PR #102）
+> 审查基线：origin/main，1d3a6a43c41e1e9ff582fb365892b80b546907d5（PR #103）
 >
 > 适用范围：由个人开发者维护的 ForgeFlow 公开预览与稳定版发布。本文件保留原文件名以避免已有链接失效；内容已不再要求企业内部审批、OIDC、KMS、值班轮值或子处理者流程。
 
@@ -46,7 +46,7 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 | PERSONAL-002 | 已完成 | 真实 HTTPS 部署 | P0 | docs/personal-preview-readiness.md 记录可信 IP HTTPS、Secure Cookie/Origin、健康检查和浏览器人工确认；validate 防止配置漂移 |
 | PERSONAL-003 | 已完成 | 预览配置与密钥隔离 | P0 | PostgreSQL 与 Bootstrap 使用被 Git 忽略的 Secret 文件；服务器无模型 Key；仓库、镜像参数和公开文档不含真实凭据 |
 | PERSONAL-004 | 仓库功能回归就绪，待服务器实测 | PostgreSQL 备份与恢复 | P0 | CI 使用合成数据实际验证备份与隔离恢复脚本；仍需所有者授权后在服务器启用自动备份、保留异机加密副本并完成一次真实隔离恢复验证 |
-| PERSONAL-005 | 实施就绪，待实测 | 最小可观测性与回滚 | P0 | 脱敏观测、15 分钟定时器、私有版本记录和只读回滚计划已准备；仍需所有者授权后连续观测并完成真实应用回滚演练 |
+| PERSONAL-005 | 仓库防护回归就绪，待服务器实测 | 最小可观测性与回滚 | P0 | CI 覆盖脱敏观测、私有环境文件与只读回滚计划；仍需所有者授权后启用定时器、连续观测并完成真实应用回滚演练 |
 | PERSONAL-006 | 实施就绪，待付费实测 | 候选功能 smoke | P1 | 私有计划、双重付费确认、固定 feature-01、基线/候选严格 GO/NO-GO 判定和离线测试已准备；仍需所有者按 docs/personal-preview-candidate-smoke.md 明确授权后运行新 Campaign |
 | PERSONAL-007 | 实施就绪，待当前候选人工验收 | 受限用户端到端验收 | P1 | docs/personal-preview-e2e-acceptance.md 已列出同一候选的真实测试清单；浏览器回归覆盖批准、拒绝、刷新、注销、失败提示和 Artifact 下载入口。仍需至少一名真实测试者按私有记录完成验证 |
 | PERSONAL-008 | 待完成（预览源仓库只读加固） | 不可信执行边界 | P0（开放任意仓库前） | 个人预览的 API/Worker 源仓库挂载均已限制只读，并由 validate 防漂移；独立执行面、最小权限、无外网 Sandbox 与拒绝测试仍须在真实环境验证。未完成前仅允许受控仓库 |

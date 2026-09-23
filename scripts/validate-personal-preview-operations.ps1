@@ -42,6 +42,8 @@ foreach ($contract in @(
     'volumesRemoved": False',
     'org.opencontainers.image.revision',
     'rendered-image',
+    'personal preview env must be a private regular file',
+    'current and target env files must be private regular files, not symlinks',
     'os.replace',
     '0o600'
 )) {
@@ -52,7 +54,7 @@ foreach ($forbidden in @('shell=True', 'docker compose down', 'down -v', 'migrat
 }
 
 $tests = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.tests)
-foreach ($contract in @('test_observation_contains_only_sanitized_aggregates', 'test_model_key_or_real_planner_fails_boundary', 'test_observation_rejects_model_key_in_private_env', 'test_rollback_plan_verifies_old_image_labels_without_execution', 'test_rollback_rejects_same_version_or_mount_change', 'test_private_report_is_atomic_and_does_not_follow_directory_symlink')) {
+foreach ($contract in @('test_observation_contains_only_sanitized_aggregates', 'test_model_key_or_real_planner_fails_boundary', 'test_observation_rejects_model_key_in_private_env', 'test_observation_rejects_non_private_env_file', 'test_observation_rejects_symlinked_env_file', 'test_rollback_plan_verifies_old_image_labels_without_execution', 'test_rollback_rejects_same_version_or_mount_change', 'test_rollback_rejects_symlinked_env_file', 'test_private_report_is_atomic_and_does_not_follow_directory_symlink')) {
     Assert-PersonalPreviewOperations ($tests.Contains($contract)) "Personal preview operations tests are missing case: $contract"
 }
 
@@ -71,7 +73,7 @@ foreach ($contract in @('PERSONAL-005 实施资产已就绪', 'PERSONAL-005 仍�
 }
 
 $plan = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.plan)
-Assert-PersonalPreviewOperations ($plan.Contains('| PERSONAL-005 | 实施就绪，待实测 |')) 'Formal launch plan must keep PERSONAL-005 pending real execution'
+Assert-PersonalPreviewOperations ($plan.Contains('| PERSONAL-005 | 仓库防护回归就绪，待服务器实测 |')) 'Formal launch plan must keep PERSONAL-005 pending real execution'
 
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.workflow)
 foreach ($contract in @('validate-personal-preview-operations.ps1', 'test_personal_preview_operations.py')) {
