@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import type { User } from '../api/client';
 import { roleLabel } from '../utils/labels';
 
 export function AppShell() {
@@ -22,20 +23,21 @@ export function AppShell() {
     </aside>
     <div className="app-content">
       <header className="topbar"><div><span className="eyebrow">工作空间</span><strong>交付控制台</strong></div><div className="user-menu"><span className={`role role--${user?.role}`}>{roleLabel(user?.role)}</span><span className="user-menu__email">{user?.email}</span><button type="button" className="text-button" onClick={handleLogout}>退出</button></div></header>
-      <PreviewScopeNotice />
+      <PreviewScopeNotice role={user?.role} />
       <main className="main-content"><Outlet /></main>
     </div>
   </div>;
 }
 
-function PreviewScopeNotice() {
+function PreviewScopeNotice({ role }: { role?: User['role'] }) {
   return <section className="preview-scope" aria-labelledby="preview-scope-title">
-    <div className="preview-scope__title"><span className="eyebrow">能力边界</span><h2 id="preview-scope-title">先看清当前公开预览能做什么</h2></div>
+    <div className="preview-scope__title"><span className="eyebrow">产品说明 · 当前为模拟预览</span><h2 id="preview-scope-title">ForgeFlow 管理 AI 辅助开发任务的计划、审批与执行记录。</h2><p>当前网页只模拟这套流程，不会调用模型或修改代码。</p></div>
     <div className="preview-scope__items">
-      <article><strong>网页当前可做</strong><p>创建模拟（Mock）规划任务、人工批准或拒绝，并查看状态与审计记录。</p></article>
-      <article><strong>真实案例在哪里</strong><p>一次真实模型改代码案例已由独立命令行流程完成；本网页不会触发它。</p></article>
-      <article><strong>尚未启用</strong><p>网页真实模型调用、自动修改源码、生产发布和批量评测。</p></article>
+      <article><strong>你可以体验</strong><p>选择受控仓库，创建模拟任务，查看计划并批准或拒绝，之后查看任务状态和审计记录。</p></article>
+      <article><strong>从这里开始</strong><p>按“新建任务 → 检查计划 → 作出审批 → 查看记录”的顺序体验完整流程。</p></article>
+      <article><strong>当前不会执行</strong><p>真实模型调用、源码修改、测试运行、生产发布或批量评测；不会产生模型费用。</p></article>
     </div>
+    {role !== 'viewer' ? <NavLink className="preview-scope__action" to="/runs/new">开始体验模拟流程 <span aria-hidden="true">→</span></NavLink> : <p className="preview-scope__readonly">只读账号：请联系管理员创建模拟任务。</p>}
   </section>;
 }
 

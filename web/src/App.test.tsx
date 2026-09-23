@@ -93,11 +93,20 @@ describe('authentication shell', () => {
     vi.mocked(api.getCurrentUser).mockResolvedValue(viewer);
     renderApp('/runs');
     expect(await screen.findByText('为订单接口增加幂等保护')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '先看清当前公开预览能做什么' })).toBeInTheDocument();
-    expect(screen.getByText(/一次真实模型改代码案例已由独立命令行流程完成/)).toBeInTheDocument();
-    expect(screen.getByText(/网页真实模型调用、自动修改源码、生产发布和批量评测/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /ForgeFlow 管理 AI 辅助开发任务的计划、审批与执行记录/ })).toBeInTheDocument();
+    expect(screen.getByText(/当前网页只模拟这套流程，不会调用模型或修改代码/)).toBeInTheDocument();
+    expect(screen.getByText(/选择受控仓库，创建模拟任务，查看计划并批准或拒绝/)).toBeInTheDocument();
+    expect(screen.getByText(/真实模型调用、源码修改、测试运行、生产发布或批量评测/)).toBeInTheDocument();
+    expect(screen.getByText('只读账号：请联系管理员创建模拟任务。')).toBeInTheDocument();
     expect(screen.getByText('只读用户')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /创建|审批|取消/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '开始体验模拟流程' })).not.toBeInTheDocument();
+  });
+
+  it('gives task creators a direct, clearly scoped first step', async () => {
+    vi.mocked(api.getCurrentUser).mockResolvedValue({ ...viewer, role: 'operator' });
+    renderApp('/runs');
+    expect(await screen.findByRole('link', { name: '开始体验模拟流程' })).toHaveAttribute('href', '/runs/new');
   });
 
   it('logs out with the authenticated mutation and returns to login', async () => {
