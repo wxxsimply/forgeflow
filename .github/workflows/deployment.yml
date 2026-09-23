@@ -73,6 +73,10 @@ jobs:
           bash -n deploy/personal-preview/ops/backup.sh
           bash -n deploy/personal-preview/ops/restore-drill.sh
 
+      - name: Exercise personal preview backup and isolated restore
+        shell: bash
+        run: bash ./scripts/test-personal-preview-backup.sh
+
       - name: Prepare non-sensitive validation inputs
         shell: bash
         run: |

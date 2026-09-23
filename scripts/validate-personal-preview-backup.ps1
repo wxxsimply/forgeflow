@@ -15,6 +15,7 @@ $assets = [ordered]@{
     restore = 'deploy/personal-preview/ops/restore-drill.sh'
     backupWrapper = 'scripts/personal-preview-backup.ps1'
     restoreWrapper = 'scripts/personal-preview-restore-drill.ps1'
+    integrationTest = 'scripts/test-personal-preview-backup.sh'
     service = 'deploy/personal-preview/systemd/forgeflow-preview-backup.service'
     timer = 'deploy/personal-preview/systemd/forgeflow-preview-backup.timer'
     ignore = 'deploy/personal-preview/backups/.gitignore'
@@ -77,10 +78,10 @@ foreach ($contract in @('PERSONAL-004 实施资产已就绪', 'PERSONAL-004 仍�
     Assert-PersonalPreviewBackup ($runbook.Contains($contract)) "Personal preview backup runbook is missing evidence boundary: $contract"
 }
 $plan = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.plan)
-Assert-PersonalPreviewBackup ($plan.Contains('| PERSONAL-004 | 实施就绪，待实测 |')) 'Formal launch plan must keep PERSONAL-004 pending real execution'
+Assert-PersonalPreviewBackup ($plan.Contains('| PERSONAL-004 | 仓库功能回归就绪，待服务器实测 |')) 'Formal launch plan must keep PERSONAL-004 pending real execution'
 
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.workflow)
-foreach ($contract in @('validate-personal-preview-backup.ps1', 'bash -n deploy/personal-preview/ops/backup.sh', 'personal-preview-backup.ps1', 'personal-preview-restore-drill.ps1')) {
+foreach ($contract in @('validate-personal-preview-backup.ps1', 'bash -n deploy/personal-preview/ops/backup.sh', 'personal-preview-backup.ps1', 'personal-preview-restore-drill.ps1', 'test-personal-preview-backup.sh')) {
     Assert-PersonalPreviewBackup ($workflow.Contains($contract)) "Deployment validation is missing personal preview backup check: $contract"
 }
 
