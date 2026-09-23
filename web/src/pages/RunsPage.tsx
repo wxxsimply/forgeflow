@@ -1,11 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { APIError, listRuns, type Run } from '../api/client';
+import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { formatDateTime, formatDuration, shortPath, statusLabel } from '../utils/format';
 import { nodeLabel } from '../utils/labels';
 
 export function RunsPage() {
+  const { user } = useAuth();
+  const canCreate = user?.role === 'admin' || user?.role === 'operator';
   const query = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn: ({ pageParam }) => listRuns(pageParam),
@@ -17,12 +20,12 @@ export function RunsPage() {
   return (
     <div className="page">
       <div className="page-heading">
-        <div><span className="eyebrow">执行记录</span><h1>运行任务</h1><p>查看 智能体工作流状态、当前节点和可验证事件。</p></div>
+        <div><span className="eyebrow">执行记录</span><h1>运行任务</h1><p>查看智能体工作流状态、当前节点和可验证事件。</p></div>
         <div className="page-heading__meta"><strong>{runs.length}</strong><span>当前已加载</span></div>
       </div>
       {offline && <div className="offline-banner" role="status">当前处于离线状态，显示的是最后一次缓存结果。</div>}
       {query.isPending ? <LoadingRows /> : query.error ? <RunsError error={query.error} retry={() => query.refetch()} /> : runs.length === 0 ? (
-        <PageState title="还没有运行任务" detail="创建第一个任务后，它会出现在这里；只读用户可等待管理员创建任务。" />
+        <PageState title="还没有运行任务" detail={canCreate ? '创建第一个模拟任务后，记录会出现在这里。' : '管理员创建任务后，记录会出现在这里。'} action={canCreate ? <Link className="primary-button primary-button--fit" to="/runs/new">创建模拟任务</Link> : undefined} />
       ) : (
         <section className="run-table-wrap" aria-label="任务列表">
           <div className="run-table-header"><span>任务</span><span>状态</span><span>当前节点</span><span>耗时</span><span>更新时间</span></div>

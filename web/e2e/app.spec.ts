@@ -29,6 +29,39 @@ test('viewer can recover a session but never receives mutation controls', async 
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
 });
 
+for (const width of [320, 390]) {
+  test(`mobile navigation stays labeled and usable at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    const state = workflowState('operator');
+    await page.route('**/api/v1/**', (route) => mockAPI(route, state));
+    await login(page, state.user.email);
+    const navigation = page.getByRole('navigation', { name: '主导航' });
+    for (const label of ['新建任务', '运行任务', '审批中心', '评测报告', '登录设备', '数据与账户']) {
+      await expect(navigation.getByRole('link', { name: label })).toBeVisible();
+    }
+    await page.getByRole('button', { name: '查看预览范围' }).click();
+    await expect(page.getByText('真实模型调用、源码修改、测试运行、生产发布或批量评测；不会产生模型费用。')).toBeVisible();
+    await page.getByRole('button', { name: '收起详细说明' }).click();
+    await expect(page.getByText('真实模型调用、源码修改、测试运行、生产发布或批量评测；不会产生模型费用。')).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expectNoSeriousAccessibilityViolations(page);
+    if (width === 390) await page.screenshot({ path: testInfo.outputPath('mobile-runs.png'), fullPage: true });
+    await navigation.getByRole('link', { name: '审批中心' }).click();
+    await expect(page.getByRole('heading', { name: '审批中心' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+test('operator empty state offers a direct create action', async ({ page }) => {
+  const state = workflowState('operator');
+  state.emptyRuns = true;
+  await page.route('**/api/v1/**', (route) => mockAPI(route, state));
+  await login(page, state.user.email);
+  await expect(page.getByRole('heading', { name: '还没有运行任务' })).toBeVisible();
+  await page.getByRole('link', { name: '创建模拟任务' }).click();
+  await expect(page).toHaveURL(/\/runs\/new$/);
+});
+
 test('operator completes login, create run, approve and report browser flow', async ({ page }) => {
   const state = workflowState('operator');
   await page.route('**/api/v1/**', (route) => mockAPI(route, state));
@@ -116,7 +149,7 @@ function workflowState(role: 'viewer' | 'operator') {
   const plan = { summary: '先增加幂等键校验，再补并发测试。', assumptions: [], filesLikelyAffected: ['internal/orders.go'], steps: [{ id: 'step-1', description: '实现幂等保护', acceptanceCriteria: ['重复请求返回相同结果'], dependsOn: [] }], risks: [{ level: 'medium', description: '并发竞争' }], testStrategy: ['并发集成测试'] };
   const approval = { request: { approvalId: ids.approval, runId: ids.run, actionType: 'plan', reason: '执行前需要人工确认计划', scope: ['internal/orders.go'], risk: 'medium', status: 'pending', requestedAt: createdAt }, runVersion: 4 };
   const run = { runId: ids.run, traceId: ids.trace, repositoryId: ids.repo, version: 4, status: 'waiting_for_plan_approval' as string, task: '为订单接口增加幂等保护', repositoryPath: 'D:/Code/orders', baseRevision: 'main', currentNodeId: 'plan-approval', completedNodeIds: ['start', 'planner', 'validate-plan'], plan, pendingApproval: approval.request as typeof approval.request | undefined, createdAt, updatedAt: '2026-08-10T08:02:00Z' };
-  return { authenticated: false, user, run, approval, failNextCreate: false, createAttemptKeys: [] as string[] };
+  return { authenticated: false, user, run, approval, emptyRuns: false, failNextCreate: false, createAttemptKeys: [] as string[] };
 }
 
 async function login(page: Page, email: string) {
@@ -142,7 +175,7 @@ async function mockAPI(route: Route, state: State) {
     }
     return json(route, 202, state.run);
   }
-  if (path.endsWith('/runs') && request.method() === 'GET') return json(route, 200, { items: [state.run] });
+  if (path.endsWith('/runs') && request.method() === 'GET') return json(route, 200, { items: state.emptyRuns ? [] : [state.run] });
   if (path.endsWith(`/runs/${ids.run}/events`)) return json(route, 200, { items: [], nextCursor: 0 });
   if (path.endsWith(`/runs/${ids.run}/stream`)) return route.fulfill({ status: 204 });
   if (path.endsWith(`/runs/${ids.run}/artifacts`)) return json(route, 200, { items: [{ id: ids.artifact, runId: ids.run, kind: 'run_report', storageKey: 'mock', sha256: 'a'.repeat(64), size: 11, contentType: 'text/plain', attributes: {}, createdAt }] });
