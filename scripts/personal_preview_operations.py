@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 
@@ -160,6 +161,8 @@ def latest_backup(backup_directory, now):
 
 def observe(root, env_file, backup_directory, data_path, read, now=None, disk_usage=shutil.disk_usage):
     now = now or datetime.now(timezone.utc)
+    if not private_file(env_file):
+        raise ValueError("personal preview env must be a private regular file")
     values = parse_env(env_file)
     release, commit = required_identity(values)
     validate_private_environment(values)
@@ -234,14 +237,18 @@ def observe(root, env_file, backup_directory, data_path, read, now=None, disk_us
 
 
 def private_file(path):
-    if os.name == "nt":
-        return True
-    return (Path(path).stat().st_mode & 0o077) == 0
+    try:
+        metadata = Path(path).lstat()
+    except OSError:
+        return False
+    if not stat.S_ISREG(metadata.st_mode):
+        return False
+    return os.name == "nt" or (metadata.st_mode & 0o077) == 0
 
 
 def rollback_plan(root, current_env, target_env, read):
     if not private_file(current_env) or not private_file(target_env):
-        raise ValueError("current and target env files must not be accessible by group or others")
+        raise ValueError("current and target env files must be private regular files, not symlinks")
     current = parse_env(current_env)
     target = parse_env(target_env)
     current_release, current_commit = required_identity(current)

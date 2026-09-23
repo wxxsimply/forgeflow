@@ -138,6 +138,31 @@ class OperationsTests(unittest.TestCase):
                     disk_usage=lambda _: DiskUsage(1000, 500, 500),
                 )
 
+    def test_observation_rejects_non_private_env_file(self):
+        if os.name == "nt":
+            self.skipTest("POSIX permission bits are not enforceable on Windows")
+        with tempfile.TemporaryDirectory() as directory:
+            env = self.write_env(directory, "preview.env", env_text())
+            os.chmod(env, 0o644)
+            with self.assertRaisesRegex(ValueError, "private regular file"):
+                operations.observe(
+                    Path(directory), env, Path(directory) / "backups", directory, FakeReader(),
+                    disk_usage=lambda _: DiskUsage(1000, 500, 500),
+                )
+
+    def test_observation_rejects_symlinked_env_file(self):
+        if os.name == "nt":
+            self.skipTest("Symlink creation requires elevated Windows permissions")
+        with tempfile.TemporaryDirectory() as directory:
+            env = self.write_env(directory, "preview.env", env_text())
+            linked_env = Path(directory) / "preview-link.env"
+            linked_env.symlink_to(env)
+            with self.assertRaisesRegex(ValueError, "private regular file"):
+                operations.observe(
+                    Path(directory), linked_env, Path(directory) / "backups", directory, FakeReader(),
+                    disk_usage=lambda _: DiskUsage(1000, 500, 500),
+                )
+
     def test_rollback_plan_verifies_old_image_labels_without_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             current = self.write_env(directory, "current.env", env_text())
@@ -159,6 +184,17 @@ class OperationsTests(unittest.TestCase):
                 "/srv/forgeflow/preview-repositories", "/tmp/untrusted"))
             with self.assertRaisesRegex(ValueError, "outside the approved roots"):
                 operations.rollback_plan(Path(directory), current, changed, FakeReader())
+
+    def test_rollback_rejects_symlinked_env_file(self):
+        if os.name == "nt":
+            self.skipTest("Symlink creation requires elevated Windows permissions")
+        with tempfile.TemporaryDirectory() as directory:
+            current = self.write_env(directory, "current.env", env_text())
+            target = self.write_env(directory, "target.env", env_text("preview-target", TARGET_SHA))
+            linked_current = Path(directory) / "current-link.env"
+            linked_current.symlink_to(current)
+            with self.assertRaisesRegex(ValueError, "private regular files, not symlinks"):
+                operations.rollback_plan(Path(directory), linked_current, target, FakeReader())
 
     def test_private_report_is_atomic_and_does_not_follow_directory_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
