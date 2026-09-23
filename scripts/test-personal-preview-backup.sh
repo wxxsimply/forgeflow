@@ -61,7 +61,9 @@ container_started=true
 
 ready=false
 for attempt in $(seq 1 30); do
-  if docker_cmd exec "$container_name" pg_isready --username forgeflow --dbname forgeflow >/dev/null 2>&1; then
+  if docker_cmd exec "$container_name" psql --no-psqlrc --quiet --tuples-only --no-align \
+    --set=ON_ERROR_STOP=1 --username forgeflow --dbname forgeflow --command='SELECT 1' \
+    >/dev/null 2>&1; then
     ready=true
     break
   fi
