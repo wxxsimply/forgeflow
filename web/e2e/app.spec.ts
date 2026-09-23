@@ -13,7 +13,11 @@ test('viewer can recover a session but never receives mutation controls', async 
   await login(page, state.user.email);
   await expect(page).toHaveURL(/\/runs$/);
   await expect(page.getByText(state.run.task)).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ForgeFlow 管理 AI 辅助开发任务的计划、审批与执行记录/ })).toBeVisible();
+  await expect(page.getByText('当前网页只模拟这套流程，不会调用模型或修改代码。')).toBeVisible();
+  await expect(page.getByText('只读账号：请联系管理员创建模拟任务。')).toBeVisible();
   await expect(page.getByText('只读用户', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '开始体验模拟流程' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '新建任务' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /暂停|恢复|取消任务|批准|拒绝/ })).toHaveCount(0);
   await expectNoSeriousAccessibilityViolations(page);
@@ -29,7 +33,11 @@ test('operator completes login, create run, approve and report browser flow', as
   const state = workflowState('operator');
   await page.route('**/api/v1/**', (route) => mockAPI(route, state));
   await login(page, state.user.email);
-  await page.getByRole('link', { name: '新建任务' }).click();
+  await expect(page).toHaveURL(/\/runs$/);
+  await expect(page.getByRole('heading', { name: /ForgeFlow 管理 AI 辅助开发任务的计划、审批与执行记录/ })).toBeVisible();
+  await expect(page.getByText('当前网页只模拟这套流程，不会调用模型或修改代码。')).toBeVisible();
+  await page.getByRole('link', { name: '开始体验模拟流程' }).click();
+  await expect(page).toHaveURL(/\/runs\/new$/);
   await expect(page.getByRole('heading', { name: '创建任务' })).toBeVisible();
   await page.getByLabel('仓库').selectOption(ids.repo);
   await page.getByLabel('任务描述').fill('为订单接口增加幂等保护');
