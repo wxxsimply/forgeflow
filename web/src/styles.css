@@ -101,14 +101,18 @@ a { color: inherit; }
 .role--operator { color: #23644c; border-color: #abd0c0; background: #eef9f4; }
 .text-button { padding: 5px; color: #596165; border: 0; background: none; font-size: .76rem; cursor: pointer; }
 .text-button:hover { color: var(--orange); }
-.preview-scope { display: grid; grid-template-columns: minmax(190px, .55fr) minmax(0, 1.8fr); gap: 24px; padding: 20px clamp(24px, 4vw, 56px); color: #e9ede9; border-bottom: 1px solid #2a353b; background: #182229; }
+.preview-scope { display: grid; grid-template-columns: minmax(210px, .65fr) minmax(0, 1.8fr); gap: 18px 24px; padding: 20px clamp(24px, 4vw, 56px); color: #e9ede9; border-bottom: 1px solid #2a353b; background: #182229; }
 .preview-scope__title { align-self: center; }
 .preview-scope__title .eyebrow { color: var(--orange-bright); }
-.preview-scope__title h2 { margin: 6px 0 0; font-size: .94rem; line-height: 1.35; }
+.preview-scope__title h2 { margin: 6px 0 0; font-size: 1rem; line-height: 1.4; }
+.preview-scope__title p { margin: 8px 0 0; color: #c0c9cc; font-size: .73rem; line-height: 1.5; }
 .preview-scope__items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .preview-scope__items article { min-width: 0; padding: 2px 18px; border-left: 1px solid #344047; }
 .preview-scope__items strong { display: block; margin-bottom: 5px; color: #fff; font-size: .73rem; }
-.preview-scope__items p { margin: 0; color: #aab5b9; font-size: .68rem; line-height: 1.55; }
+.preview-scope__items p { margin: 0; color: #c0c9cc; font-size: .73rem; line-height: 1.6; }
+.preview-scope__action, .preview-scope__readonly { grid-column: 2; justify-self: start; margin: 0 18px; color: #ff9a67; font-size: .75rem; font-weight: 700; text-decoration: none; }
+.preview-scope__action:hover { color: #ffc09d; text-decoration: underline; }
+.preview-scope__readonly { color: #c0c9cc; font-weight: 500; }
 .main-content { padding: 0 clamp(24px, 4vw, 58px) 64px; }
 .page { width: min(100%, 1240px); margin: 0 auto; }
 .page-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; padding: 52px 0 34px; }
@@ -301,6 +305,7 @@ a { color: inherit; }
 
 @media (max-width: 980px) {
 	.preview-scope { grid-template-columns: 1fr; gap: 14px; }
+	.preview-scope__action, .preview-scope__readonly { grid-column: 1; margin-left: 0; }
 	.eval-catalog { grid-template-columns: 1fr 1fr; }
 	.eval-catalog article:nth-child(2) { border-right: 0; }
 	.eval-comparison { grid-template-columns: 1fr; }
