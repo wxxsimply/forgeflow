@@ -2,7 +2,7 @@
 
 > 更新日期：2026-09-23
 >
-> 审查基线：origin/main，df1635c41cb71e1f79fab627dddbfd0b36eed1f4（PR #106）
+> 审查基线：origin/main，0b1c8bb19ffe6508368e4c4a96af9db7c0307b87（PR #107）
 >
 > 适用范围：由个人开发者维护的 ForgeFlow 公开预览与稳定版发布。本文件保留原文件名以避免已有链接失效；内容已不再要求企业内部审批、OIDC、KMS、值班轮值或子处理者流程。
 
