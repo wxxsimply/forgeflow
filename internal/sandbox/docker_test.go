@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -74,6 +75,50 @@ func TestDockerRunnerRejectsEscapesSecretsShellsAndUnpinnedImages(t *testing.T) 
 	}
 	if _, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{"example/forgeflow:latest"}}); err == nil {
 		t.Fatal("NewDockerRunner accepted an unpinned image")
+	}
+}
+
+func TestDockerRunnerRejectsWorkspaceSymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation semantics require the Linux CI environment")
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	workspaceLink := filepath.Join(root, "run-link")
+	if err := os.Symlink(outside, workspaceLink); err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{testImage}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = runner.BuildArgs(Request{Image: testImage, WorkspacePath: workspaceLink, Program: "go"})
+	if !apperror.IsCode(err, apperror.CodePolicyDenied) {
+		t.Fatalf("BuildArgs() error = %v, want symlink escape to be denied", err)
+	}
+}
+
+func TestDockerRunnerRejectsWorkingDirectorySymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation semantics require the Linux CI environment")
+	}
+	root := t.TempDir()
+	workspace := filepath.Join(root, "run-1")
+	makeDirectory(t, workspace)
+	outside := t.TempDir()
+	workingDirectoryLink := filepath.Join(workspace, "linked")
+	if err := os.Symlink(outside, workingDirectoryLink); err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{testImage}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = runner.BuildArgs(Request{
+		Image: testImage, WorkspacePath: workspace, WorkingDir: "linked", Program: "go",
+	})
+	if !apperror.IsCode(err, apperror.CodePolicyDenied) {
+		t.Fatalf("BuildArgs() error = %v, want working-directory symlink escape to be denied", err)
 	}
 }
 

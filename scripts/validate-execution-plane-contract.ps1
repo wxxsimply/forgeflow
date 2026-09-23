@@ -20,6 +20,7 @@ $template = Read-ExecutionAsset 'deploy/production/execution-plane/execution-pla
 $readme = Read-ExecutionAsset 'deploy/production/execution-plane/README.md'
 $networkTests = Read-ExecutionAsset 'deploy/production/execution-plane/network-test-contract.md'
 $dockerRunner = Read-ExecutionAsset 'internal/sandbox/docker.go'
+$dockerTests = Read-ExecutionAsset 'internal/sandbox/docker_test.go'
 
 foreach ($contract in @(
     'non-deployable Production contract template',
@@ -71,6 +72,12 @@ Assert-ExecutionContract ($template -notmatch '(?im)^[ \t]*value:[ \t]*(?:sk-[A-
 Assert-ExecutionContract ($dockerRunner.Contains('"--network", "none"')) 'Sandbox implementation must enforce Docker network isolation'
 Assert-ExecutionContract ($dockerRunner.Contains('"--read-only"')) 'Sandbox implementation must enforce a read-only root filesystem'
 Assert-ExecutionContract ($dockerRunner.Contains('"--cap-drop", "ALL"')) 'Sandbox implementation must drop all Linux capabilities'
+foreach ($contract in @(
+    'TestDockerRunnerRejectsWorkspaceSymlinkEscape',
+    'TestDockerRunnerRejectsWorkingDirectorySymlinkEscape'
+)) {
+    Assert-ExecutionContract ($dockerTests.Contains($contract)) "Sandbox path-escape regression is missing: $contract"
+}
 
 foreach ($contract in @(
     'P8-002',

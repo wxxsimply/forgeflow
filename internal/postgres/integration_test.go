@@ -118,7 +118,14 @@ func TestPostgresQueueAllowsOnlyOneWorkerAndRecoversExpiredLease(t *testing.T) {
 	db := openTestDatabase(t)
 	ctx := context.Background()
 	q := queue.NewPostgresQueue(db)
-	job := queue.Job{ID: domain.NewID(), Type: "fixture", DedupeKey: domain.NewID(), Payload: []byte(`{}`), MaxAttempts: 2}
+	var availableAt time.Time
+	if err := db.QueryRowContext(ctx, `SELECT clock_timestamp() - interval '1 second'`).Scan(&availableAt); err != nil {
+		t.Fatal(err)
+	}
+	job := queue.Job{
+		ID: domain.NewID(), Type: "fixture", DedupeKey: domain.NewID(),
+		Payload: []byte(`{}`), MaxAttempts: 2, AvailableAt: availableAt,
+	}
 	if err := q.Enqueue(ctx, job); err != nil {
 		t.Fatal(err)
 	}
