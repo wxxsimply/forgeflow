@@ -14,6 +14,8 @@
 - 临时文件验证成功后才原子重命名，文件权限设为 `0600`；
 - 只清理符合 `forgeflow-preview-*.dump` 命名且超过保留期的本项目备份。
 
+GitHub validate 还会启动隔离的 PostgreSQL 17 临时容器，以合成数据实际执行备份、校验和、恢复到 `forgeflow_preview_restore_*` 并核对源库未变；这验证仓库脚本在 CI 的功能路径，不代表个人预览服务器已启用定时器或完成真实恢复。
+
 恢复服务只接受 `/backups/forgeflow-preview-<UTC>.dump`，并要求目标数据库匹配 `forgeflow_preview_restore_*`。它会先验证 checksum、manifest、大小与 Migration 版本，再创建隔离数据库；不能覆盖在线 `forgeflow` 数据库，也不执行 down migration。
 
 ## 2. 首次启用前检查
