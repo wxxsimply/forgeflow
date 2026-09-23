@@ -190,6 +190,8 @@ jobs:
               and .services.worker.environment.FORGEFLOW_WORKFLOW_MODE == "planning"
               and .services.worker.environment.FORGEFLOW_PLANNER_MODE == "mock"
               and .services.worker.environment.FORGEFLOW_DOCKER_ENABLED == "false"
+              and any(.services.api.volumes[]; .target == "/repositories" and .read_only == true)
+              and any(.services.worker.volumes[]; .target == "/repositories" and .read_only == true)
               and ((.services.api.environment | has("OPENAI_API_KEY")) | not)
               and ((.services.worker.environment | has("OPENAI_API_KEY")) | not)
             ' > /dev/null
@@ -212,6 +214,8 @@ jobs:
               and any(.services.caddy.volumes[]; .target == "/data" and .type == "volume")
               and any(.services.caddy.volumes[]; .target == "/config" and .type == "volume")
               and all(.services.caddy.tmpfs[]; startswith("/tmp:"))
+              and any(.services.api.volumes[]; .target == "/repositories" and .read_only == true)
+              and any(.services.worker.volumes[]; .target == "/repositories" and .read_only == true)
             ' > /dev/null
 
           docker compose \

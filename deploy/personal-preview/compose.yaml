@@ -150,6 +150,7 @@ services:
       - type: bind
         source: ${FORGEFLOW_REPOSITORY_PATH:?FORGEFLOW_REPOSITORY_PATH is required}
         target: /repositories
+        read_only: true
       - artifacts:/var/lib/forgeflow/artifacts
       - workspaces:/var/lib/forgeflow/workspaces
     networks:

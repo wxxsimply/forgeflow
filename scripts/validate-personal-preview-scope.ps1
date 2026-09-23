@@ -44,6 +44,10 @@ $apiMatch = [regex]::Match($compose, '(?ms)^  api:\r?\n(?<body>.*?)(?=^  worker:
 Assert-PersonalPreviewScope ($apiMatch.Success) 'Personal preview API service block is missing'
 Assert-PersonalPreviewScope ($apiMatch.Groups['body'].Value -match 'target: /repositories\s+read_only: true') 'Personal preview API repository mount must stay read-only'
 
+$workerMatch = [regex]::Match($compose, '(?ms)^  worker:\r?\n(?<body>.*?)(?=^  web:)')
+Assert-PersonalPreviewScope ($workerMatch.Success) 'Personal preview Worker service block is missing'
+Assert-PersonalPreviewScope ($workerMatch.Groups['body'].Value -match 'target: /repositories\s+read_only: true') 'Personal preview Worker repository mount must stay read-only'
+
 $workflow = Get-Content -Raw -LiteralPath $workflowPath
 Assert-PersonalPreviewScope ($workflow.Contains('validate-personal-preview-scope.ps1')) 'Deployment validation must run the personal preview scope contract'
 
