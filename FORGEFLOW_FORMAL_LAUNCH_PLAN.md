@@ -2,7 +2,7 @@
 
 > 更新日期：2026-09-23
 >
-> 审查基线：origin/main，df15659d586698a48ca7f7fb62f687e2a02c3a88（PR #98）
+> 审查基线：origin/main，1c01cb6fe9baf761ba4596dd3d16d751d274372c（PR #99）
 >
 > 适用范围：由个人开发者维护的 ForgeFlow 公开预览与稳定版发布。本文件保留原文件名以避免已有链接失效；内容已不再要求企业内部审批、OIDC、KMS、值班轮值或子处理者流程。
 
@@ -48,7 +48,7 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 | PERSONAL-004 | 实施就绪，待实测 | PostgreSQL 备份与恢复 | P0 | 备份、定时器和隔离恢复工具已准备；仍需所有者授权后在服务器启用自动备份，并完成一次真实隔离恢复验证 |
 | PERSONAL-005 | 实施就绪，待实测 | 最小可观测性与回滚 | P0 | 脱敏观测、15 分钟定时器、私有版本记录和只读回滚计划已准备；仍需所有者授权后连续观测并完成真实应用回滚演练 |
 | PERSONAL-006 | 实施就绪，待付费实测 | 候选功能 smoke | P1 | 私有计划、双重付费确认、固定 feature-01、基线/候选严格 GO/NO-GO 判定和离线测试已准备；仍需所有者按 docs/personal-preview-candidate-smoke.md 明确授权后运行新 Campaign |
-| PERSONAL-007 | 待完成 | 受限用户端到端验收 | P1 | 登录、仓库选择、批准或拒绝、刷新恢复、注销保护和失败提示均由至少一名真实测试者验证 |
+| PERSONAL-007 | 实施就绪，待当前候选人工验收 | 受限用户端到端验收 | P1 | docs/personal-preview-e2e-acceptance.md 已列出同一候选的真实测试清单；浏览器回归覆盖批准、拒绝、刷新、注销、失败提示和 Artifact 下载入口。仍需至少一名真实测试者按私有记录完成验证 |
 | PERSONAL-008 | 待完成 | 不可信执行边界 | P0（开放任意仓库前） | 独立执行面、最小权限、无外网 Sandbox 与拒绝测试均在真实环境验证；未完成前仅允许受控仓库 |
 
 ## 5. 阶段 A：确定预览边界和候选
@@ -139,7 +139,7 @@ main 现已启用 GitHub 规则集：必须经 Pull Request、解决审查讨论
 3. PERSONAL-004 的仓库工具已就绪；按 docs/personal-preview-backup-restore.md 在所有者明确授权后启用真实自动备份并完成隔离恢复，未实测前不得标记完成。
 4. PERSONAL-005 的仓库工具已就绪；按 docs/personal-preview-operations.md 在所有者明确授权后启用脱敏观测，并完成一次不降级数据库的应用回滚演练。
 5. PERSONAL-006 的仓库工具已就绪；按 docs/personal-preview-candidate-smoke.md 从干净的新 main SHA 完成一次受控付费 smoke。任何 JSON、diff、apply、测试、费用或基础设施错误均为 NO-GO。
-6. 用同一候选完成受限用户端到端验收（PERSONAL-007）。
+6. PERSONAL-007 的页面和自动化回归已就绪；合并后按 docs/personal-preview-e2e-acceptance.md 用同一候选完成真实受限用户端到端验收。2026-09-17/18 的旧回报因缺少当前候选 SHA，不代替本轮结果。
 7. 开放 1–5 位受邀测试者；每天检查错误和费用（阶段 D）。
 8. 当需要处理任意不可信仓库时，先完成独立执行面验证（PERSONAL-008）。
 

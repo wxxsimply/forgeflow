@@ -1,8 +1,8 @@
 # ForgeFlow 个人预览执行计划
 
-> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)；HTTPS 与 Secret 证据见 [个人预览就绪记录](docs/personal-preview-readiness.md)；备份与隔离恢复步骤见 [个人预览备份恢复手册](docs/personal-preview-backup-restore.md)；最小观测与回滚见 [个人预览观测回滚手册](docs/personal-preview-operations.md)；候选 smoke 见 [个人预览候选 smoke 手册](docs/personal-preview-candidate-smoke.md)。受邀者身份、备份内容、观测快照、模型 Evidence 和部署私有记录不得提交 Git。
+> 当前非敏感用户、仓库、数据、模型费用和停止边界统一见 [个人预览边界](docs/personal-preview-scope.md)；HTTPS 与 Secret 证据见 [个人预览就绪记录](docs/personal-preview-readiness.md)；备份与隔离恢复步骤见 [个人预览备份恢复手册](docs/personal-preview-backup-restore.md)；最小观测与回滚见 [个人预览观测回滚手册](docs/personal-preview-operations.md)；候选 smoke 见 [个人预览候选 smoke 手册](docs/personal-preview-candidate-smoke.md)；当前候选的真实用户流程见 [个人预览端到端人工验收](docs/personal-preview-e2e-acceptance.md)。受邀者身份、备份内容、观测快照、模型 Evidence 和部署私有记录不得提交 Git。
 >
-> 最新人工验收：用户已在本轮会话回复“全部成功了”，确认阶段 C 网页模拟流程与安全组核查。以 [人工确认记录](docs/preview-rollout-result.md) 为准；下文“待人工验收”为部署时历史状态。服务器无需重部署，真实模型任务仍未执行。
+> 历史人工验收：用户曾回复“全部成功了”，确认当时的阶段 C 网页模拟流程与安全组核查。以 [人工确认记录](docs/preview-rollout-result.md) 为准；这不代表最新代码候选已部署或完成 PERSONAL-007 验收。新候选是否部署须另行确认，真实模型任务仍未执行。
 
 > 2026-09-14 最新：SSH 已恢复，PR #53 已合并，获授权部署完成。API/Web/Worker 当前提交为 `238bf013e57bcacb4b381093dd3761b760881a87`，镜像标签为 `0.1.0-preview.1-238bf01`；已切换到专用演示根。部署后 28 项检查和外部 HTTPS 检查通过，浏览器人工验收仍待确认。详见 [实际部署记录](docs/preview-rollout-result.md)。以下旧版本与早期验收为历史记录，不代替本轮确认。
 
