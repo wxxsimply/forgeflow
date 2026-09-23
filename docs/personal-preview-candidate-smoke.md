@@ -74,4 +74,4 @@ notepad .forgeflow/personal-preview/candidate-smoke/plan.json
 
 任何 JSON、diff、apply、测试、超时、费用、基础设施或证据错误都记录或视为 `NO-GO`，脚本以失败退出。不得手工把失败 JSON 改成 GO，也不得使用同一 Campaign 覆盖原 Evidence。
 
-GO 之后只能把经过脱敏的日期、完整候选 SHA、两侧通过数、总费用和人工结论回填到公开计划。不要提交原始 summary 或 decision；公开记录前再次扫描路径、任务内容、补丁、隐藏测试名称和凭据。
+决策文件以原子且不覆盖的方式创建；若同名文件在检查后由其他进程抢先创建，脚本会保留原文件并将本次写入阻断。GO 之后只能把经过脱敏的日期、完整候选 SHA、两侧通过数、总费用和人工结论回填到公开计划。不要提交原始 summary 或 decision；公开记录前再次扫描路径、任务内容、补丁、隐藏测试名称和凭据。

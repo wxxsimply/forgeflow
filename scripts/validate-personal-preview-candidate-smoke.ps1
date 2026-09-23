@@ -64,10 +64,16 @@ foreach ($Contract in @(
     'planner_developer',
     'promotionEligible',
     'NO-GO',
-    'ALLOWED_FAILURES'
+    'ALLOWED_FAILURES',
+    'os.link',
+    'decision_output_exists',
+    'decision_write_failed'
 )) {
     Assert-Contract ($Reviewer.Contains($Contract)) "Personal candidate smoke reviewer is missing contract: $Contract"
 }
+
+$Tests = Get-Content -Raw -LiteralPath (Join-Path $Workspace 'scripts/test_personal_candidate_smoke.py')
+Assert-Contract ($Tests.Contains('test_private_writer_does_not_overwrite_concurrent_target')) 'Candidate smoke tests are missing the concurrent output collision regression'
 
 $Runbook = Get-Content -Raw -LiteralPath (Join-Path $Workspace 'docs/personal-preview-candidate-smoke.md')
 foreach ($Contract in @(
@@ -78,12 +84,13 @@ foreach ($Contract in @(
     'NO-GO',
     '.forgeflow/',
     '不得提交 Git',
-    '不是 Promotion'
+    '不是 Promotion',
+    '原子且不覆盖'
 )) {
     Assert-Contract ($Runbook.Contains($Contract)) "Personal candidate smoke runbook is missing contract: $Contract"
 }
 
 $Plan = Get-Content -Raw -LiteralPath (Join-Path $Workspace 'FORGEFLOW_FORMAL_LAUNCH_PLAN.md')
-Assert-Contract ($Plan.Contains('PERSONAL-006 | 实施就绪，待付费实测')) 'Formal launch plan must keep PERSONAL-006 pending the authorized paid smoke'
+Assert-Contract ($Plan.Contains('PERSONAL-006 | 离线决策写入回归就绪，待付费实测')) 'Formal launch plan must keep PERSONAL-006 pending the authorized paid smoke'
 
 Write-Host 'Personal preview candidate smoke contract validation passed. No provider request was sent.'
