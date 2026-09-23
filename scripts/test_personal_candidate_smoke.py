@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("personal_candidate_smoke.py")
@@ -129,6 +130,21 @@ class PersonalCandidateSmokeTests(unittest.TestCase):
             with self.assertRaises(MODULE.ReviewError):
                 MODULE._write_private_json(path, {"result": "GO"})
             self.assertEqual(path.read_text(encoding="utf-8"), "existing")
+
+    def test_private_writer_does_not_overwrite_concurrent_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "decision.json")
+            original_link = os.link
+
+            def create_target_before_link(source, destination):
+                Path(destination).write_text("concurrent writer", encoding="utf-8")
+                return original_link(source, destination)
+
+            with mock.patch.object(MODULE.os, "link", side_effect=create_target_before_link):
+                with self.assertRaisesRegex(MODULE.ReviewError, "decision_output_exists"):
+                    MODULE._write_private_json(path, {"result": "GO"})
+            self.assertEqual(path.read_text(encoding="utf-8"), "concurrent writer")
+            self.assertEqual(list(Path(directory).glob(".decision-*.tmp")), [])
 
     def test_private_writer_is_atomic_and_owner_only_on_posix(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -214,7 +214,12 @@ def _write_private_json(path: Path, value: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temporary, stat.S_IRUSR | stat.S_IWUSR)
-        os.replace(temporary, path)
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ReviewError("decision_output_exists") from exc
+        except OSError:
+            raise ReviewError("decision_write_failed") from None
     finally:
         if temporary.exists():
             temporary.unlink()
