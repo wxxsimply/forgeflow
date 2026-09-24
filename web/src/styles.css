@@ -87,9 +87,9 @@ a { color: inherit; }
 .nav-item svg { flex: 0 0 19px; width: 19px; height: 19px; fill: currentColor; }
 .nav-item:hover { color: #f2f4ef; background: rgba(255,255,255,.045); }
 .nav-item--active { color: #fff; background: rgba(237,106,44,.2); box-shadow: inset 3px 0 var(--orange-bright); }
-.sidebar__footer { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding: 16px 10px 0; color: #929da2; border-top: 1px solid #273138; font: 500 .61rem 'IBM Plex Mono', monospace; text-transform: uppercase; }
-.environment { color: #a1abb0; }
-.environment i { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #42a478; box-shadow: 0 0 0 3px rgba(66,164,120,.12); }
+.sidebar__footer { display: flex; flex-direction: column; gap: 5px; margin-top: auto; padding: 16px 10px 0; color: #bdc7ca; border-top: 1px solid #354149; font-size: .875rem; font-weight: 500; line-height: 1.5; }
+.environment { color: #e1e9e7; font-size: .9375rem; font-weight: 700; }
+.environment i { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #42a478; box-shadow: 0 0 0 3px rgba(66,164,120,.12); }
 .app-content { min-width: 0; }
 .topbar { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(24px, 4vw, 56px); border-bottom: 1px solid var(--line); background: rgba(251,250,246,.78); backdrop-filter: blur(14px); }
 .topbar > div:first-child { display: flex; flex-direction: column; gap: 4px; }
