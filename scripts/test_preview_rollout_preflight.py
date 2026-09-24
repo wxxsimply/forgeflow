@@ -27,7 +27,7 @@ def fixture():
     infos["postgres"]["configFiles"] = base
     for service in ("api", "worker"):
         infos[service]["mounts"] = [{"Destination": "/repositories", "Source": preflight.REPOSITORY_ROOT,
-                                     "Type": "bind", "RW": service == "worker"}]
+                                     "Type": "bind", "RW": False}]
     infos["caddy"]["mounts"] = [{"Destination": path, "Type": "volume", "Name": "test-" + path[1:]} for path in ("/data", "/config")]
     infos["caddy"]["ports"] = {
         "443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "443"}],
@@ -123,6 +123,15 @@ class PreflightTests(unittest.TestCase):
         reader = Reader()
         reader.infos["worker"]["revision"] = "old"
         self.assertFalse(preflight.audit(reader, SHA, "after")["checksPassed"])
+
+    def test_before_allows_legacy_writable_worker_but_after_requires_read_only(self):
+        reader = Reader()
+        reader.infos["worker"]["mounts"][0]["RW"] = True
+        self.assertTrue(preflight.audit(reader, SHA, "before")["checksPassed"])
+        report = preflight.audit(reader, SHA, "after")
+        self.assertFalse(report["checksPassed"])
+        self.assertFalse(next(check["passed"] for check in report["checks"]
+                              if check["name"] == "repository.mounts"))
 
     def test_unrestricted_host_mount_is_never_accepted(self):
         reader = Reader()

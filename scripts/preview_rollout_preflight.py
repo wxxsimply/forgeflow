@@ -103,8 +103,10 @@ def audit(read, expected_commit, phase):
         check("repository.mounts", api_root.get("Type") == worker_root.get("Type") == "bind"
               and api_root.get("Source") == worker_root.get("Source")
               and api_root.get("Source") in ("/srv/forgeflow/repositories", REPOSITORY_ROOT)
-              and api_root.get("RW") is False and worker_root.get("RW") is True,
-              "API 只读、Worker 可写且来源一致；更新后只能使用专用演示根。")
+              and api_root.get("RW") is False
+              and (worker_root.get("RW") is False if phase == "after"
+                   else type(worker_root.get("RW")) is bool),
+              "API 始终只读；更新前允许旧 Worker 可写，更新后 Worker 也须只读；来源须一致。")
         ports = infos["caddy"]["ports"]
         bindings = [(port, item) for port, items in ports.items() for item in (items or [])]
         safe_ports = bool(ports.get("443/tcp")) and bool(ports.get("8080/tcp")) and all(
