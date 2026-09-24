@@ -17,6 +17,11 @@ test('viewer can recover a session but never receives mutation controls', async 
   await expect(page.getByText('当前网页只模拟这套流程，不会调用模型或修改代码。')).toBeVisible();
   await expect(page.getByText('只读账号：请联系管理员创建模拟任务。')).toBeVisible();
   await expect(page.getByText('只读用户', { exact: true })).toBeVisible();
+  const footerFontSize = await page.locator('.sidebar__footer').evaluate((element) =>
+    Number.parseFloat(window.getComputedStyle(element).fontSize),
+  );
+  expect(footerFontSize).toBeGreaterThanOrEqual(14);
+  await expect(page.locator('.sidebar__footer')).toContainText('控制台已连接');
   await expect(page.getByRole('link', { name: '开始体验模拟流程' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '新建任务' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /暂停|恢复|取消任务|批准|拒绝/ })).toHaveCount(0);
