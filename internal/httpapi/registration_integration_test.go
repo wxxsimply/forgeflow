@@ -78,6 +78,7 @@ func TestPublicRegistrationLoginAndOwnerIsolation(t *testing.T) {
 func TestPublicRegistrationRejectsInvalidDuplicateAndCrossOrigin(t *testing.T) {
 	f := newFixtureWithOptions(t, auth.NewMemoryLimiter(100, time.Minute), fixtureOptions{
 		registrationLimiter: auth.NewMemoryLimiter(100, time.Minute),
+		allowedOrigins:      []string{"https://forgeflow.example"},
 	})
 	checks := []struct {
 		body, origin string
@@ -100,6 +101,11 @@ func TestPublicRegistrationRejectsInvalidDuplicateAndCrossOrigin(t *testing.T) {
 	if err := f.db.QueryRow(`SELECT count(*) FROM users`).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("invalid registrations changed user count=%d err=%v", count, err)
 	}
+	allowed := postRegistration(t, f, `{"email":"new@example.com","password":"a strong passphrase for signup"}`, "https://forgeflow.example")
+	if allowed.StatusCode != http.StatusCreated {
+		t.Fatalf("allowed origin registration status=%d body=%s", allowed.StatusCode, read(allowed))
+	}
+	_ = read(allowed)
 }
 
 func TestPublicRegistrationRateLimit(t *testing.T) {
