@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Creates an ordinary operator account. Registration does not sign the user in. */
+        post: operations["registerAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -977,6 +994,11 @@ export interface components {
             secondFactor?: string;
             remember?: boolean;
         };
+        RegisterRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
         CreateRepositoryRequest: {
             name: string;
             localPath: string;
@@ -1182,6 +1204,33 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    registerAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Account created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
     login: {
         parameters: {
             query?: never;

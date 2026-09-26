@@ -7,6 +7,7 @@ import { AccountPage } from './pages/AccountPage';
 import { ApprovalDetailPage } from './pages/ApprovalDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { EvalDetailPage, EvalsPage } from './pages/EvalsPage';
 import { NewRunPage } from './pages/NewRunPage';
 import { RunDetailPage } from './pages/RunDetailPage';
@@ -17,6 +18,7 @@ import { SessionsPage } from './pages/SessionsPage';
 export function App() {
   return <ErrorBoundary><Routes>
     <Route path="/login" element={<LoginPage />} />
+    <Route path="/register" element={<RegisterPage />} />
     <Route element={<ProtectedRoute />}><Route element={<AppShell />}>
       <Route index element={<Navigate to="/runs" replace />} />
       <Route path="/runs" element={<RunsPage />} />

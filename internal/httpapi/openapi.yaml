@@ -8,6 +8,21 @@ servers:
 security:
   - sessionCookie: []
 paths:
+  /auth/register:
+    post:
+      security: []
+      operationId: registerAccount
+      description: Creates an ordinary operator account. Registration does not sign the user in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRequest'}
+      responses:
+        '201': {description: Account created, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
   /auth/login:
     post:
       security: []
@@ -769,6 +784,11 @@ components:
       additionalProperties: false
       required: [email, password]
       properties: {email: {type: string, format: email}, password: {type: string}, secondFactor: {type: string, maxLength: 64}, remember: {type: boolean}}
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 1024}}
     CreateRepositoryRequest:
       type: object
       additionalProperties: false

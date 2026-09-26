@@ -61,6 +61,7 @@ type Principal struct {
 }
 
 var ErrNotFound = errors.New("auth record not found")
+var ErrEmailExists = errors.New("email is already registered")
 
 type Store interface {
 	CountUsers(context.Context) (int, error)

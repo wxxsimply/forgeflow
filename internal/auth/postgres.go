@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type PostgresStore struct{ db *sql.DB }
@@ -19,6 +21,10 @@ func (s *PostgresStore) CountUsers(ctx context.Context) (int, error) {
 }
 func (s *PostgresStore) CreateUser(ctx context.Context, u UserCredential) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO users(id,email,normalized_email,password_hash,role,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$7)`, u.ID, u.Email, NormalizeEmail(u.Email), u.PasswordHash, u.Role, u.Status, u.CreatedAt)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_normalized_email_key" {
+		return ErrEmailExists
+	}
 	return err
 }
 func (s *PostgresStore) FindUserByEmail(ctx context.Context, email string) (UserCredential, error) {

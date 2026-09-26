@@ -19,13 +19,21 @@ Assert-PersonalPreviewScope (Test-Path -LiteralPath $composePath -PathType Leaf)
 $scope = Get-Content -Raw -LiteralPath $scopePath
 foreach ($contract in @(
     'PERSONAL-001 已完成',
-    '同时最多 5 个活跃测试账号',
+    '公开自助注册',
+    '只能创建 `operator` 普通账号',
+    '没有邮箱验证或自助密码找回',
     '运行时外部模型调用上限：0 次',
     '本轮总计 0 USD',
     'PERSONAL-008 完成前'
 )) {
     Assert-PersonalPreviewScope ($scope.Contains($contract)) "Personal preview scope is missing contract: $contract"
 }
+
+$server = Get-Content -Raw -LiteralPath (Join-Path $workspace 'internal/httpapi/server.go')
+$auth = Get-Content -Raw -LiteralPath (Join-Path $workspace 'internal/auth/service.go')
+Assert-PersonalPreviewScope ($server.Contains('POST /api/v1/auth/register')) 'Public registration route is missing'
+Assert-PersonalPreviewScope ($server.Contains('RegistrationLimiter')) 'Public registration rate limit is missing'
+Assert-PersonalPreviewScope ($auth.Contains('Role: RoleOperator')) 'Public registration must create an ordinary operator account'
 
 $compose = Get-Content -Raw -LiteralPath $composePath
 foreach ($contract in @(

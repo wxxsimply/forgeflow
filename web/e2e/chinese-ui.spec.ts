@@ -15,4 +15,16 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('chinese-login.png'), fullPage: true });
   });
+
+  test(`Chinese registration fits ${viewport.width}px viewport`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.route('**/api/v1/**', (route) => route.fulfill({
+      status: 401, contentType: 'application/json', body: JSON.stringify({ code: 'unauthorized' }),
+    }));
+    await page.goto('/register');
+    await expect(page.getByRole('heading', { name: '创建账号', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '注册账号' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('chinese-registration.png'), fullPage: true });
+  });
 }
