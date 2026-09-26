@@ -10,7 +10,7 @@ vi.mock('./api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api/client')>();
   return {
     ...actual,
-    getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(),
+    getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), registerAccount: vi.fn(),
     listRuns: vi.fn(), getRun: vi.fn(), listRunEvents: vi.fn(),
     listSessions: vi.fn(), revokeSession: vi.fn(),
     getMFAStatus: vi.fn(), setupMFA: vi.fn(), confirmMFA: vi.fn(),
@@ -29,7 +29,7 @@ const run: Run = {
 };
 
 beforeEach(() => {
-  vi.mocked(api.getCurrentUser).mockReset(); vi.mocked(api.login).mockReset(); vi.mocked(api.logout).mockReset();
+  vi.mocked(api.getCurrentUser).mockReset(); vi.mocked(api.login).mockReset(); vi.mocked(api.logout).mockReset(); vi.mocked(api.registerAccount).mockReset();
   vi.mocked(api.listRuns).mockReset(); vi.mocked(api.getRun).mockReset(); vi.mocked(api.listRunEvents).mockReset();
   vi.mocked(api.listSessions).mockReset(); vi.mocked(api.revokeSession).mockReset();
   vi.mocked(api.getMFAStatus).mockReset(); vi.mocked(api.setupMFA).mockReset(); vi.mocked(api.confirmMFA).mockReset();
@@ -38,6 +38,45 @@ beforeEach(() => {
 });
 
 describe('authentication shell', () => {
+  it('lets a visitor create an account and then log in', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValue(new APIError(401));
+    vi.mocked(api.registerAccount).mockResolvedValue({ ...viewer, email: 'new@example.com', role: 'operator' });
+    vi.mocked(api.login).mockResolvedValue({ ...viewer, email: 'new@example.com', role: 'operator' });
+    const user = userEvent.setup(); renderApp('/login');
+    await user.click(await screen.findByRole('link', { name: '创建账号' }));
+    expect(await screen.findByRole('heading', { name: '创建账号' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('邮箱'), 'new@example.com');
+    await user.type(screen.getByLabelText('密码'), 'a strong passphrase for signup');
+    await user.type(screen.getByLabelText('确认密码'), 'different strong password');
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('两次输入的密码不一致');
+    expect(api.registerAccount).not.toHaveBeenCalled();
+    await user.clear(screen.getByLabelText('确认密码'));
+    await user.type(screen.getByLabelText('确认密码'), 'a strong passphrase for signup');
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    expect(api.registerAccount).toHaveBeenCalledWith({ email: 'new@example.com', password: 'a strong passphrase for signup' });
+    expect(await screen.findByRole('status')).toHaveTextContent('注册成功');
+    await user.type(screen.getByLabelText('邮箱'), 'new@example.com');
+    await user.type(screen.getByLabelText('密码'), 'a strong passphrase for signup');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+    expect(await screen.findByRole('heading', { name: '运行任务' })).toBeInTheDocument();
+  });
+
+  it('keeps registration failures actionable without exposing server internals', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValue(new APIError(401));
+    vi.mocked(api.registerAccount).mockRejectedValue(new APIError(409, { code: 'conflict', message: 'database trace must not render' }));
+    const user = userEvent.setup(); renderApp('/register');
+    await user.type(await screen.findByLabelText('邮箱'), 'existing@example.com');
+    await user.type(screen.getByLabelText('密码'), 'a strong passphrase for signup');
+    await user.type(screen.getByLabelText('确认密码'), 'a strong passphrase for signup');
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('该邮箱已注册');
+    expect(screen.queryByText(/database trace/i)).not.toBeInTheDocument();
+    vi.mocked(api.registerAccount).mockRejectedValue(new APIError(429));
+    await user.click(screen.getByRole('button', { name: '注册账号' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('注册尝试过于频繁');
+  });
+
   it('provides accessible login controls and redirects only to an internal path', async () => {
     vi.mocked(api.getCurrentUser).mockRejectedValue(new APIError(401, { code: 'unauthorized', message: 'hidden server text' }));
     vi.mocked(api.login).mockResolvedValue(viewer);

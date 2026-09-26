@@ -6,8 +6,12 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"net/mail"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"forgeflow/internal/apperror"
 	"forgeflow/internal/domain"
@@ -89,6 +93,36 @@ func (s *Service) BootstrapAdmin(ctx context.Context, email, password string) (U
 	}
 	user := User{ID: domain.NewID(), Email: normalized, Role: RoleAdmin, Status: "active", CreatedAt: s.options.Now()}
 	if err := s.store.CreateUser(ctx, UserCredential{User: user, PasswordHash: hash}); err != nil {
+		return User{}, err
+	}
+	return user, nil
+}
+
+// Register creates an ordinary account. Public input can never choose a role.
+func (s *Service) Register(ctx context.Context, email, password string) (User, error) {
+	count, err := s.store.CountUsers(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	if count == 0 {
+		return User{}, apperror.New(apperror.CodeConflict, "registration is unavailable until setup completes")
+	}
+	normalized := NormalizeEmail(email)
+	if !validEmail(normalized) {
+		return User{}, apperror.New(apperror.CodeValidation, "email is invalid")
+	}
+	if utf8.RuneCountInString(password) < 12 {
+		return User{}, apperror.New(apperror.CodeValidation, "password must contain at least 12 characters")
+	}
+	hash, err := HashPassword(password, s.options.PasswordParams)
+	if err != nil {
+		return User{}, apperror.New(apperror.CodeValidation, err.Error())
+	}
+	user := User{ID: domain.NewID(), Email: normalized, Role: RoleOperator, Status: "active", CreatedAt: s.options.Now()}
+	if err := s.store.CreateUser(ctx, UserCredential{User: user, PasswordHash: hash}); err != nil {
+		if errors.Is(err, ErrEmailExists) {
+			return User{}, apperror.New(apperror.CodeConflict, "email is already registered")
+		}
 		return User{}, err
 	}
 	return user, nil
@@ -238,10 +272,6 @@ func validEmail(value string) bool {
 	if len(value) < 3 || len(value) > 320 {
 		return false
 	}
-	for i, c := range value {
-		if c == '@' && i > 0 && i < len(value)-1 {
-			return true
-		}
-	}
-	return false
+	parsed, err := mail.ParseAddress(value)
+	return err == nil && parsed.Address == value && !strings.ContainsAny(value, " \t\r\n")
 }

@@ -39,25 +39,26 @@ const CSRFCookie = "forgeflow_csrf"
 var specFS embed.FS
 
 type Options struct {
-	Auth              *auth.Service
-	Control           *controlplane.Store
-	Runs              *application.Service
-	Artifacts         artifact.Store
-	Inspector         *repoharness.GitInspector
-	CookieSecure      bool
-	CookieDomain      string
-	CookieMaxAge      time.Duration
-	AllowedOrigins    []string
-	RepositoryRoots   []string
-	MutationLimiter   auth.Limiter
-	MetricsEnabled    bool
-	ServiceVersion    string
-	GitCommit         string
-	Governance        *governance.Store
-	Catalog           *governance.Catalog
-	UserData          *userdata.Service
-	ExternalAudit     audit.Appender
-	AuditIntegrityKey []byte
+	Auth                *auth.Service
+	Control             *controlplane.Store
+	Runs                *application.Service
+	Artifacts           artifact.Store
+	Inspector           *repoharness.GitInspector
+	CookieSecure        bool
+	CookieDomain        string
+	CookieMaxAge        time.Duration
+	AllowedOrigins      []string
+	RepositoryRoots     []string
+	MutationLimiter     auth.Limiter
+	RegistrationLimiter auth.Limiter
+	MetricsEnabled      bool
+	ServiceVersion      string
+	GitCommit           string
+	Governance          *governance.Store
+	Catalog             *governance.Catalog
+	UserData            *userdata.Service
+	ExternalAudit       audit.Appender
+	AuditIntegrityKey   []byte
 }
 
 type Server struct {
@@ -84,6 +85,9 @@ func New(options Options) (*Server, error) {
 	if options.MutationLimiter == nil {
 		options.MutationLimiter = auth.NewMemoryLimiter(30, time.Minute)
 	}
+	if options.RegistrationLimiter == nil {
+		options.RegistrationLimiter = auth.NewMemoryLimiter(5, time.Minute)
+	}
 	s := &Server{options: options, origins: map[string]bool{}}
 	for _, origin := range options.AllowedOrigins {
 		s.origins[strings.TrimRight(origin, "/")] = true
@@ -109,6 +113,7 @@ func New(options Options) (*Server, error) {
 	}
 	mux.HandleFunc("GET /api/openapi.yaml", s.openAPI)
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
+	mux.HandleFunc("POST /api/v1/auth/register", s.register)
 	mux.Handle("POST /api/v1/auth/logout", s.protectedMFA(true, true, http.HandlerFunc(s.logout)))
 	mux.Handle("GET /api/v1/auth/me", s.protectedMFA(false, true, http.HandlerFunc(s.me)))
 	mux.Handle("GET /api/v1/auth/sessions", s.protected(false, http.HandlerFunc(s.sessions)))
@@ -306,6 +311,38 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	s.setCookies(w, result.Token, result.CSRFToken, maxAge)
 	s.audit(r, result.Principal.User.ID, "auth.login", "session", result.Principal.Session.ID, nil)
 	writeJSON(w, http.StatusOK, map[string]any{"user": result.Principal.User, "session": result.Principal.Session, "csrfToken": result.CSRFToken})
+}
+
+func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	if err := s.appendExternalAudit(r, "", "auth.register.attempt", "http_route", r.URL.Path, map[string]any{"method": r.Method, "route": r.Pattern}); err != nil {
+		s.fail(w, r, apperror.Wrap(err, apperror.CodeTransient, "audit.register", "external audit backend is unavailable"))
+		return
+	}
+	if !s.originAllowed(r) {
+		s.fail(w, r, apperror.New(apperror.CodeForbidden, "request origin is not allowed"))
+		return
+	}
+	result := s.options.RegistrationLimiter.Allow("register:"+sourceIP(r), time.Now().UTC())
+	if !result.Allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(max(1, int(result.RetryAfter.Seconds()))))
+		s.fail(w, r, apperror.New(apperror.CodeRateLimited, "too many registration attempts; try again later"))
+		return
+	}
+	var in struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := decode(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	user, err := s.options.Auth.Register(r.Context(), in.Email, in.Password)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.audit(r, user.ID, "auth.register", "user", user.ID, nil)
+	writeJSON(w, http.StatusCreated, user)
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	c, _ := r.Cookie(SessionCookie)

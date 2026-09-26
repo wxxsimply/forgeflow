@@ -522,8 +522,10 @@ func (f *apiFixture) request(t *testing.T, state loginState, method, path, body 
 }
 
 type fixtureOptions struct {
-	requireAdminMFA bool
-	externalAudit   audit.Appender
+	requireAdminMFA     bool
+	externalAudit       audit.Appender
+	registrationLimiter auth.Limiter
+	allowedOrigins      []string
 }
 
 type toggleAudit struct {
@@ -620,7 +622,7 @@ func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fi
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef")})
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, AllowedOrigins: options.allowedOrigins, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef"), RegistrationLimiter: options.registrationLimiter})
 	if err != nil {
 		t.Fatal(err)
 	}

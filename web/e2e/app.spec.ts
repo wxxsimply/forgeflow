@@ -7,6 +7,24 @@ const ids = {
 };
 const createdAt = '2026-08-10T08:00:00Z';
 
+test('visitor registers, signs in and reaches own mock workspace', async ({ page }) => {
+  const state = workflowState('operator');
+  await page.route('**/api/v1/**', (route) => mockAPI(route, state));
+  await page.goto('/login');
+  await page.getByRole('link', { name: '创建账号' }).click();
+  await expect(page.getByRole('heading', { name: '创建账号', exact: true })).toBeVisible();
+  await page.getByLabel('邮箱').fill(state.user.email);
+  await page.getByLabel('密码', { exact: true }).fill('secure test password');
+  await page.getByLabel('确认密码').fill('secure test password');
+  await page.getByRole('button', { name: '注册账号' }).click();
+  await expect(page.getByRole('status')).toContainText('注册成功');
+  await page.getByLabel('邮箱').fill(state.user.email);
+  await page.getByLabel('密码', { exact: true }).fill('secure test password');
+  await page.getByRole('button', { name: '登录' }).click();
+  await expect(page.getByRole('link', { name: '新建任务' })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+});
+
 test('viewer can recover a session but never receives mutation controls', async ({ page }) => {
   const state = workflowState('viewer');
   await page.route('**/api/v1/**', (route) => mockAPI(route, state));
@@ -167,6 +185,7 @@ async function login(page: Page, email: string) {
 async function mockAPI(route: Route, state: State) {
   const request = route.request();
   const path = new URL(request.url()).pathname;
+  if (path.endsWith('/auth/register')) return json(route, 201, state.user);
   if (path.endsWith('/auth/login')) { state.authenticated = true; return json(route, 200, { user: state.user, session: { id: '00000000-0000-4000-8000-000000000002', sourceIp: '127.0.0.1', userAgent: 'Playwright', createdAt, lastSeenAt: createdAt, expiresAt: '2026-08-11T08:00:00Z', idleExpiresAt: '2026-08-11T08:00:00Z' }, csrfToken: 'e2e-csrf' }, { 'Set-Cookie': 'forgeflow_csrf=e2e-csrf; Path=/; SameSite=Lax' }); }
   if (path.endsWith('/auth/logout')) { state.authenticated = false; return route.fulfill({ status: 204 }); }
   if (!state.authenticated) return json(route, 401, { code: 'unauthorized', message: 'authentication required', requestId: 'e2e', details: {} });

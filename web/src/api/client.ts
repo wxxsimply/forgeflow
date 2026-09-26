@@ -63,6 +63,12 @@ export async function login(input: { email: string; password: string; secondFact
   return data.user;
 }
 
+export async function registerAccount(input: { email: string; password: string }): Promise<User> {
+  const { data, error, response } = await client.POST('/auth/register', { body: input });
+  if (!data) throw toAPIError(response, error);
+  return data;
+}
+
 export async function getMFAStatus(): Promise<MFAStatus> {
   const { data, error, response } = await client.GET('/account/mfa');
   if (!data) throw toAPIError(response, error);

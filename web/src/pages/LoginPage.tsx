@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { APIError } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -17,6 +17,7 @@ export function LoginPage() {
   const [error, setError] = useState('');
 
   const destination = safeDestination(new URLSearchParams(location.search).get('next'));
+  const registered = new URLSearchParams(location.search).get('registered') === '1';
   useEffect(() => {
     if (!loading && user) navigate(user.mfaRequired && !user.mfaEnabled ? '/account' : '/runs', { replace: true });
   }, [loading, navigate, user]);
@@ -52,7 +53,8 @@ export function LoginPage() {
         <form className="login-card" onSubmit={submit} aria-describedby={error ? formErrorId : undefined}>
           <span className="eyebrow">欢迎回来</span>
           <h2>登录控制台</h2>
-          <p className="login-card__intro">使用管理员分配的账号继续。</p>
+          <p className="login-card__intro">使用你的账号继续；没有账号也可以自行注册。</p>
+          {registered && <p className="form-success" role="status">注册成功，请使用新账号登录。</p>}
           <label htmlFor="email">邮箱</label>
           <input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} aria-describedby={emailErrorId} />
           <span id={emailErrorId} className="field-hint">请输入你的账号邮箱。</span>
@@ -66,7 +68,7 @@ export function LoginPage() {
           <button className="primary-button" type="submit" disabled={submitting}>
             {submitting ? <><span className="spinner spinner--small" />正在验证</> : '登录'}
           </button>
-          <div className="login-help"><span>无法登录？</span><span>请联系 ForgeFlow 管理员</span></div>
+          <div className="login-help"><span>还没有账号？ <Link to="/register">创建账号</Link></span><span>无法登录请联系管理员</span></div>
         </form>
       </section>
     </main>
