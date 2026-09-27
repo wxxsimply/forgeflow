@@ -12,7 +12,7 @@ paths:
     post:
       security: []
       operationId: registerAccount
-      description: Creates an ordinary operator account. Registration does not sign the user in.
+      description: Creates an ordinary operator account only after a one-time email verification code is accepted. Registration does not sign the user in.
       requestBody:
         required: true
         content:
@@ -23,6 +23,22 @@ paths:
         '400': {$ref: '#/components/responses/Error'}
         '409': {$ref: '#/components/responses/Error'}
         '429': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+  /auth/register/code:
+    post:
+      security: []
+      operationId: requestRegistrationCode
+      description: Emails an eight-digit registration code. Codes expire after ten minutes; requests for the same email are limited to one per minute.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationCodeRequest'}
+      responses:
+        '202': {description: Request accepted; no code is returned in the response}
+        '400': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
   /auth/login:
     post:
       security: []
@@ -787,8 +803,13 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, password]
-      properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 1024}}
+      required: [email, password, code]
+      properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 1024}, code: {type: string, pattern: '^[0-9]{8}$'}}
+    RegistrationCodeRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties: {email: {type: string, format: email}}
     CreateRepositoryRequest:
       type: object
       additionalProperties: false

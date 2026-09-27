@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -10,6 +11,27 @@ import (
 	"testing"
 	"time"
 )
+
+func TestLoadRegistrationEmailSettings(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "development")
+	t.Setenv("FORGEFLOW_SMTP_HOST", "smtp.example.com")
+	t.Setenv("FORGEFLOW_SMTP_PORT", "465")
+	t.Setenv("FORGEFLOW_SMTP_FROM", "sender@example.com")
+	t.Setenv("FORGEFLOW_SMTP_USER", "sender@example.com")
+	t.Setenv("FORGEFLOW_SMTP_PASSWORD", "test-authorization-code")
+	t.Setenv("FORGEFLOW_REGISTRATION_CODE_KEY", base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")))
+	configuration, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.SMTPHost != "smtp.example.com" || configuration.SMTPPort != 465 || len(configuration.RegistrationCodeKey) != 32 {
+		t.Fatal("registration mail settings were not loaded")
+	}
+	t.Setenv("FORGEFLOW_SMTP_PASSWORD", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("partial registration mail settings were accepted")
+	}
+}
 
 func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	for _, key := range []string{
@@ -75,6 +97,14 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_AUDIT_RETENTION",
 		"FORGEFLOW_AUDIT_INTEGRITY_KEY",
 		"FORGEFLOW_AUDIT_INTEGRITY_KEY_FILE",
+		"FORGEFLOW_SMTP_HOST",
+		"FORGEFLOW_SMTP_PORT",
+		"FORGEFLOW_SMTP_FROM",
+		"FORGEFLOW_SMTP_USER",
+		"FORGEFLOW_SMTP_PASSWORD",
+		"FORGEFLOW_SMTP_PASSWORD_FILE",
+		"FORGEFLOW_REGISTRATION_CODE_KEY",
+		"FORGEFLOW_REGISTRATION_CODE_KEY_FILE",
 		"FORGEFLOW_DATA_GOVERNANCE_POLICY",
 		"FORGEFLOW_DATA_GOVERNANCE_POLICY_FILE",
 		"FORGEFLOW_DATA_GOVERNANCE_POLICY_SHA256",

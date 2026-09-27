@@ -63,7 +63,12 @@ export async function login(input: { email: string; password: string; secondFact
   return data.user;
 }
 
-export async function registerAccount(input: { email: string; password: string }): Promise<User> {
+export async function requestRegistrationCode(email: string): Promise<void> {
+  const { error, response } = await client.POST('/auth/register/code', { body: { email } });
+  if (!response.ok) throw toAPIError(response, error);
+}
+
+export async function registerAccount(input: { email: string; password: string; code: string }): Promise<User> {
   const { data, error, response } = await client.POST('/auth/register', { body: input });
   if (!data) throw toAPIError(response, error);
   return data;

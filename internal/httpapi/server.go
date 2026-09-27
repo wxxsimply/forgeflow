@@ -28,6 +28,7 @@ import (
 	"forgeflow/internal/domain"
 	"forgeflow/internal/governance"
 	"forgeflow/internal/observability"
+	"forgeflow/internal/registration"
 	repoharness "forgeflow/internal/repository"
 	"forgeflow/internal/userdata"
 )
@@ -40,6 +41,7 @@ var specFS embed.FS
 
 type Options struct {
 	Auth                *auth.Service
+	Registration        *registration.Service
 	Control             *controlplane.Store
 	Runs                *application.Service
 	Artifacts           artifact.Store
@@ -114,6 +116,7 @@ func New(options Options) (*Server, error) {
 	mux.HandleFunc("GET /api/openapi.yaml", s.openAPI)
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
 	mux.HandleFunc("POST /api/v1/auth/register", s.register)
+	mux.HandleFunc("POST /api/v1/auth/register/code", s.requestRegistrationCode)
 	mux.Handle("POST /api/v1/auth/logout", s.protectedMFA(true, true, http.HandlerFunc(s.logout)))
 	mux.Handle("GET /api/v1/auth/me", s.protectedMFA(false, true, http.HandlerFunc(s.me)))
 	mux.Handle("GET /api/v1/auth/sessions", s.protected(false, http.HandlerFunc(s.sessions)))
@@ -322,6 +325,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, apperror.New(apperror.CodeForbidden, "request origin is not allowed"))
 		return
 	}
+	if s.options.Registration == nil {
+		s.fail(w, r, apperror.New(apperror.CodeTransient, "email registration is not configured"))
+		return
+	}
 	result := s.options.RegistrationLimiter.Allow("register:"+sourceIP(r), time.Now().UTC())
 	if !result.Allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(max(1, int(result.RetryAfter.Seconds()))))
@@ -331,18 +338,51 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		Code     string `json:"code"`
 	}
 	if err := decode(r, &in); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	user, err := s.options.Auth.Register(r.Context(), in.Email, in.Password)
+	user, err := s.options.Registration.Register(r.Context(), in.Email, in.Password, in.Code)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	s.audit(r, user.ID, "auth.register", "user", user.ID, nil)
 	writeJSON(w, http.StatusCreated, user)
+}
+func (s *Server) requestRegistrationCode(w http.ResponseWriter, r *http.Request) {
+	if err := s.appendExternalAudit(r, "", "auth.register_code.attempt", "http_route", r.URL.Path, map[string]any{"method": r.Method, "route": r.Pattern}); err != nil {
+		s.fail(w, r, apperror.Wrap(err, apperror.CodeTransient, "audit.register_code", "external audit backend is unavailable"))
+		return
+	}
+	if !s.originAllowed(r) {
+		s.fail(w, r, apperror.New(apperror.CodeForbidden, "request origin is not allowed"))
+		return
+	}
+	if s.options.Registration == nil {
+		s.fail(w, r, apperror.New(apperror.CodeTransient, "email registration is not configured"))
+		return
+	}
+	result := s.options.RegistrationLimiter.Allow("register-code:"+sourceIP(r), time.Now().UTC())
+	if !result.Allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(max(1, int(result.RetryAfter.Seconds()))))
+		s.fail(w, r, apperror.New(apperror.CodeRateLimited, "too many code requests; try again later"))
+		return
+	}
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := decode(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.options.Registration.RequestCode(r.Context(), in.Email); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	c, _ := r.Cookie(SessionCookie)

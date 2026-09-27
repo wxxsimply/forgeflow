@@ -24,6 +24,7 @@ import (
 	"forgeflow/internal/observability"
 	"forgeflow/internal/planner"
 	pg "forgeflow/internal/postgres"
+	"forgeflow/internal/registration"
 	"forgeflow/internal/repository"
 	"forgeflow/internal/userdata"
 )
@@ -91,6 +92,17 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
+	var registrationService *registration.Service
+	if configuration.SMTPHost != "" {
+		sender, err := registration.NewSMTPSender(configuration.SMTPHost, configuration.SMTPPort, configuration.SMTPFrom, configuration.SMTPUser, configuration.SMTPPassword)
+		if err != nil {
+			return err
+		}
+		registrationService, err = registration.New(authService, registration.NewPostgresStore(db), sender, configuration.RegistrationCodeKey)
+		if err != nil {
+			return err
+		}
+	}
 	if configuration.BootstrapAdminEmail != "" {
 		count, err := authStore.CountUsers(ctx)
 		if err != nil {
@@ -110,7 +122,7 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
-	api, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: externalAudit, AuditIntegrityKey: configuration.AuditIntegrityKey})
+	api, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: externalAudit, AuditIntegrityKey: configuration.AuditIntegrityKey})
 	if err != nil {
 		return err
 	}
