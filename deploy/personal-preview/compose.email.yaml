@@ -1,0 +1,19 @@
+# Opt-in email registration overlay. Keep credentials in private, host-owned files.
+services:
+  api:
+    environment:
+      FORGEFLOW_SMTP_HOST: ${FORGEFLOW_SMTP_HOST:?SMTP host is required}
+      FORGEFLOW_SMTP_PORT: ${FORGEFLOW_SMTP_PORT:?SMTP port is required}
+      FORGEFLOW_SMTP_FROM: ${FORGEFLOW_SMTP_FROM:?sender address is required}
+      FORGEFLOW_SMTP_USER: ${FORGEFLOW_SMTP_USER:?SMTP user is required}
+      FORGEFLOW_SMTP_PASSWORD_FILE: /run/secrets/registration_smtp_password
+      FORGEFLOW_REGISTRATION_CODE_KEY_FILE: /run/secrets/registration_code_key
+    secrets:
+      - registration_smtp_password
+      - registration_code_key
+
+secrets:
+  registration_smtp_password:
+    file: ${FORGEFLOW_SMTP_PASSWORD_PATH:?SMTP password file is required}
+  registration_code_key:
+    file: ${FORGEFLOW_REGISTRATION_CODE_KEY_PATH:?registration code key file is required}

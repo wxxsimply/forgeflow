@@ -13,7 +13,10 @@ test('visitor registers, signs in and reaches own mock workspace', async ({ page
   await page.goto('/login');
   await page.getByRole('link', { name: '创建账号' }).click();
   await expect(page.getByRole('heading', { name: '创建账号', exact: true })).toBeVisible();
-  await page.getByLabel('邮箱').fill(state.user.email);
+  await page.getByLabel('邮箱', { exact: true }).fill(state.user.email);
+  await page.getByRole('button', { name: '获取验证码' }).click();
+  await expect(page.getByText(/验证码已发送/)).toBeVisible();
+  await page.getByLabel('邮箱验证码').fill('12345678');
   await page.getByLabel('密码', { exact: true }).fill('secure test password');
   await page.getByLabel('确认密码').fill('secure test password');
   await page.getByRole('button', { name: '注册账号' }).click();
@@ -185,6 +188,7 @@ async function login(page: Page, email: string) {
 async function mockAPI(route: Route, state: State) {
   const request = route.request();
   const path = new URL(request.url()).pathname;
+  if (path.endsWith('/auth/register/code')) return route.fulfill({ status: 202 });
   if (path.endsWith('/auth/register')) return json(route, 201, state.user);
   if (path.endsWith('/auth/login')) { state.authenticated = true; return json(route, 200, { user: state.user, session: { id: '00000000-0000-4000-8000-000000000002', sourceIp: '127.0.0.1', userAgent: 'Playwright', createdAt, lastSeenAt: createdAt, expiresAt: '2026-08-11T08:00:00Z', idleExpiresAt: '2026-08-11T08:00:00Z' }, csrfToken: 'e2e-csrf' }, { 'Set-Cookie': 'forgeflow_csrf=e2e-csrf; Path=/; SameSite=Lax' }); }
   if (path.endsWith('/auth/logout')) { state.authenticated = false; return route.fulfill({ status: 204 }); }

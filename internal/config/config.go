@@ -29,6 +29,12 @@ type Config struct {
 	SessionIdleTTL                        time.Duration
 	AdminMFARequired                      bool
 	MFAEncryptionKey                      []byte
+	SMTPHost                              string
+	SMTPPort                              int
+	SMTPFrom                              string
+	SMTPUser                              string
+	SMTPPassword                          string
+	RegistrationCodeKey                   []byte
 	BootstrapAdminEmail                   string
 	BootstrapAdminPassword                string
 	DataDir                               string
@@ -168,6 +174,32 @@ func Load() (Config, error) {
 	}
 	if direct, directSet := os.LookupEnv("FORGEFLOW_MFA_ENCRYPTION_KEY"); environment == "production" && directSet && strings.TrimSpace(direct) != "" {
 		return Config{}, fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY must be provided through FORGEFLOW_MFA_ENCRYPTION_KEY_FILE in production")
+	}
+	smtpPort, err := envInt("FORGEFLOW_SMTP_PORT", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	smtpPassword, err := envOrFile("FORGEFLOW_SMTP_PASSWORD")
+	if err != nil {
+		return Config{}, err
+	}
+	codeKeyEncoded, err := envOrFile("FORGEFLOW_REGISTRATION_CODE_KEY")
+	if err != nil {
+		return Config{}, err
+	}
+	var codeKey []byte
+	if strings.TrimSpace(codeKeyEncoded) != "" {
+		codeKey, err = base64.StdEncoding.DecodeString(strings.TrimSpace(codeKeyEncoded))
+		if err != nil || len(codeKey) != 32 {
+			return Config{}, fmt.Errorf("FORGEFLOW_REGISTRATION_CODE_KEY must be standard base64 encoding exactly 32 bytes")
+		}
+	}
+	if environment == "production" {
+		for _, key := range []string{"FORGEFLOW_SMTP_PASSWORD", "FORGEFLOW_REGISTRATION_CODE_KEY"} {
+			if direct, set := os.LookupEnv(key); set && strings.TrimSpace(direct) != "" {
+				return Config{}, fmt.Errorf("%s must be provided through %s_FILE in production", key, key)
+			}
+		}
 	}
 	maxRetries, err := envInt("FORGEFLOW_OPENAI_MAX_RETRIES", 2)
 	if err != nil {
@@ -350,6 +382,9 @@ func Load() (Config, error) {
 		RepositoryRoots:    splitCSV(envOrDefault("FORGEFLOW_REPOSITORY_ROOTS", ".")),
 		SessionTTL:         sessionTTL, SessionIdleTTL: sessionIdleTTL,
 		AdminMFARequired: adminMFARequired, MFAEncryptionKey: mfaEncryptionKey,
+		SMTPHost: strings.TrimSpace(os.Getenv("FORGEFLOW_SMTP_HOST")), SMTPPort: smtpPort,
+		SMTPFrom: strings.TrimSpace(os.Getenv("FORGEFLOW_SMTP_FROM")), SMTPUser: strings.TrimSpace(os.Getenv("FORGEFLOW_SMTP_USER")),
+		SMTPPassword: smtpPassword, RegistrationCodeKey: codeKey,
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL")),
 		BootstrapAdminPassword: bootstrapAdminPassword,
 		DataDir:                dataDirectory, WorkflowMode: envOrDefault("FORGEFLOW_WORKFLOW_MODE", "planning"), PlannerMode: envOrDefault("FORGEFLOW_PLANNER_MODE", "mock"),
@@ -442,6 +477,11 @@ func (c Config) Validate() error {
 	}
 	if c.AdminMFARequired && len(c.MFAEncryptionKey) != 32 {
 		return fmt.Errorf("FORGEFLOW_MFA_ENCRYPTION_KEY is required when FORGEFLOW_ADMIN_MFA_REQUIRED=true")
+	}
+	if c.SMTPHost != "" || c.SMTPPort != 0 || c.SMTPFrom != "" || c.SMTPUser != "" || c.SMTPPassword != "" || len(c.RegistrationCodeKey) != 0 {
+		if c.SMTPHost == "" || (c.SMTPPort != 465 && c.SMTPPort != 587) || c.SMTPFrom == "" || c.SMTPUser == "" || c.SMTPPassword == "" || len(c.RegistrationCodeKey) != 32 {
+			return fmt.Errorf("email registration requires SMTP host, port 465 or 587, from address, user, password, and a 32-byte code key")
+		}
 	}
 	if (c.BootstrapAdminEmail == "") != (c.BootstrapAdminPassword == "") {
 		return fmt.Errorf("bootstrap admin email and password must be configured together")

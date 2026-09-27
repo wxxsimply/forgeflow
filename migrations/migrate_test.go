@@ -10,8 +10,11 @@ func TestEmbeddedMigrationsArePairedAndContainControlPlaneTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 7 || all[0].Version != 1 || all[1].Version != 2 || all[2].Version != 3 || all[3].Version != 4 || all[4].Version != 5 || all[5].Version != 6 || all[6].Version != 7 || strings.TrimSpace(all[6].Down) == "" {
+	if len(all) != 8 || all[0].Version != 1 || all[1].Version != 2 || all[2].Version != 3 || all[3].Version != 4 || all[4].Version != 5 || all[5].Version != 6 || all[6].Version != 7 || all[7].Version != 8 || strings.TrimSpace(all[7].Down) == "" {
 		t.Fatalf("migrations=%+v", all)
+	}
+	if !strings.Contains(all[7].Up, "CREATE TABLE registration_codes") || !strings.Contains(all[7].Up, "code_hash bytea") {
+		t.Fatal("email verification migration is missing its code table or hash")
 	}
 	if !strings.Contains(all[4].Up, "ADD COLUMN model") {
 		t.Fatal("prompt release model migration is missing")

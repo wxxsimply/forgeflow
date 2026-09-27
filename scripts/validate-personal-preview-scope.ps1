@@ -11,17 +11,21 @@ function Assert-PersonalPreviewScope {
 
 $scopePath = Join-Path $workspace 'docs/personal-preview-scope.md'
 $composePath = Join-Path $workspace 'deploy/personal-preview/compose.yaml'
+$emailOverlayPath = Join-Path $workspace 'deploy/personal-preview/compose.email.yaml'
 $workflowPath = Join-Path $workspace '.github/workflows/deployment.yml'
 
 Assert-PersonalPreviewScope (Test-Path -LiteralPath $scopePath -PathType Leaf) 'Personal preview scope document is missing'
 Assert-PersonalPreviewScope (Test-Path -LiteralPath $composePath -PathType Leaf) 'Personal preview Compose file is missing'
+Assert-PersonalPreviewScope (Test-Path -LiteralPath $emailOverlayPath -PathType Leaf) 'Email registration overlay is missing'
 
 $scope = Get-Content -Raw -LiteralPath $scopePath
 foreach ($contract in @(
     'PERSONAL-001 已完成',
     '公开自助注册',
     '只能创建 `operator` 普通账号',
-    '没有邮箱验证或自助密码找回',
+    '邮箱验证码候选版本要求先发码再注册',
+    '缺少 SMTP 配置时新注册关闭',
+    '自助密码找回仍未提供',
     '运行时外部模型调用上限：0 次',
     '本轮总计 0 USD',
     'PERSONAL-008 完成前'
@@ -32,6 +36,8 @@ foreach ($contract in @(
 $server = Get-Content -Raw -LiteralPath (Join-Path $workspace 'internal/httpapi/server.go')
 $auth = Get-Content -Raw -LiteralPath (Join-Path $workspace 'internal/auth/service.go')
 Assert-PersonalPreviewScope ($server.Contains('POST /api/v1/auth/register')) 'Public registration route is missing'
+Assert-PersonalPreviewScope ($server.Contains('POST /api/v1/auth/register/code')) 'Email verification route is missing'
+Assert-PersonalPreviewScope ($server.Contains('s.options.Registration.Register(')) 'Public registration must use the verified registration service'
 Assert-PersonalPreviewScope ($server.Contains('RegistrationLimiter')) 'Public registration rate limit is missing'
 Assert-PersonalPreviewScope ($auth.Contains('Role: RoleOperator')) 'Public registration must create an ordinary operator account'
 
@@ -47,6 +53,11 @@ foreach ($contract in @(
 foreach ($forbidden in @('OPENAI_API_KEY', 'DEEPSEEK_API_KEY')) {
     Assert-PersonalPreviewScope (-not $compose.Contains($forbidden)) "Personal preview Compose must not declare $forbidden"
 }
+$emailOverlay = Get-Content -Raw -LiteralPath $emailOverlayPath
+foreach ($contract in @('FORGEFLOW_SMTP_PASSWORD_FILE: /run/secrets/registration_smtp_password', 'FORGEFLOW_REGISTRATION_CODE_KEY_FILE: /run/secrets/registration_code_key', 'FORGEFLOW_SMTP_PASSWORD_PATH', 'FORGEFLOW_REGISTRATION_CODE_KEY_PATH')) {
+    Assert-PersonalPreviewScope ($emailOverlay.Contains($contract)) "Email registration overlay is missing boundary: $contract"
+}
+Assert-PersonalPreviewScope ($emailOverlay -notmatch '(?m)^\s+FORGEFLOW_SMTP_PASSWORD:\s') 'SMTP password must not be injected directly'
 
 $apiMatch = [regex]::Match($compose, '(?ms)^  api:\r?\n(?<body>.*?)(?=^  worker:)')
 Assert-PersonalPreviewScope ($apiMatch.Success) 'Personal preview API service block is missing'

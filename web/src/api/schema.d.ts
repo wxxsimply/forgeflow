@@ -13,8 +13,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Creates an ordinary operator account. Registration does not sign the user in. */
+        /** @description Creates an ordinary operator account only after a one-time email verification code is accepted. Registration does not sign the user in. */
         post: operations["registerAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/register/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Emails an eight-digit registration code. Codes expire after ten minutes; requests for the same email are limited to one per minute. */
+        post: operations["requestRegistrationCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -998,6 +1015,11 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
+            code: string;
+        };
+        RegistrationCodeRequest: {
+            /** Format: email */
+            email: string;
         };
         CreateRepositoryRequest: {
             name: string;
@@ -1229,6 +1251,32 @@ export interface operations {
             400: components["responses"]["Error"];
             409: components["responses"]["Error"];
             429: components["responses"]["Error"];
+            503: components["responses"]["Error"];
+        };
+    };
+    requestRegistrationCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Request accepted; no code is returned in the response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+            503: components["responses"]["Error"];
         };
     };
     login: {

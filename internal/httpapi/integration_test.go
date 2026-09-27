@@ -33,18 +33,46 @@ import (
 	"forgeflow/internal/httpapi"
 	"forgeflow/internal/planner"
 	pg "forgeflow/internal/postgres"
+	"forgeflow/internal/registration"
 	"forgeflow/internal/repository"
 	"forgeflow/internal/userdata"
 	"forgeflow/migrations"
 )
 
 type apiFixture struct {
-	server    *httptest.Server
-	db        *sql.DB
-	auth      *auth.Service
-	authStore *auth.PostgresStore
-	runs      *application.Service
-	artifacts artifact.Store
+	server     *httptest.Server
+	db         *sql.DB
+	auth       *auth.Service
+	authStore  *auth.PostgresStore
+	runs       *application.Service
+	artifacts  artifact.Store
+	codeSender *testRegistrationSender
+}
+
+type testRegistrationSender struct {
+	mu        sync.Mutex
+	lastEmail string
+	lastCode  string
+	err       error
+}
+
+func (s *testRegistrationSender) Send(_ context.Context, email, code string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return s.err
+	}
+	s.lastEmail, s.lastCode = email, code
+	return nil
+}
+
+func (s *testRegistrationSender) code(email string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastEmail != email {
+		return ""
+	}
+	return s.lastCode
 }
 
 func TestAuthenticationCSRFHorizontalAuthorizationAndApprovalVersion(t *testing.T) {
@@ -523,6 +551,7 @@ func (f *apiFixture) request(t *testing.T, state loginState, method, path, body 
 
 type fixtureOptions struct {
 	requireAdminMFA     bool
+	disableRegistration bool
 	externalAudit       audit.Appender
 	registrationLimiter auth.Limiter
 	allowedOrigins      []string
@@ -591,7 +620,7 @@ func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fi
 	if err := migrations.Apply(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`TRUNCATE TABLE user_deletion_requests,user_data_exports,prompt_releases,eval_runs,audit_log,idempotency_keys,sessions,tool_calls,model_calls,artifacts,jobs,outbox,node_executions,approvals,run_events,checkpoints,runs,repositories,users CASCADE`); err != nil {
+	if _, err := db.Exec(`TRUNCATE TABLE registration_codes,user_deletion_requests,user_data_exports,prompt_releases,eval_runs,audit_log,idempotency_keys,sessions,tool_calls,model_calls,artifacts,jobs,outbox,node_executions,approvals,run_events,checkpoints,runs,repositories,users CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	store := auth.NewPostgresStore(db)
@@ -601,6 +630,14 @@ func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fi
 	}
 	if _, err := authService.BootstrapAdmin(context.Background(), "admin@example.com", "correct horse battery staple"); err != nil {
 		t.Fatal(err)
+	}
+	codeSender := &testRegistrationSender{}
+	registrationService, err := registration.New(authService, registration.NewPostgresStore(db), codeSender, []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.disableRegistration {
+		registrationService = nil
 	}
 	runStore := checkpoint.NewPostgresStore(db)
 	runs := application.NewService(runStore, planner.Mock{})
@@ -622,13 +659,13 @@ func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fi
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, AllowedOrigins: options.allowedOrigins, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef"), RegistrationLimiter: options.registrationLimiter})
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, AllowedOrigins: options.allowedOrigins, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef"), RegistrationLimiter: options.registrationLimiter})
 	if err != nil {
 		t.Fatal(err)
 	}
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
-	return &apiFixture{server: httpServer, db: db, auth: authService, authStore: store, runs: runs, artifacts: artifactStore}
+	return &apiFixture{server: httpServer, db: db, auth: authService, authStore: store, runs: runs, artifacts: artifactStore, codeSender: codeSender}
 }
 
 func integrationTOTP(secret []byte, at time.Time) string {
