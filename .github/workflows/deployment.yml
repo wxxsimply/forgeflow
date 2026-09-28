@@ -131,6 +131,10 @@ jobs:
           ./scripts/personal-preview-backup.ps1 -EnvFile deploy/personal-preview/preview.env.example -DryRun
           ./scripts/personal-preview-restore-drill.ps1 -EnvFile deploy/personal-preview/preview.env.example -BackupFile /backups/forgeflow-preview-20260922T000000Z.dump -ConfirmRestore -DryRun
 
+      - name: Validate email registration egress isolation
+        shell: pwsh
+        run: ./scripts/validate-email-registration-compose.ps1
+
       - name: Validate Caddy configuration
         run: |
           docker run --rm -e FORGEFLOW_DOMAIN=forgeflow-ci.example.invalid -e ACME_EMAIL=ci@example.invalid -v "$PWD/deploy/staging/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile

@@ -1,6 +1,8 @@
 # Opt-in email registration overlay. Keep credentials in private, host-owned files.
 services:
   api:
+    networks:
+      - registration-egress
     environment:
       FORGEFLOW_SMTP_HOST: ${FORGEFLOW_SMTP_HOST:?SMTP host is required}
       FORGEFLOW_SMTP_PORT: ${FORGEFLOW_SMTP_PORT:?SMTP port is required}
@@ -17,3 +19,8 @@ secrets:
     file: ${FORGEFLOW_SMTP_PASSWORD_PATH:?SMTP password file is required}
   registration_code_key:
     file: ${FORGEFLOW_REGISTRATION_CODE_KEY_PATH:?registration code key file is required}
+
+# Opt-in outbound bridge for SMTP. app/data remain internal; no ports are published.
+networks:
+  registration-egress:
+    driver: bridge

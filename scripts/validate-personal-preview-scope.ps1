@@ -58,6 +58,8 @@ foreach ($contract in @('FORGEFLOW_SMTP_PASSWORD_FILE: /run/secrets/registration
     Assert-PersonalPreviewScope ($emailOverlay.Contains($contract)) "Email registration overlay is missing boundary: $contract"
 }
 Assert-PersonalPreviewScope ($emailOverlay -notmatch '(?m)^\s+FORGEFLOW_SMTP_PASSWORD:\s') 'SMTP password must not be injected directly'
+Assert-PersonalPreviewScope ($emailOverlay -match '(?ms)^  api:\r?\n\s+networks:\r?\n\s+- registration-egress') 'Email API must attach its SMTP egress network'
+Assert-PersonalPreviewScope ($emailOverlay -match '(?ms)^networks:\r?\n  registration-egress:\r?\n    driver: bridge') 'Email registration requires an opt-in outbound bridge'
 
 $apiMatch = [regex]::Match($compose, '(?ms)^  api:\r?\n(?<body>.*?)(?=^  worker:)')
 Assert-PersonalPreviewScope ($apiMatch.Success) 'Personal preview API service block is missing'

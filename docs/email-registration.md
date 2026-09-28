@@ -9,10 +9,19 @@
 1. 准备一个支持 SMTP AUTH 且启用 TLS 的发信邮箱。只支持 465（隐式 TLS）或 587（STARTTLS）；不允许明文 SMTP。发件地址须与服务商允许的地址一致。确认服务器能连通该端口，并取得该邮箱的 SMTP 授权码；不要把授权码发到聊天、工单或 Git 仓库。
 2. 在服务器的私有目录创建 `registration-smtp-password` 和 `registration-code-key` 两个文件。前者存放 SMTP 授权码，后者存放独立随机 32 字节密钥的标准 Base64 编码。密钥可在服务器私下用 `umask 077; openssl rand -base64 32 > /srv/forgeflow/secrets/registration-code-key` 生成。文件型 Compose secret 在个人预览中由非 root 的 API 用户 `10001:10001` 读取；挂载前核对实际权限，建议文件归 `10001:10001` 且权限为 `0400`，不要只让宿主机的 `forgeflow` 用户可读。不要复用 MFA 或审计密钥，也不要在部署之间轮换，否则未使用的验证码会失效。
 3. 在私有 `deploy/personal-preview/preview.env` 中设置 `FORGEFLOW_SMTP_HOST`、`FORGEFLOW_SMTP_PORT`、`FORGEFLOW_SMTP_FROM`、`FORGEFLOW_SMTP_USER`、`FORGEFLOW_SMTP_PASSWORD_PATH`、`FORGEFLOW_REGISTRATION_CODE_KEY_PATH`，参照 `preview.env.example`。私密文件路径仅供 Compose 读取，文件内容不得写入 env 或提交。
-4. 发布时在原有 Compose 文件后追加 `-f deploy/personal-preview/compose.email.yaml`。这个可选 overlay 只给 API 提供 SMTP 配置和私有文件，不向 worker/web 暴露授权码。
+4. 发布时在原有 Compose 文件后追加 `-f deploy/personal-preview/compose.email.yaml`。这个可选 overlay 只给 API 提供 SMTP 配置、私有文件和 `registration-egress` 出口网络，不向 worker/web 暴露授权码。基础 `app`/`data` 网络保持 `internal: true`；API 必须额外连接这个非 internal 的 bridge，才能访问外部 SMTP。此出口不发布公网端口，也不是 SMTP 目标白名单；如需严格限制目的地址，须另行配置宿主机出口规则。
+
+上线前运行 `pwsh -NoProfile -File scripts/validate-email-registration-compose.ps1`，核对基础和公网 HTTPS 组合配置中的邮件出口、Secret 和网络隔离。该检查只解析非敏感示例配置，不连接 SMTP、不发送邮件。部署后可在 API 容器里用 `ip route` 确认存在默认路由；只验证宿主机连接 QQ SMTP 成功，不能证明 API 容器可以发信。
 
 此次新增 `000008_registration_codes` 数据库迁移。上线前先备份并校验数据库，然后用新镜像显式运行 Compose 的 `migrate` 服务（其命令为 `db migrate`），确认 schema version 为 8，再启动新 API。不能在未运行迁移时直接切换，因为 API 会拒绝旧 schema。服务器内存较小，镜像应在本机或 CI 构建后传入，不要在服务器运行 `docker compose build`。
 
 部署后检查：API、worker、web、Caddy、PostgreSQL 健康；公网 HTTPS 的 `/healthz` 与 `/release.json` 提交号一致；向自己控制的邮箱发送一次验证码并完成注册/登录；错误验证码、过期验证码、重复使用和未配置 SMTP 均不能创建账号。不要把实际验证码、SMTP 授权码、完整 env 文件或数据库连接串贴到 PR。
 
 回滚注意：旧版 API 只接受 schema version 7，不能直接运行在迁移后的 version 8 上。若新版本异常，优先停止新 API 并修复/前进发布；若必须回滚到 version 7，先保留迁移后数据备份，再由维护者审查并执行 `000008_registration_codes.down.sql`，删除 `schema_migrations` 中的 version 8 记录后恢复旧镜像。降级仅会丢弃尚未使用的验证码，已创建用户不受影响；不得自动回滚数据库。
+
+## 发信排查
+
+- 宿主机能连接 SMTP，不代表 API 容器可以连接；先检查 API 的默认路由和实际部署是否包含邮件 overlay。
+- SMTP `535` 表示认证被拒绝：核对发件邮箱与 SMTP 用户是否一致，以及授权码是否由该邮箱生成、是否仍有效、账号是否存在服务商安全限制。不要把该错误当作 TLS 故障，也不要通过关闭证书验证解决。
+- 替换授权码文件后，须用包含邮件 overlay 的 Compose 配置强制重建 API，使其重新读取启动配置和文件挂载；不能只替换文件就认定凭据已更新。独立验证码密钥不要随授权码一起重新生成。
+- 接口返回 `202` 只证明发信流程提交成功；还须由收件人确认收件，并用未注册邮箱人工验收完整注册与登录。故障期间接口保持拒绝注册，现有账号登录不受影响。
