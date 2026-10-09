@@ -42,8 +42,7 @@
 
 ## 4. 证据与边界
 
-- docs/preview-rollout-result.md 记录部署版本、健康检查、外部 HTTPS 检查及用户人工确认。
-- FORGEFLOW_PERSONAL_PREVIEW_PLAN.md 记录部署方式、安全组和 Bootstrap 清理历史。
+- 历史部署版本、HTTPS 检查、人工确认及安全组配置记录保留在维护者本地归档中。
 - deploy/personal-preview/compose.yaml 使用文件型 PostgreSQL Secret。
 - deploy/personal-preview/compose.public-ip.yaml 固定 HTTPS、Secure Cookie、Origin、443 和证书卷。
 - deploy/personal-preview/secrets/README.md 记录创建、权限和清理步骤。

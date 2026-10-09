@@ -1,4 +1,4 @@
-ARG GO_IMAGE=golang:1.26.6-alpine
+ARG GO_IMAGE=golang:1.26.9-alpine
 FROM ${GO_IMAGE}
 ARG FORGEFLOW_VERSION=development
 ARG FORGEFLOW_GIT_COMMIT=unknown
