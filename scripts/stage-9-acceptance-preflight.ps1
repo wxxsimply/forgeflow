@@ -99,10 +99,9 @@ function Assert-PlanShape {
 
 $runbookPath = Join-Path $workspace 'docs/stage-9-acceptance-window-runbook.md'
 $summaryTemplatePath = Join-Path $workspace 'release-reports/stage-9-acceptance-summary-template.md'
-$auditPath = Join-Path $workspace 'docs/stage-9-acceptance-preflight-audit.md'
 $initializerPath = Join-Path $PSScriptRoot 'initialize-stage-9-acceptance-plan.ps1'
 $initializerTestPath = Join-Path $PSScriptRoot 'test-stage-9-plan-initializer.ps1'
-foreach ($requiredPath in @($runbookPath, $summaryTemplatePath, $auditPath, $initializerPath, $initializerTestPath)) {
+foreach ($requiredPath in @($runbookPath, $summaryTemplatePath, $initializerPath, $initializerTestPath)) {
     Assert-Acceptance (Test-Path -LiteralPath $requiredPath -PathType Leaf) "Missing stage 9 acceptance asset: $requiredPath"
 }
 $runbook = Get-Content -Raw -LiteralPath $runbookPath

@@ -51,7 +51,7 @@ python -B scripts/preview_demo_task.py inspect --task-id "<同一任务编号>"
 
 ## 4. 导入提案，审查后再决定是否测试
 
-提案格式沿用 [补丁说明](preview-demo-patch-review.md)：任务编号、任务正文摘要和原始快照摘要必须与归档相符，只能替换 `greeting.go`、`greeting_test.go`。导入前仍检查 UTF-8、禁止额外字段/路径及候选 128 KiB 上限。`propose` 的人工导入标记为 `manual_import`；新离线请求入口的固定模拟返回标记为 `fake_request`。两者都不能说成 DeepSeek 生成，后者还必须有匹配的请求和预算来源记录。
+提案格式沿用 [提案格式与校验实现](../scripts/preview_demo_patch.py)：任务编号、任务正文摘要和原始快照摘要必须与归档相符，只能替换 `greeting.go`、`greeting_test.go`。导入前仍检查 UTF-8、禁止额外字段/路径及候选 128 KiB 上限。`propose` 的人工导入标记为 `manual_import`；新离线请求入口的固定模拟返回标记为 `fake_request`。两者都不能说成 DeepSeek 生成，后者还必须有匹配的请求和预算来源记录。
 
 ```powershell
 python -B scripts/preview_demo_task.py propose --task-id "<同一任务编号>" --proposal "<受控提案JSON文件>"

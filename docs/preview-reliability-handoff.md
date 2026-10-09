@@ -1,6 +1,6 @@
 # 个人预览修复交接
 
-> 2026-09-14 更新：本轮修复已通过 PR #52 合并，提交为 `6156165e0ea501093e3e31d5cffedd5118aeecfd`，四项 CI 通过。本文保留原修复和提交过程；不要重复执行下面旧的 PR 创建步骤。下一阶段的新提交清单与线上边界见 [阶段 C 更新操作单](preview-rollout-plan.md)。服务器是否更新仍待核实。
+> 2026-09-14 更新：本轮修复已通过 PR #52 合并，提交为 `6156165e0ea501093e3e31d5cffedd5118aeecfd`，四项 CI 通过。本文保留原修复和提交过程；不要重复执行下面旧的 PR 创建步骤。下一阶段的新提交清单与线上边界见 阶段 C 更新操作单（历史记录已本地归档）。服务器是否更新仍待核实。
 
 ## 范围与停止点
 
@@ -63,7 +63,7 @@
 ```powershell
 git branch --show-current
 git status --short
-git add FORGEFLOW_NEXT_STAGE_PLAN.md docs/preview-reliability-handoff.md
+git add docs/preview-reliability-handoff.md
 git add internal/application/service.go internal/checkpoint/postgres.go internal/checkpoint/idempotency.go internal/controlplane/postgres.go
 git add internal/httpapi/server.go internal/httpapi/integration_test.go internal/httpapi/idempotency_test.go internal/httpapi/openapi.yaml
 git add web/src/pages/NewRunPage.tsx web/src/WorkflowPages.test.tsx web/src/utils/taskInput.ts web/src/utils/taskInput.test.ts web/src/api/schema.d.ts

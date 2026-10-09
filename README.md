@@ -2,7 +2,7 @@
 
 ForgeFlow 是一个可治理的多 Agent 软件交付平台。当前版本先实现最小纵向链路：
 
-完整开发、接口、登录、Prompt、评测和部署路线见 [FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md](./FORGEFLOW_GO_IMPLEMENTATION_GUIDE.md)。
+开发与协作见 [贡献指南](./CONTRIBUTING.md)；运行架构见 [架构与数据流](./docs/production-architecture.md)，模型与流程验证见 [评测说明](./docs/phase-10-observability-eval.md)。
 
 个人预览部署见[个人预览部署手册](./docs/personal-preview-deployment.md)；无需自有域名的公网访问见[公网 IP HTTPS 部署手册](./docs/public-ip-https-deployment.md)。
 
@@ -212,7 +212,7 @@ $manifest = '.forgeflow/release/0.12.0-rc.1/release-manifest.json'
 ./scripts/staging-release.ps1 -Release 0.12.0-rc.1 -Manifest $manifest -IncludeBootstrap -ConfirmDeploy
 ```
 
-部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～8 的 Prompt/模型治理、不可变镜像、Staging 部署、运维/安全演练和 Production/发布治理工程准备均为待集中验收。Production 方案见[架构与数据流](./docs/production-architecture.md)、[安全就绪与风险清单](./docs/production-security-readiness.md)、[SLO 与容量](./docs/production-slo-capacity.md)、[数据治理](./docs/production-data-governance.md)和[阶段 8 审计](./docs/stage-8-production-release-audit.md)。正式候选对照、Promotion/rollback、完整镜像、公网 Staging、真实恢复/安全/负载验证尚未执行，因此仍不能据此批准 Production。
+部署拓扑不会公开 API、Worker、数据库或监控端口；只有 Caddy 对外提供 80/443。阶段 3 真实三基线已获人工批准为后续候选对照基线；阶段 4～8 的 Prompt/模型治理、不可变镜像、Staging 部署、运维/安全演练和 Production/发布治理工程准备均为待集中验收。Production 方案见[架构与数据流](./docs/production-architecture.md)、[安全就绪与风险清单](./docs/production-security-readiness.md)、[SLO 与容量](./docs/production-slo-capacity.md)、[数据治理](./docs/production-data-governance.md)。正式候选对照、Promotion/rollback、完整镜像、公网 Staging、真实恢复/安全/负载验证尚未执行，因此仍不能据此批准 Production。
 
 启用真实 Provider 时，在 Worker/当前进程环境中设置 `OPENAI_API_KEY`，并确保目标仓库存在可解析的 Git commit：
 
@@ -264,4 +264,4 @@ ForgeFlow 使用 [Apache License 2.0](./LICENSE) 授权。第三方依赖仍遵�
 
 ## 剩余发布验收
 
-阶段 0～3 已完成，阶段 4～8 工程准备已通过并等待最终集中验收。阶段 9 已建立[集中验收窗口手册](./docs/stage-9-acceptance-window-runbook.md)、冻结计划和串行门禁；可用 `./scripts/stage-9-acceptance-preflight.ps1` 运行无外部副作用的静态预检。2026-09-09 的 v1/v4 smoke 均在 `patch_check` 阻断，当前先合并安全统一 diff 规范化并从新主分支 SHA 重跑 smoke；通过前不得启动正式 Eval。此后仍须依次完成不可变镜像供应链、公网 Staging、恢复/安全/负载演练和最终 Go/No-Go。全部真实证据通过前，不得发布 `v1.0.0` 或开放 Production 流量。准确状态与执行顺序见[后续分阶段路线图](./FORGEFLOW_POST_IMPLEMENTATION_ROADMAP.md)。
+阶段 0～3 已完成，阶段 4～8 工程准备已通过并等待最终集中验收。阶段 9 已建立[集中验收窗口手册](./docs/stage-9-acceptance-window-runbook.md)、冻结计划和串行门禁；可用 `./scripts/stage-9-acceptance-preflight.ps1` 运行无外部副作用的静态预检。2026-09-09 的 v1/v4 smoke 均在 `patch_check` 阻断，当前先合并安全统一 diff 规范化并从新主分支 SHA 重跑 smoke；通过前不得启动正式 Eval。此后仍须依次完成不可变镜像供应链、公网 Staging、恢复/安全/负载演练和最终 Go/No-Go。全部真实证据通过前，不得发布 `v1.0.0` 或开放 Production 流量。验收执行顺序与必需门禁见[集中验收窗口手册](./docs/stage-9-acceptance-window-runbook.md)。开发计划和历史验收记录保留在维护者本地归档中，不随源码发布。

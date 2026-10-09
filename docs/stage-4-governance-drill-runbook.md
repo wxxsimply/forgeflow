@@ -2,7 +2,7 @@
 
 > 状态：操作工具已就绪，尚未执行真实 Promotion/rollback，也未代替 Admin 人工批准或签署。
 
-本手册在路线图阶段 9 的镜像构建、扫描、上传和隔离 Staging API 就绪后执行。阶段 4 只准备命令和检查，见 `docs/stage-4-engineering-readiness.md`。
+本手册在路线图阶段 9 的镜像构建、扫描、上传和隔离 Staging API 就绪后执行。阶段 4 只准备命令和检查，历史准备记录由维护者本地归档。
 
 ## 1. 安全边界
 
@@ -133,7 +133,7 @@ go build -trimpath -ldflags "-X forgeflow/internal/buildinfo.Commit=$releaseComm
 
 ## 8. 人工验收记录
 
-演练完成后，由 Admin 人工向 `docs/stage-4-prompt-model-governance-audit.md` 追加：
+演练完成后，由 Admin 在批准的私有证据存储中追加验收记录，不提交原始记录到 Git：
 
 - UTC 开始/结束时间和操作者。
 - 已批准 Eval Run ID。

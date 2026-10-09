@@ -159,7 +159,7 @@ PR #60 已合并为 `a38cf4b491db947ac32804e47b7aef96d7a4bae0`，四项 GitHub C
 
 ## 前一轮：持久化审批与执行收据（PR #60，已合并）
 
-PR #59 已合并为 `5a952f0b8f1d6b27ec2bbab73f25d3de5305975b`，四项 GitHub CI 均通过。本轮基于该提交建立 `codex/demo-execution-evidence`，新增 [收据模块](../scripts/preview_demo_evidence.py)、[收据测试](../scripts/test_preview_demo_evidence.py)，并接入补丁 CLI；[使用说明](preview-demo-patch-review.md) 已更新。
+PR #59 已合并为 `5a952f0b8f1d6b27ec2bbab73f25d3de5305975b`，四项 GitHub CI 均通过。本轮基于该提交建立 `codex/demo-execution-evidence`，新增 [收据模块](../scripts/preview_demo_evidence.py)、[收据测试](../scripts/test_preview_demo_evidence.py)，并接入补丁 CLI；使用说明（历史记录已本地归档） 已更新。
 
 现在明确分为“只读审查 → 显式创建收据 → 人工批准并消费收据 → 保存测试结果”。`--record-review` 只能创建新文件，不覆盖或自动恢复旧收据；执行必须提供已有 `--evidence-db`。收据绑定任务、原始/候选快照和批准摘要，不允许写在原始源码目录内。
 
@@ -173,7 +173,7 @@ SQLite 使用 `BEGIN IMMEDIATE` 和 `synchronous=FULL`：先提交 `running` 及
 
 ## 前一轮：离线补丁审查入口（PR #59，已合并）
 
-PR #58 已合并为 `9fcb66ba7b0682d0a36a6910cacffa4f3567de5f`，Go、Web、PostgreSQL、部署资产四项检查均通过，包括上一轮修复后的 Git 临时仓库清理测试。本轮基于该提交建立 `codex/demo-patch-review`，新增 [补丁审查工具](../scripts/preview_demo_patch.py)、[离线测试](../scripts/test_preview_demo_patch.py) 和 [使用说明](preview-demo-patch-review.md)。
+PR #58 已合并为 `9fcb66ba7b0682d0a36a6910cacffa4f3567de5f`，Go、Web、PostgreSQL、部署资产四项检查均通过，包括上一轮修复后的 Git 临时仓库清理测试。本轮基于该提交建立 `codex/demo-patch-review`，新增 [补丁审查工具](../scripts/preview_demo_patch.py)、[离线测试](../scripts/test_preview_demo_patch.py) 和 使用说明（历史记录已本地归档）。
 
 通俗解释：先看“准备改什么”，确认后只能测试刚才看过的那份代码。任务、原始四文件或候选内容一旦变化，就需要重新审查，不能沿用旧的批准摘要。
 

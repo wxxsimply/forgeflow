@@ -15,7 +15,6 @@ $assets = [ordered]@{
     service = 'deploy/personal-preview/systemd/forgeflow-preview-observe.service'
     timer = 'deploy/personal-preview/systemd/forgeflow-preview-observe.timer'
     runbook = 'docs/personal-preview-operations.md'
-    plan = 'FORGEFLOW_FORMAL_LAUNCH_PLAN.md'
     workflow = '.github/workflows/deployment.yml'
 }
 foreach ($entry in $assets.GetEnumerator()) {
@@ -71,9 +70,6 @@ $runbook = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.runbook)
 foreach ($contract in @('PERSONAL-005 实施资产已就绪', 'PERSONAL-005 仍未完成', '尚未执行', '不保存或打印原始日志', '不能读取第三方账单', '至少观察 24 小时', 'rollback-plan', '不得执行 `docker compose down`', '不证明服务器定时器或回滚演练已经发生')) {
     Assert-PersonalPreviewOperations ($runbook.Contains($contract)) "Personal preview operations runbook is missing evidence boundary: $contract"
 }
-
-$plan = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.plan)
-Assert-PersonalPreviewOperations ($plan.Contains('| PERSONAL-005 | 仓库防护回归就绪，待服务器实测 |')) 'Formal launch plan must keep PERSONAL-005 pending real execution'
 
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $workspace $assets.workflow)
 foreach ($contract in @('validate-personal-preview-operations.ps1', 'test_personal_preview_operations.py')) {

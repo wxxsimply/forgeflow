@@ -90,7 +90,4 @@ foreach ($Contract in @(
     Assert-Contract ($Runbook.Contains($Contract)) "Personal candidate smoke runbook is missing contract: $Contract"
 }
 
-$Plan = Get-Content -Raw -LiteralPath (Join-Path $Workspace 'FORGEFLOW_FORMAL_LAUNCH_PLAN.md')
-Assert-Contract ($Plan.Contains('PERSONAL-006 | 离线决策写入回归就绪，待付费实测')) 'Formal launch plan must keep PERSONAL-006 pending the authorized paid smoke'
-
 Write-Host 'Personal preview candidate smoke contract validation passed. No provider request was sent.'

@@ -53,8 +53,7 @@
 
 ## 6. 可复核证据
 
-- FORGEFLOW_PERSONAL_PREVIEW_PLAN.md：个人预览部署范围和历史验收。
-- docs/preview-rollout-result.md：实际部署与人工验收记录。
+- 个人预览的历史部署范围、实际部署与人工验收记录保留在维护者本地归档中。
 - deploy/personal-preview/compose.yaml：Planning、Mock、Docker 关闭和仓库挂载契约。
 - scripts/preview_rollout_preflight.py：真实运行时的只读边界检查。
 - scripts/validate-personal-preview-scope.ps1：仓库级边界防漂移检查。
