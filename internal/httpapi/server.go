@@ -24,6 +24,7 @@ import (
 	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
+	"forgeflow/internal/controlleddev"
 	"forgeflow/internal/controlplane"
 	"forgeflow/internal/domain"
 	"forgeflow/internal/governance"
@@ -40,27 +41,28 @@ const CSRFCookie = "forgeflow_csrf"
 var specFS embed.FS
 
 type Options struct {
-	Auth                *auth.Service
-	Registration        *registration.Service
-	Control             *controlplane.Store
-	Runs                *application.Service
-	Artifacts           artifact.Store
-	Inspector           *repoharness.GitInspector
-	CookieSecure        bool
-	CookieDomain        string
-	CookieMaxAge        time.Duration
-	AllowedOrigins      []string
-	RepositoryRoots     []string
-	MutationLimiter     auth.Limiter
-	RegistrationLimiter auth.Limiter
-	MetricsEnabled      bool
-	ServiceVersion      string
-	GitCommit           string
-	Governance          *governance.Store
-	Catalog             *governance.Catalog
-	UserData            *userdata.Service
-	ExternalAudit       audit.Appender
-	AuditIntegrityKey   []byte
+	Auth                  *auth.Service
+	Registration          *registration.Service
+	Control               *controlplane.Store
+	Runs                  *application.Service
+	ControlledDevelopment *controlleddev.Policy
+	Artifacts             artifact.Store
+	Inspector             *repoharness.GitInspector
+	CookieSecure          bool
+	CookieDomain          string
+	CookieMaxAge          time.Duration
+	AllowedOrigins        []string
+	RepositoryRoots       []string
+	MutationLimiter       auth.Limiter
+	RegistrationLimiter   auth.Limiter
+	MetricsEnabled        bool
+	ServiceVersion        string
+	GitCommit             string
+	Governance            *governance.Store
+	Catalog               *governance.Catalog
+	UserData              *userdata.Service
+	ExternalAudit         audit.Appender
+	AuditIntegrityKey     []byte
 }
 
 type Server struct {
@@ -80,6 +82,11 @@ func New(options Options) (*Server, error) {
 	}
 	if options.ExternalAudit != nil && len(options.AuditIntegrityKey) != 32 {
 		return nil, fmt.Errorf("external audit integrity key must contain exactly 32 bytes")
+	}
+	if options.ControlledDevelopment != nil {
+		if err := options.ControlledDevelopment.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	if options.CookieMaxAge <= 0 {
 		options.CookieMaxAge = 24 * time.Hour
@@ -700,6 +707,20 @@ func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, notFound(err))
 		return
 	}
+	var budget *domain.RunBudget
+	if policy := s.options.ControlledDevelopment; policy != nil {
+		if !policy.Allows(p.User, repo.LocalPath) {
+			s.fail(w, r, forbidden())
+			return
+		}
+		if in.MaxIterations > 1 {
+			s.fail(w, r, validation("controlled development permits one iteration without automatic repair"))
+			return
+		}
+		limited := policy.Budget()
+		budget = &limited
+		in.MaxIterations = 1
+	}
 	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if len(key) > 128 {
 		s.fail(w, r, validation("Idempotency-Key is too long"))
@@ -709,7 +730,7 @@ func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = repo.DefaultBranch
 	}
-	state, err := s.options.Runs.CreateQueued(r.Context(), application.CreateInput{OwnerID: p.User.ID, RepositoryID: repo.ID, Task: in.Task, RepositoryPath: repo.LocalPath, BaseRevision: base, MaxIterations: in.MaxIterations, IdempotencyKey: key, RequestBody: body})
+	state, err := s.options.Runs.CreateQueued(r.Context(), application.CreateInput{OwnerID: p.User.ID, RepositoryID: repo.ID, Task: in.Task, RepositoryPath: repo.LocalPath, BaseRevision: base, MaxIterations: in.MaxIterations, Budget: budget, IdempotencyKey: key, RequestBody: body})
 	if err != nil {
 		s.fail(w, r, err)
 		return
