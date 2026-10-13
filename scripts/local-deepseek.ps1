@@ -253,6 +253,7 @@ try {
     )
     $records | ConvertTo-Json | Set-Content -LiteralPath $processFile -Encoding utf8
     Write-Host 'Local ForgeFlow is ready at http://127.0.0.1:5173'
+    Write-Host "Allowed repository path: $repository"
     Write-Host "Login: $adminEmail; password file: $adminPasswordFile"
     Write-Host 'Only the Worker receives the DeepSeek key file. This setup is for your own computer, not a public server.'
 } catch {

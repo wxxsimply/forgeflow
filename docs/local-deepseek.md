@@ -23,7 +23,7 @@ notepad .forgeflow\local\secrets\deepseek_api_key
 pwsh -NoProfile -File ./scripts/local-deepseek.ps1 -Action start
 ```
 
-首次启动会构建本地命令沙箱与 Go 程序、安装 Web 依赖、启动私有 PostgreSQL、迁移数据库和创建本地管理员。打开 <http://127.0.0.1:5173>，使用 `admin@forgeflow.local` 登录；密码从 `.forgeflow/local/secrets/bootstrap_admin_password` 在你自己的电脑上读取。本机模式不开放自助注册。登记启动脚本允许的干净克隆仓库绝对路径，再创建任务并按页面要求批准计划、审查补丁。**提交任务时就可能产生规划调用费用**；仓库源码和任务片段会发送给 DeepSeek。修改仅进入受管 Git worktree，仍需你审查最终产物。
+首次启动会构建本地命令沙箱与 Go 程序、安装 Web 依赖、启动私有 PostgreSQL、迁移数据库和创建本地管理员。打开 <http://127.0.0.1:5173>，使用 `admin@forgeflow.local` 登录；密码从 `.forgeflow/local/secrets/bootstrap_admin_password` 在你自己的电脑上读取。本机模式不开放自助注册。登记仓库时，直接复制启动输出中的 `Allowed repository path` 绝对路径；该仓库必须保持干净，再创建任务并按页面要求批准计划、审查补丁。**提交任务时就可能产生规划调用费用**；仓库源码和任务片段会发送给 DeepSeek。修改仅进入受管 Git worktree，仍需你审查最终产物。
 
 启动脚本固定 `deepseek-flash`、单轮最多 4 次模型调用、零自动重试，并在每次付费调用前检查该密钥所属账户的余额。余额查询失败、不是仅人民币余额、没有余额或余额超过 5 元时会拒绝调用。**不要用高余额主账户密钥测试。** 本机完整流程仍可能因模型输出、网络、依赖或测试失败而不能完成任务；本项目不承诺任意需求都可自动交付。
 
