@@ -78,6 +78,27 @@ func TestDockerRunnerRejectsEscapesSecretsShellsAndUnpinnedImages(t *testing.T) 
 	}
 }
 
+func TestLocalImageIDRequiresExplicitOptIn(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "run-1")
+	makeDirectory(t, workspace)
+	image := "sha256:" + strings.Repeat("a", 64)
+	if _, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{image}}); err == nil {
+		t.Fatal("local image ID was accepted without opt-in")
+	}
+	runner, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{image}, AllowLocalImageID: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, _, err := runner.BuildArgs(Request{Image: image, WorkspacePath: workspace, Program: "go"})
+	if err != nil || !slices.Contains(args, image) {
+		t.Fatalf("local image ID was not bound to the allowlist: args=%v err=%v", args, err)
+	}
+	if _, err := NewDockerRunner(DockerConfig{WorkspaceRoot: root, AllowedImages: []string{"sha256:" + strings.Repeat("g", 64)}, AllowLocalImageID: true}); err == nil {
+		t.Fatal("malformed local image ID was accepted")
+	}
+}
+
 func TestDockerRunnerRejectsWorkspaceSymlinkEscape(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation semantics require the Linux CI environment")

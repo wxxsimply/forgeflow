@@ -272,7 +272,8 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 	runner, err := sandbox.NewDockerRunner(sandbox.DockerConfig{
 		Enabled: configuration.DockerEnabled, Binary: configuration.DockerBinary,
 		WorkspaceRoot: configuration.SandboxWorkspaceRoot, AllowedImages: []string{configuration.SandboxImage},
-		CPUs: configuration.SandboxCPUs, Memory: configuration.SandboxMemory, PIDsLimit: configuration.SandboxPIDsLimit,
+		AllowLocalImageID: configuration.Environment == "development" && configuration.WorkflowMode == "controlled_development",
+		CPUs:              configuration.SandboxCPUs, Memory: configuration.SandboxMemory, PIDsLimit: configuration.SandboxPIDsLimit,
 		TmpfsSizeBytes: int64(configuration.SandboxTmpfsBytes), MaxOutputBytes: int64(configuration.SandboxMaxOutputBytes), MaxTimeout: configuration.SandboxTimeout,
 	})
 	if err != nil {

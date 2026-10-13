@@ -202,6 +202,16 @@ func TestControlledDevelopmentIsFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	configuration.SandboxImage = "sha256:" + strings.Repeat("a", 64)
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("local development image ID was rejected: %v", err)
+	}
+	configuration.Environment = "staging"
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("staging accepted a local image ID")
+	}
+	configuration.Environment = "development"
+	configuration.SandboxImage = "example.test/sandbox@sha256:" + strings.Repeat("a", 64)
 	for _, mutate := range []func(*Config){
 		func(c *Config) { c.ControlledAdminEmail = "" },
 		func(c *Config) { c.ControlledRepositoryPath = "relative" },

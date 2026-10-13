@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { APIError, registerAccount, requestRegistrationCode } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { localControlledDevelopment } from '../config/localMode';
 
 export function RegisterPage() {
   const { user, loading } = useAuth();
@@ -57,6 +58,8 @@ export function RegisterPage() {
       else setError('暂时无法注册，请检查网络后重试。');
     } finally { setSubmitting(false); }
   }
+
+  if (localControlledDevelopment) return <main className="login-page"><section className="login-panel"><div className="login-card"><span className="eyebrow">本机运行</span><h2>使用管理员账号登录</h2><p className="login-card__intro">本机受控开发不开放自助注册。账号为 admin@forgeflow.local，密码位于初始化脚本生成的本机密码文件。</p><Link className="primary-button" to="/login">返回登录</Link></div></section></main>;
 
   return <main className="login-page">
     <section className="login-story" aria-label="ForgeFlow 产品介绍">

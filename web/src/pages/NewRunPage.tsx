@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { errorMessage } from '../utils/labels';
 import { MAX_TASK_BYTES, taskByteLength } from '../utils/taskInput';
+import { localControlledDevelopment } from '../config/localMode';
 
 export function NewRunPage() {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export function NewRunPage() {
   const taskBytes = taskByteLength(task);
   const taskTooLong = taskBytes > MAX_TASK_BYTES;
   const [baseRevision, setBaseRevision] = useState('');
-  const [maxIterations, setMaxIterations] = useState(2);
+  const [maxIterations, setMaxIterations] = useState(localControlledDevelopment ? 1 : 2);
   const [showRepositoryForm, setShowRepositoryForm] = useState(false);
   const [repository, setRepository] = useState({ name: '', localPath: '', defaultBranch: 'HEAD' });
 
@@ -40,7 +41,7 @@ export function NewRunPage() {
     onSuccess: (run) => navigate(`/runs/${run.runId}`),
   });
 
-  if (user?.role === 'viewer') return <div className="page"><PageState tone="danger" title="只读账号无法创建任务" detail="请使用管理员或操作员账号执行变更任务。" action={<Link className="secondary-button" to="/runs">返回任务列表</Link>} /></div>;
+  if (user?.role === 'viewer' || (localControlledDevelopment && user?.role !== 'admin')) return <div className="page"><PageState tone="danger" title="当前账号无法创建任务" detail={localControlledDevelopment ? '本机受控开发仅允许管理员账号。' : '请使用管理员或操作员账号执行变更任务。'} action={<Link className="secondary-button" to="/runs">返回任务列表</Link>} /></div>;
   if (repositories.isPending) return <div className="page"><LoadingRows count={5} /></div>;
   if (repositories.error) return <div className="page"><PageState tone="danger" title="无法加载仓库" detail="请检查服务连接后重试。" /></div>;
   const items = repositories.data.items;
@@ -57,11 +58,11 @@ export function NewRunPage() {
 
   return <div className="page narrow-page">
     <Link className="back-link" to="/runs">← 返回任务列表</Link>
-    <div className="page-heading"><div><span className="eyebrow">模拟规划与审批</span><h1>创建任务</h1><p>选择受控仓库并描述任务；本页不会启动真实模型或代码执行。</p></div></div>
+    <div className="page-heading"><div><span className="eyebrow">{localControlledDevelopment ? '本机真实开发与审批' : '模拟规划与审批'}</span><h1>创建任务</h1><p>{localControlledDevelopment ? '选择启动脚本允许的本机仓库；提交后会开始真实规划，请先确认密钥余额与任务范围。' : '选择受控仓库并描述任务；本页不会启动真实模型或代码执行。'}</p></div></div>
     <aside className="scope-callout" aria-labelledby="run-scope-title">
       <span className="eyebrow">提交后会发生什么</span>
-      <strong id="run-scope-title">本页创建模拟规划任务</strong>
-      <p>你可以检查计划、批准或拒绝并查看记录；系统不会修改仓库、运行测试或产生模型费用。页面中的预算仅展示配置上限，不是付款或真实调用授权。</p>
+      <strong id="run-scope-title">{localControlledDevelopment ? '提交即可能产生模型费用' : '本页创建模拟规划任务'}</strong>
+      <p>{localControlledDevelopment ? '提交后 Worker 会用本机密钥调用 DeepSeek 生成计划；批准后才会继续开发和审查。改动进入隔离工作区，不会自动上线。请不要提交含敏感数据的仓库。' : '你可以检查计划、批准或拒绝并查看记录；系统不会修改仓库、运行测试或产生模型费用。页面中的预算仅展示配置上限，不是付款或真实调用授权。'}</p>
     </aside>
     <form className="panel form-panel" onSubmit={submitRun}>
       <div className="form-section">
@@ -77,7 +78,7 @@ export function NewRunPage() {
       {showRepositoryForm && <fieldset className="nested-form">
         <legend>登记仓库</legend>
         <label htmlFor="repo-name">名称</label><input id="repo-name" value={repository.name} onChange={(e) => setRepository({ ...repository, name: e.target.value })} required />
-        <label htmlFor="repo-path">服务端仓库绝对路径</label><input id="repo-path" value={repository.localPath} onChange={(e) => setRepository({ ...repository, localPath: e.target.value })} placeholder="例如 /repositories/project" required />
+        <label htmlFor="repo-path">{localControlledDevelopment ? '本机仓库绝对路径' : '服务端仓库绝对路径'}</label><input id="repo-path" value={repository.localPath} onChange={(e) => setRepository({ ...repository, localPath: e.target.value })} placeholder={localControlledDevelopment ? '例如 D:\\Code\\forgeflow' : '例如 /repositories/project'} required />
         <label htmlFor="repo-branch">默认基线</label><input id="repo-branch" value={repository.defaultBranch} onChange={(e) => setRepository({ ...repository, defaultBranch: e.target.value })} />
         {registerMutation.error && <ErrorMessage error={registerMutation.error} />}
         <button className="secondary-button" type="button" disabled={registerMutation.isPending || !repository.name.trim() || !repository.localPath.trim()} onClick={submitRepository}>{registerMutation.isPending ? '登记中…' : '登记仓库'}</button>
@@ -93,13 +94,16 @@ export function NewRunPage() {
       <div className="form-section form-section--split">
         <div className="section-number">03</div><div className="form-section__body">
           <label htmlFor="base-revision">基线版本（可选）</label><input id="base-revision" value={baseRevision} onChange={(event) => setBaseRevision(event.target.value)} placeholder="留空使用仓库默认基线" />
-          <label htmlFor="max-iterations">最大迭代次数</label><input id="max-iterations" type="number" min={1} max={10} value={maxIterations} onChange={(event) => setMaxIterations(Number(event.target.value))} />
+          {localControlledDevelopment ? <p className="field-hint">本机受控模式固定为 1 次迭代，不会自动修复重试。</p> : <><label htmlFor="max-iterations">最大迭代次数</label><input id="max-iterations" type="number" min={1} max={10} value={maxIterations} onChange={(event) => setMaxIterations(Number(event.target.value))} /></>}
         </div>
-        <aside className="budget-card" aria-label="默认配置上限（当前预览不消耗）">
+        {localControlledDevelopment ? <aside className="budget-card" aria-label="本机受控开发限制">
+          <span className="eyebrow">付费调用</span><strong>最多 4 次模型调用</strong>
+          <p className="budget-card__note">单轮无自动修复；每次调用前检查 DeepSeek 账户余额须在 0–5 元之间。余额检查和估算不是精确费用硬上限；请使用关闭自动充值的低余额专用密钥。</p>
+        </aside> : <aside className="budget-card" aria-label="默认配置上限（当前预览不消耗）">
           <span className="eyebrow">配置上限</span><strong>当前为模拟流程</strong>
           <p className="budget-card__note">最多 {maxIterations} 次流程迭代；以下限制不会授权或触发真实调用。</p>
           <ul><li>模型调用 20 次</li><li>工具调用 200 次</li><li>改动文件 32 个</li><li>差异 4,000 行 / 1 MiB</li><li>预计成本上限 $10</li><li>最长 30 分钟</li></ul>
-        </aside>
+        </aside>}
       </div>
       {runMutation.error && <ErrorMessage error={runMutation.error} />}
       <div className="form-actions"><Link className="secondary-button" to="/runs">取消</Link><button className="primary-button primary-button--fit" disabled={!repositoryId || !task.trim() || taskTooLong || runMutation.isPending}>{runMutation.isPending ? '正在创建…' : '创建并查看任务'}</button></div>

@@ -23,16 +23,19 @@ import (
 )
 
 type DockerConfig struct {
-	Enabled        bool
-	Binary         string
-	WorkspaceRoot  string
-	AllowedImages  []string
-	CPUs           string
-	Memory         string
-	PIDsLimit      int
-	TmpfsSizeBytes int64
-	MaxOutputBytes int64
-	MaxTimeout     time.Duration
+	Enabled       bool
+	Binary        string
+	WorkspaceRoot string
+	AllowedImages []string
+	// AllowLocalImageID is only for a locally built, content-addressed image
+	// on a developer's own Docker daemon. Production keeps registry digests.
+	AllowLocalImageID bool
+	CPUs              string
+	Memory            string
+	PIDsLimit         int
+	TmpfsSizeBytes    int64
+	MaxOutputBytes    int64
+	MaxTimeout        time.Duration
 }
 
 type DockerRunner struct {
@@ -62,7 +65,7 @@ func NewDockerRunner(configuration DockerConfig) (*DockerRunner, error) {
 	}
 	allowedImages := make(map[string]struct{}, len(configuration.AllowedImages))
 	for _, image := range configuration.AllowedImages {
-		if !pinnedImagePattern.MatchString(image) {
+		if !pinnedImagePattern.MatchString(image) && !(configuration.AllowLocalImageID && localImageIDPattern.MatchString(image)) {
 			return nil, apperror.New(apperror.CodeValidation, "sandbox images must be pinned by sha256 digest")
 		}
 		allowedImages[image] = struct{}{}
@@ -303,6 +306,7 @@ func (b *limitedBuffer) Write(data []byte) (int, error) {
 func (b *limitedBuffer) String() string { return b.buffer.String() }
 
 var pinnedImagePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._/:@-]*@sha256:[a-f0-9]{64}$`)
+var localImageIDPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 var programPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$`)
 var environmentNamePattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 var memoryLimitPattern = regexp.MustCompile(`^[1-9][0-9]*(?:[kKmMgG])?$`)

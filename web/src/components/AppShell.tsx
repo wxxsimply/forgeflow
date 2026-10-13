@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import type { User } from '../api/client';
 import { roleLabel } from '../utils/labels';
+import { localControlledDevelopment } from '../config/localMode';
 
 export function AppShell() {
   const { user, signOut } = useAuth();
@@ -13,7 +14,7 @@ export function AppShell() {
     <aside className="sidebar">
       <NavLink to="/runs" className="brand" aria-label="ForgeFlow 任务列表"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>可控交付</small></span></NavLink>
       <nav aria-label="主导航">
-        {user?.role !== 'viewer' && <NavLink to="/runs/new" className={navClass}><PlusIcon /><span>新建任务</span></NavLink>}
+        {(user?.role === 'admin' || (!localControlledDevelopment && user?.role === 'operator')) && <NavLink to="/runs/new" className={navClass}><PlusIcon /><span>新建任务</span></NavLink>}
         <NavLink to="/runs" end className={navClass}><RunIcon /><span>运行任务</span></NavLink>
         <NavLink to="/approvals" className={navClass}><ApprovalIcon /><span>审批中心</span></NavLink>
         <NavLink to="/evals" className={navClass}><EvalIcon /><span>评测报告</span></NavLink>
@@ -33,6 +34,16 @@ export function AppShell() {
 function PreviewScopeNotice({ role }: { role?: User['role'] }) {
   const [expanded, setExpanded] = useState(false);
   const canCreate = role === 'admin' || role === 'operator';
+  if (localControlledDevelopment) return <section className="preview-scope" aria-labelledby="preview-scope-title">
+    <div className="preview-scope__title"><span className="eyebrow">本机运行 · 受控真实开发</span><h2 id="preview-scope-title">仅管理员可在允许的本地仓库运行真实开发任务。</h2><p>批准后会调用你配置的 DeepSeek 密钥，并在隔离工作区修改代码、运行测试；不会自动发布到服务器。</p></div>
+    <button className="preview-scope__toggle" type="button" aria-expanded={expanded} aria-controls="preview-scope-details" onClick={() => setExpanded((value) => !value)}>{expanded ? '收起详细说明' : '查看运行范围'} <span aria-hidden="true">{expanded ? '↑' : '↓'}</span></button>
+    <div id="preview-scope-details" className={`preview-scope__items${expanded ? ' preview-scope__items--expanded' : ''}`}>
+      <article><strong>准备任务</strong><p>登记启动脚本允许的干净 Git 仓库，描述改动并检查计划。</p></article>
+      <article><strong>人工审批</strong><p>按页面步骤批准计划和补丁；模型调用会产生费用，且结果需要人工复核。</p></article>
+      <article><strong>安全边界</strong><p>只允许本机管理员、单个仓库及最多 4 次模型调用；不会自动部署。</p></article>
+    </div>
+    {role === 'admin' ? <NavLink className="preview-scope__action" to="/runs/new">创建本地开发任务 <span aria-hidden="true">→</span></NavLink> : <p className="preview-scope__readonly">当前账号不能发起本机受控开发任务。</p>}
+  </section>;
   return <section className="preview-scope" aria-labelledby="preview-scope-title">
     <div className="preview-scope__title"><span className="eyebrow">产品说明 · 当前为模拟预览</span><h2 id="preview-scope-title">ForgeFlow 管理 AI 辅助开发任务的计划、审批与执行记录。</h2><p>当前网页只模拟这套流程，不会调用模型或修改代码。</p></div>
     <button className="preview-scope__toggle" type="button" aria-expanded={expanded} aria-controls="preview-scope-details" onClick={() => setExpanded((value) => !value)}>{expanded ? '收起详细说明' : '查看预览范围'} <span aria-hidden="true">{expanded ? '↑' : '↓'}</span></button>
