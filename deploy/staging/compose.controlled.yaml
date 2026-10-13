@@ -1,0 +1,38 @@
+# Experimental admin-only development overlay. Never apply to the public
+# personal-preview stack. Combine with compose.yaml and compose.openai.yaml on
+# a separately sized and isolated staging/execution host.
+services:
+  api:
+    environment:
+      FORGEFLOW_CONTROLLED_DEVELOPMENT_API: "true"
+      FORGEFLOW_CONTROLLED_ADMIN_EMAIL: ${FORGEFLOW_CONTROLLED_ADMIN_EMAIL:?FORGEFLOW_CONTROLLED_ADMIN_EMAIL is required}
+      FORGEFLOW_CONTROLLED_REPOSITORY_PATH: /repositories/demo
+      FORGEFLOW_MODEL_PROVIDER: deepseek
+      FORGEFLOW_PLANNER_MODEL: deepseek-flash
+      FORGEFLOW_DEVELOPER_MODEL: deepseek-flash
+      FORGEFLOW_REVIEWER_MODEL: deepseek-flash
+      FORGEFLOW_SECURITY_MODEL: deepseek-flash
+
+  worker:
+    environment:
+      FORGEFLOW_WORKFLOW_MODE: controlled_development
+      FORGEFLOW_CONTROLLED_ADMIN_EMAIL: ${FORGEFLOW_CONTROLLED_ADMIN_EMAIL:?FORGEFLOW_CONTROLLED_ADMIN_EMAIL is required}
+      FORGEFLOW_CONTROLLED_REPOSITORY_PATH: /repositories/demo
+      FORGEFLOW_MODEL_PROVIDER: deepseek
+      FORGEFLOW_OPENAI_BASE_URL: https://api.deepseek.com
+      FORGEFLOW_OPENAI_MAX_RETRIES: "0"
+      FORGEFLOW_PLANNER_MODEL: deepseek-flash
+      FORGEFLOW_DEVELOPER_MODEL: deepseek-flash
+      FORGEFLOW_REVIEWER_MODEL: deepseek-flash
+      FORGEFLOW_SECURITY_MODEL: deepseek-flash
+      # Current published peak cache-miss/input and output USD per million
+      # token rates. Revalidate before any future paid acceptance run.
+      FORGEFLOW_PLANNER_INPUT_USD_PER_MTOK: "0.3"
+      FORGEFLOW_PLANNER_OUTPUT_USD_PER_MTOK: "1.2"
+      FORGEFLOW_PLANNER_MAX_OUTPUT_TOKENS: "4096"
+      FORGEFLOW_DEVELOPER_MAX_OUTPUT_TOKENS: "8000"
+      FORGEFLOW_REVIEWER_MAX_OUTPUT_TOKENS: "3000"
+      FORGEFLOW_SECURITY_MAX_OUTPUT_TOKENS: "3000"
+      FORGEFLOW_DEVELOPER_CONTEXT_MAX_BYTES: "65536"
+      FORGEFLOW_REVIEWER_CONTEXT_MAX_BYTES: "65536"
+      FORGEFLOW_SECURITY_CONTEXT_MAX_BYTES: "65536"

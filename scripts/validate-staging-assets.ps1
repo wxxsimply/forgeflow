@@ -43,6 +43,17 @@ Assert-StagingAsset ($openAICompose.Contains('${DOCKER_DIND_IMAGE:?DOCKER_DIND_I
 Assert-StagingAsset ($openAICompose -match 'OPENAI_API_KEY_FILE') 'OpenAI key must be injected through a Worker-only secret file'
 Assert-StagingAsset ($openAICompose -notmatch 'docker\.sock') 'OpenAI overlay must not mount the host Docker socket'
 
+$controlledCompose = Get-Content -Raw -LiteralPath (Join-Path $workspace 'deploy/staging/compose.controlled.yaml')
+$controlledApi = [regex]::Match($controlledCompose, '(?ms)^  api:\r?\n(?<body>.*?)(?=^  worker:)')
+$controlledWorker = [regex]::Match($controlledCompose, '(?ms)^  worker:\r?\n(?<body>.*)$')
+Assert-StagingAsset ($controlledApi.Success -and $controlledWorker.Success) 'Controlled overlay requires separate API and Worker blocks'
+Assert-StagingAsset ($controlledApi.Groups['body'].Value.Contains('FORGEFLOW_CONTROLLED_DEVELOPMENT_API: "true"')) 'Controlled API guard must be enabled'
+Assert-StagingAsset ($controlledApi.Groups['body'].Value -notmatch 'OPENAI_API_KEY|DOCKER_HOST|DOCKER_CERT_PATH') 'Controlled API must not receive model or Docker credentials'
+foreach ($contract in @('FORGEFLOW_WORKFLOW_MODE: controlled_development', 'FORGEFLOW_OPENAI_MAX_RETRIES: "0"', 'FORGEFLOW_MODEL_PROVIDER: deepseek', 'FORGEFLOW_CONTROLLED_REPOSITORY_PATH: /repositories/demo')) {
+    Assert-StagingAsset ($controlledWorker.Groups['body'].Value.Contains($contract)) "Controlled Worker is missing $contract"
+}
+Assert-StagingAsset ($controlledCompose -notmatch 'docker\.sock') 'Controlled overlay must not mount the host Docker socket'
+
 $environmentTemplate = Get-Content -Raw -LiteralPath (Join-Path $workspace 'deploy/staging/staging.env.example')
 foreach ($variable in @('FORGEFLOW_API_IMAGE', 'FORGEFLOW_WORKER_IMAGE', 'FORGEFLOW_WEB_IMAGE', 'FORGEFLOW_CADDY_IMAGE', 'FORGEFLOW_SANDBOX_IMAGE', 'POSTGRES_IMAGE', 'OTEL_COLLECTOR_IMAGE', 'PROMETHEUS_IMAGE', 'ALERTMANAGER_IMAGE', 'DOCKER_DIND_IMAGE')) {
     Assert-StagingAsset ($environmentTemplate -match "(?m)^$variable=[^\r\n]+@sha256:<digest>$") "$variable template must require an immutable digest"

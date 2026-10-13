@@ -39,6 +39,9 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 		"FORGEFLOW_LOG_LEVEL",
 		"FORGEFLOW_DATA_DIR",
 		"FORGEFLOW_WORKFLOW_MODE",
+		"FORGEFLOW_CONTROLLED_DEVELOPMENT_API",
+		"FORGEFLOW_CONTROLLED_ADMIN_EMAIL",
+		"FORGEFLOW_CONTROLLED_REPOSITORY_PATH",
 		"FORGEFLOW_PLANNER_MODE",
 		"FORGEFLOW_MODEL_PROVIDER",
 		"FORGEFLOW_OPENAI_MAX_RETRIES",
@@ -174,6 +177,71 @@ func TestLoadUsesDefaultsForEmptyValues(t *testing.T) {
 	}
 	if configuration.PlannerModel != "gpt-5.6" || configuration.PlannerPromptVersion != "planner/v1" || configuration.PlannerTimeout.String() != "2m0s" {
 		t.Fatalf("planner defaults = model %q prompt %q timeout %s", configuration.PlannerModel, configuration.PlannerPromptVersion, configuration.PlannerTimeout)
+	}
+}
+
+func TestControlledDevelopmentIsFailClosed(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "development")
+	t.Setenv("FORGEFLOW_WORKFLOW_MODE", "controlled_development")
+	t.Setenv("FORGEFLOW_PLANNER_MODE", "openai")
+	t.Setenv("FORGEFLOW_MODEL_PROVIDER", "deepseek")
+	t.Setenv("FORGEFLOW_OPENAI_BASE_URL", "https://api.deepseek.com")
+	t.Setenv("OPENAI_API_KEY", "test-only-key")
+	t.Setenv("FORGEFLOW_OPENAI_MAX_RETRIES", "0")
+	t.Setenv("FORGEFLOW_CONTROLLED_ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("FORGEFLOW_CONTROLLED_REPOSITORY_PATH", filepath.Join(t.TempDir(), "demo"))
+	t.Setenv("FORGEFLOW_PLANNER_MODEL", "deepseek-flash")
+	t.Setenv("FORGEFLOW_DEVELOPER_MODEL", "deepseek-flash")
+	t.Setenv("FORGEFLOW_REVIEWER_MODEL", "deepseek-flash")
+	t.Setenv("FORGEFLOW_SECURITY_MODEL", "deepseek-flash")
+	t.Setenv("FORGEFLOW_PLANNER_INPUT_USD_PER_MTOK", "0.3")
+	t.Setenv("FORGEFLOW_PLANNER_OUTPUT_USD_PER_MTOK", "1.2")
+	t.Setenv("FORGEFLOW_DOCKER_ENABLED", "true")
+	t.Setenv("FORGEFLOW_SANDBOX_IMAGE", "example.test/sandbox@sha256:"+strings.Repeat("a", 64))
+	configuration, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*Config){
+		func(c *Config) { c.ControlledAdminEmail = "" },
+		func(c *Config) { c.ControlledRepositoryPath = "relative" },
+		func(c *Config) { c.OpenAIMaxRetries = 2 },
+		func(c *Config) { c.PlannerModel = "deepseekv4-flash" },
+		func(c *Config) { c.PlannerInputUSDPerMTok = 0 },
+		func(c *Config) { c.DockerEnabled = false },
+	} {
+		candidate := configuration
+		mutate(&candidate)
+		if err := candidate.Validate(); err == nil {
+			t.Fatalf("unsafe controlled development configuration was accepted: %+v", candidate)
+		}
+	}
+}
+
+func TestControlledAPIDoesNotNeedWorkerCredentials(t *testing.T) {
+	t.Setenv("FORGEFLOW_ENV", "development")
+	t.Setenv("FORGEFLOW_WORKFLOW_MODE", "planning")
+	t.Setenv("FORGEFLOW_CONTROLLED_DEVELOPMENT_API", "true")
+	t.Setenv("FORGEFLOW_CONTROLLED_ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("FORGEFLOW_CONTROLLED_REPOSITORY_PATH", filepath.Join(t.TempDir(), "demo"))
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("OPENAI_API_KEY_FILE", "")
+	t.Setenv("FORGEFLOW_DOCKER_ENABLED", "false")
+	configuration, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !configuration.ControlledDevelopmentAPI || configuration.OpenAIAPIKey != "" || configuration.DockerEnabled {
+		t.Fatal("controlled API unexpectedly acquired execution credentials")
+	}
+	configuration.ControlledAdminEmail = ""
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("controlled API accepted missing administrator allowlist")
+	}
+	configuration.ControlledAdminEmail = "admin@example.com"
+	configuration.OpenAIAPIKey = "test-only-key"
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("controlled API accepted a model credential")
 	}
 }
 

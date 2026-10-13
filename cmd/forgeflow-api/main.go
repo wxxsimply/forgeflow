@@ -18,6 +18,7 @@ import (
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
+	"forgeflow/internal/controlleddev"
 	"forgeflow/internal/controlplane"
 	"forgeflow/internal/governance"
 	"forgeflow/internal/httpapi"
@@ -122,7 +123,11 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
-	api, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runService, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: externalAudit, AuditIntegrityKey: configuration.AuditIntegrityKey})
+	var controlledPolicy *controlleddev.Policy
+	if configuration.ControlledDevelopmentAPI {
+		controlledPolicy = &controlleddev.Policy{AdminEmail: configuration.ControlledAdminEmail, RepositoryPath: configuration.ControlledRepositoryPath}
+	}
+	api, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runService, ControlledDevelopment: controlledPolicy, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: configuration.HTTPCookieSecure, CookieDomain: configuration.HTTPCookieDomain, CookieMaxAge: configuration.SessionTTL, AllowedOrigins: configuration.HTTPAllowedOrigins, RepositoryRoots: configuration.RepositoryRoots, MetricsEnabled: configuration.MetricsEnabled, ServiceVersion: configuration.ServiceVersion, GitCommit: buildinfo.Commit, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: externalAudit, AuditIntegrityKey: configuration.AuditIntegrityKey})
 	if err != nil {
 		return err
 	}

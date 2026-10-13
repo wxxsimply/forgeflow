@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"forgeflow/internal/controlleddev"
 )
 
 type Config struct {
@@ -39,6 +41,9 @@ type Config struct {
 	BootstrapAdminPassword                string
 	DataDir                               string
 	WorkflowMode                          string
+	ControlledDevelopmentAPI              bool
+	ControlledAdminEmail                  string
+	ControlledRepositoryPath              string
 	PlannerMode                           string
 	ModelProvider                         string
 	OpenAIAPIKey                          string
@@ -355,6 +360,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	controlledDevelopmentAPI, err := envBool("FORGEFLOW_CONTROLLED_DEVELOPMENT_API", false)
+	if err != nil {
+		return Config{}, err
+	}
 	dataDirectory := envOrDefault("FORGEFLOW_DATA_DIR", ".forgeflow")
 	bootstrapAdminPassword, err := envOrFile("FORGEFLOW_BOOTSTRAP_ADMIN_PASSWORD")
 	if err != nil {
@@ -388,8 +397,11 @@ func Load() (Config, error) {
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("FORGEFLOW_BOOTSTRAP_ADMIN_EMAIL")),
 		BootstrapAdminPassword: bootstrapAdminPassword,
 		DataDir:                dataDirectory, WorkflowMode: envOrDefault("FORGEFLOW_WORKFLOW_MODE", "planning"), PlannerMode: envOrDefault("FORGEFLOW_PLANNER_MODE", "mock"),
-		ModelProvider: envOrDefault("FORGEFLOW_MODEL_PROVIDER", "openai"),
-		OpenAIAPIKey:  strings.TrimSpace(openAIAPIKey), OpenAIBaseURL: envOrDefault("FORGEFLOW_OPENAI_BASE_URL", "https://api.openai.com/v1"),
+		ControlledDevelopmentAPI: controlledDevelopmentAPI,
+		ControlledAdminEmail:     strings.TrimSpace(os.Getenv("FORGEFLOW_CONTROLLED_ADMIN_EMAIL")),
+		ControlledRepositoryPath: strings.TrimSpace(os.Getenv("FORGEFLOW_CONTROLLED_REPOSITORY_PATH")),
+		ModelProvider:            envOrDefault("FORGEFLOW_MODEL_PROVIDER", "openai"),
+		OpenAIAPIKey:             strings.TrimSpace(openAIAPIKey), OpenAIBaseURL: envOrDefault("FORGEFLOW_OPENAI_BASE_URL", "https://api.openai.com/v1"),
 		OpenAIOrganization: strings.TrimSpace(os.Getenv("OPENAI_ORGANIZATION")), OpenAIProject: strings.TrimSpace(os.Getenv("OPENAI_PROJECT")),
 		OpenAIMaxRetries: maxRetries, PlannerModel: envOrDefault("FORGEFLOW_PLANNER_MODEL", "gpt-5.6"),
 		PlannerPromptVersion:   envOrDefault("FORGEFLOW_PLANNER_PROMPT_VERSION", "planner/v1"),
@@ -489,11 +501,33 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.DataDir) == "" {
 		return fmt.Errorf("FORGEFLOW_DATA_DIR cannot be empty")
 	}
-	if !oneOf(c.WorkflowMode, "planning", "development") {
-		return fmt.Errorf("FORGEFLOW_WORKFLOW_MODE must be planning or development")
+	if !oneOf(c.WorkflowMode, "planning", "development", "controlled_development") {
+		return fmt.Errorf("FORGEFLOW_WORKFLOW_MODE must be planning, development, or controlled_development")
 	}
-	if c.WorkflowMode == "development" && (c.PlannerMode != "openai" || strings.TrimSpace(c.OpenAIAPIKey) == "" || !c.DockerEnabled) {
+	if c.WorkflowMode != "planning" && (c.PlannerMode != "openai" || strings.TrimSpace(c.OpenAIAPIKey) == "" || !c.DockerEnabled) {
 		return fmt.Errorf("development workflow requires FORGEFLOW_PLANNER_MODE=openai, OPENAI_API_KEY, and FORGEFLOW_DOCKER_ENABLED=true")
+	}
+	if c.WorkflowMode == "controlled_development" || c.ControlledDevelopmentAPI {
+		if err := (controlleddev.Policy{AdminEmail: c.ControlledAdminEmail, RepositoryPath: c.ControlledRepositoryPath}).Validate(); err != nil {
+			return err
+		}
+	}
+	if c.ControlledDevelopmentAPI && (c.WorkflowMode != "planning" || c.PlannerMode != "mock" || c.OpenAIAPIKey != "" || c.DockerEnabled) {
+		return fmt.Errorf("controlled API must remain planning/mock without model credentials or Docker access")
+	}
+	if c.WorkflowMode == "controlled_development" {
+		if c.ModelProvider != "deepseek" || c.OpenAIBaseURL != "https://api.deepseek.com" || c.OpenAIMaxRetries != 0 {
+			return fmt.Errorf("controlled development requires DeepSeek, its official HTTPS base URL, and zero provider retries")
+		}
+		if c.PlannerModel != "deepseek-flash" || c.DeveloperModel != "deepseek-flash" || c.ReviewerModel != "deepseek-flash" || c.SecurityModel != "deepseek-flash" {
+			return fmt.Errorf("controlled development requires deepseek-flash for every model agent")
+		}
+		if c.PlannerInputUSDPerMTok < 0.3 || c.PlannerOutputUSDPerMTok < 1.2 {
+			return fmt.Errorf("controlled development requires conservative peak token prices")
+		}
+		if c.PlannerMaxOutputTokens > 16_000 || c.DeveloperMaxOutputTokens > 16_000 || c.ReviewerMaxOutputTokens > 16_000 || c.SecurityMaxOutputTokens > 16_000 {
+			return fmt.Errorf("controlled development limits every response to at most 16000 output tokens")
+		}
 	}
 	if !oneOf(c.PlannerMode, "mock", "openai") {
 		return fmt.Errorf("FORGEFLOW_PLANNER_MODE must be mock or openai")

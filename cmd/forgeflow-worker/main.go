@@ -14,9 +14,11 @@ import (
 	"forgeflow/internal/application"
 	"forgeflow/internal/artifact"
 	"forgeflow/internal/assessment"
+	"forgeflow/internal/auth"
 	"forgeflow/internal/buildinfo"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
+	"forgeflow/internal/controlleddev"
 	"forgeflow/internal/developer"
 	"forgeflow/internal/domain"
 	"forgeflow/internal/governance"
@@ -127,6 +129,11 @@ func run(ctx context.Context, configuration config.Config) error {
 	if err != nil {
 		return err
 	}
+	var controlledPolicy *controlleddev.Policy
+	if configuration.WorkflowMode == "controlled_development" {
+		controlledPolicy = &controlleddev.Policy{AdminEmail: configuration.ControlledAdminEmail, RepositoryPath: configuration.ControlledRepositoryPath}
+	}
+	userStore := auth.NewPostgresStore(db)
 	jobQueue := queue.NewPostgresQueue(db)
 	hostname, _ := os.Hostname()
 	workerID := hostname + "-" + domain.NewID()
@@ -164,6 +171,18 @@ func run(ctx context.Context, configuration config.Config) error {
 			}
 			if !workerShouldExecute(state) {
 				return nil
+			}
+			if controlledPolicy != nil {
+				user, err := userStore.FindUserByID(jobContext, state.OwnerID)
+				if err != nil || !controlledPolicy.AllowsState(user.User, state) {
+					if !state.Cancellation.Requested() {
+						if _, err := service.CancelQueued(jobContext, state.RunID, "system", "controlled development authorization failed"); err != nil {
+							return err
+						}
+					}
+					_, err = service.Continue(jobContext, state.RunID)
+					return err
+				}
 			}
 			_, err = service.Continue(jobContext, payload.RunID)
 			return err
@@ -219,12 +238,19 @@ func workerModelProvider(configuration config.Config) (model.Provider, error) {
 	if configuration.PlannerMode != "openai" {
 		return nil, nil
 	}
-	return model.NewOpenAIProvider(model.OpenAIConfig{
+	provider, err := model.NewOpenAIProvider(model.OpenAIConfig{
 		APIKey: configuration.OpenAIAPIKey, BaseURL: configuration.OpenAIBaseURL,
 		ProviderName: configuration.ModelProvider,
 		Organization: configuration.OpenAIOrganization, Project: configuration.OpenAIProject,
 		MaxRetries: configuration.OpenAIMaxRetries,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if configuration.WorkflowMode == "controlled_development" {
+		return controlleddev.NewProvider(provider, configuration.OpenAIAPIKey)
+	}
+	return provider, nil
 }
 
 func workerApplication(configuration config.Config, store checkpoint.Store, planAgent planner.Planner, provider model.Provider) (*application.Service, error) {
@@ -269,6 +295,7 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 		Model: configuration.DeveloperModel, PromptVersion: configuration.DeveloperPromptVersion,
 		ReasoningEffort: configuration.DeveloperReasoningEffort, MaxOutputTokens: configuration.DeveloperMaxOutputTokens,
 		Timeout: configuration.DeveloperTimeout,
+		Pricing: model.Pricing{InputUSDPerMillionTokens: configuration.PlannerInputUSDPerMTok, OutputUSDPerMillionTokens: configuration.PlannerOutputUSDPerMTok},
 	})
 	if err != nil {
 		return nil, err
@@ -278,6 +305,7 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 		Model: configuration.ReviewerModel, PromptVersion: configuration.ReviewerPromptVersion,
 		ReasoningEffort: configuration.ReviewerReasoningEffort, MaxOutputTokens: configuration.ReviewerMaxOutputTokens,
 		Timeout: configuration.ReviewerTimeout,
+		Pricing: model.Pricing{InputUSDPerMillionTokens: configuration.PlannerInputUSDPerMTok, OutputUSDPerMillionTokens: configuration.PlannerOutputUSDPerMTok},
 	})
 	if err != nil {
 		return nil, err
@@ -287,6 +315,7 @@ func workerApplication(configuration config.Config, store checkpoint.Store, plan
 		Model: configuration.SecurityModel, PromptVersion: configuration.SecurityPromptVersion,
 		ReasoningEffort: configuration.SecurityReasoningEffort, MaxOutputTokens: configuration.SecurityMaxOutputTokens,
 		Timeout: configuration.SecurityTimeout,
+		Pricing: model.Pricing{InputUSDPerMillionTokens: configuration.PlannerInputUSDPerMTok, OutputUSDPerMillionTokens: configuration.PlannerOutputUSDPerMTok},
 	})
 	if err != nil {
 		return nil, err

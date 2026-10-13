@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -26,6 +27,7 @@ import (
 	"forgeflow/internal/auth"
 	"forgeflow/internal/checkpoint"
 	"forgeflow/internal/config"
+	"forgeflow/internal/controlleddev"
 	"forgeflow/internal/controlplane"
 	"forgeflow/internal/domain"
 	fulleval "forgeflow/internal/eval"
@@ -493,6 +495,78 @@ func TestPromptPromotionRollbackIsImmutableAuditedAndDoesNotRewriteRuns(t *testi
 
 type loginState struct{ session, csrf, sessionID, userID string }
 
+func TestControlledDevelopmentRejectsOtherUsersAndRepositories(t *testing.T) {
+	root := t.TempDir()
+	demo := filepath.Join(root, "demo")
+	if err := os.MkdirAll(demo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	policy := &controlleddev.Policy{AdminEmail: "admin@example.com", RepositoryPath: demo}
+	f := newFixtureWithOptions(t, auth.NewMemoryLimiter(20, time.Minute), fixtureOptions{
+		controlledPolicy: policy, repositoryRoots: []string{root},
+	})
+	admin := f.login(t, "admin@example.com", "correct horse battery staple", "")
+	createRepository := func(actor loginState, name, path string) string {
+		t.Helper()
+		body, _ := json.Marshal(map[string]string{"name": name, "localPath": path})
+		response := f.request(t, actor, http.MethodPost, "/api/v1/repositories", string(body), true, nil)
+		if response.StatusCode != http.StatusCreated {
+			t.Fatalf("create repository status=%d body=%s", response.StatusCode, read(response))
+		}
+		var repo controlplane.Repository
+		decodeResponse(t, response, &repo)
+		return repo.ID
+	}
+	demoID := createRepository(admin, "demo", demo)
+	otherID := createRepository(admin, "other", filepath.Join(root, "other"))
+	requestRun := func(actor loginState, repositoryID string, iterations int) *http.Response {
+		t.Helper()
+		body, _ := json.Marshal(map[string]any{"repositoryId": repositoryID, "task": "controlled fixture", "maxIterations": iterations})
+		return f.request(t, actor, http.MethodPost, "/api/v1/runs", string(body), true, nil)
+	}
+	response := requestRun(admin, demoID, 0)
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("controlled run status=%d body=%s", response.StatusCode, read(response))
+	}
+	var run domain.RunState
+	decodeResponse(t, response, &run)
+	if run.Budget.MaxModelCalls != 4 || run.Budget.MaxRepairs != 0 || run.MaxIterations != 1 {
+		t.Fatalf("unbounded controlled run: %+v", run.Budget)
+	}
+	for _, test := range []struct {
+		actor      loginState
+		repo       string
+		iterations int
+		status     int
+	}{
+		{admin, otherID, 0, http.StatusForbidden},
+		{admin, demoID, 2, http.StatusBadRequest},
+	} {
+		response = requestRun(test.actor, test.repo, test.iterations)
+		if response.StatusCode != test.status {
+			t.Fatalf("rejected run status=%d want=%d body=%s", response.StatusCode, test.status, read(response))
+		}
+		_ = read(response)
+	}
+	hash, err := auth.HashPassword("operator secure password", testPasswordParams())
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorID := domain.NewID()
+	if err := f.authStore.CreateUser(context.Background(), auth.UserCredential{User: auth.User{
+		ID: operatorID, Email: "operator@example.com", Role: auth.RoleOperator, Status: "active", CreatedAt: time.Now().UTC(),
+	}, PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	operator := f.login(t, "operator@example.com", "operator secure password", "")
+	operatorRepoID := createRepository(operator, "operator-demo", demo)
+	response = requestRun(operator, operatorRepoID, 0)
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("operator run status=%d body=%s", response.StatusCode, read(response))
+	}
+	_ = read(response)
+}
+
 func (f *apiFixture) login(t *testing.T, email, password, old string) loginState {
 	t.Helper()
 	response := f.rawLogin(t, email, password, old)
@@ -555,6 +629,8 @@ type fixtureOptions struct {
 	externalAudit       audit.Appender
 	registrationLimiter auth.Limiter
 	allowedOrigins      []string
+	controlledPolicy    *controlleddev.Policy
+	repositoryRoots     []string
 }
 
 type toggleAudit struct {
@@ -659,7 +735,11 @@ func newFixtureWithOptions(t *testing.T, accountLimiter auth.Limiter, options fi
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runs, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, AllowedOrigins: options.allowedOrigins, RepositoryRoots: []string{"."}, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef"), RegistrationLimiter: options.registrationLimiter})
+	repositoryRoots := options.repositoryRoots
+	if len(repositoryRoots) == 0 {
+		repositoryRoots = []string{"."}
+	}
+	server, err := httpapi.New(httpapi.Options{Auth: authService, Registration: registrationService, Control: controlplane.NewStore(db), Runs: runs, ControlledDevelopment: options.controlledPolicy, Artifacts: artifactStore, Inspector: repository.NewGitInspector(repository.DefaultLimits()), CookieSecure: false, AllowedOrigins: options.allowedOrigins, RepositoryRoots: repositoryRoots, Governance: governance.NewStore(db), Catalog: catalog, UserData: userDataService, ExternalAudit: options.externalAudit, AuditIntegrityKey: []byte("0123456789abcdef0123456789abcdef"), RegistrationLimiter: options.registrationLimiter})
 	if err != nil {
 		t.Fatal(err)
 	}
