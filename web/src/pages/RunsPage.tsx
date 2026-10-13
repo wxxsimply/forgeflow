@@ -5,10 +5,11 @@ import { useAuth } from '../auth/AuthProvider';
 import { LoadingRows, PageState } from '../components/States';
 import { formatDateTime, formatDuration, shortPath, statusLabel } from '../utils/format';
 import { nodeLabel } from '../utils/labels';
+import { localControlledDevelopment } from '../config/localMode';
 
 export function RunsPage() {
   const { user } = useAuth();
-  const canCreate = user?.role === 'admin' || user?.role === 'operator';
+  const canCreate = user?.role === 'admin' || (!localControlledDevelopment && user?.role === 'operator');
   const query = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn: ({ pageParam }) => listRuns(pageParam),
@@ -25,7 +26,7 @@ export function RunsPage() {
       </div>
       {offline && <div className="offline-banner" role="status">当前处于离线状态，显示的是最后一次缓存结果。</div>}
       {query.isPending ? <LoadingRows /> : query.error ? <RunsError error={query.error} retry={() => query.refetch()} /> : runs.length === 0 ? (
-        <PageState title="还没有运行任务" detail={canCreate ? '创建第一个模拟任务后，记录会出现在这里。' : '管理员创建任务后，记录会出现在这里。'} action={canCreate ? <Link className="primary-button primary-button--fit" to="/runs/new">创建模拟任务</Link> : undefined} />
+        <PageState title="还没有运行任务" detail={canCreate ? localControlledDevelopment ? '创建本机开发任务后，记录会出现在这里。' : '创建第一个模拟任务后，记录会出现在这里。' : '管理员创建任务后，记录会出现在这里。'} action={canCreate ? <Link className="primary-button primary-button--fit" to="/runs/new">{localControlledDevelopment ? '创建本机开发任务' : '创建模拟任务'}</Link> : undefined} />
       ) : (
         <section className="run-table-wrap" aria-label="任务列表">
           <div className="run-table-header"><span>任务</span><span>状态</span><span>当前节点</span><span>耗时</span><span>更新时间</span></div>

@@ -6,6 +6,8 @@ ForgeFlow 是一个可治理的多 Agent 软件交付平台。当前版本先实
 
 个人预览部署见[个人预览部署手册](./docs/personal-preview-deployment.md)；无需自有域名的公网访问见[公网 IP HTTPS 部署手册](./docs/public-ip-https-deployment.md)。
 
+想在**自己的电脑**使用个人 DeepSeek 密钥运行受控真实开发，请按[本地 DeepSeek 启动指南](./docs/local-deepseek.md)操作；它不会改变线上模拟预览，也不是多用户网页密钥功能。
+
 ```text
 Task -> Planner -> Plan Approval -> Worktree -> Developer -> Patch Approval -> Diff -> Test
                                                                                 -> Reviewer + Security (isolated parallel branches)

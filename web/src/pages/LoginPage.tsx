@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { APIError } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { localControlledDevelopment } from '../config/localMode';
 
 export function LoginPage() {
   const { user, loading, signIn } = useAuth();
@@ -41,19 +42,19 @@ export function LoginPage() {
       <section className="login-story" aria-label="ForgeFlow 产品介绍">
         <div className="brand brand--light"><span className="brand__mark" aria-hidden="true"><i /><i /><i /></span><span><strong>ForgeFlow</strong><small>可控交付</small></span></div>
         <div className="login-story__content">
-          <span className="eyebrow">公开预览 · 模拟流程</span>
+          <span className="eyebrow">{localControlledDevelopment ? '本机运行 · 受控真实开发' : '公开预览 · 模拟流程'}</span>
           <h1>把任务放进<br />可审查、可恢复的流程。</h1>
-          <p>当前网页展示模拟（Mock）规划、人工审批和审计记录，不会从网页调用真实模型或修改源码。</p>
+          <p>{localControlledDevelopment ? '仅本机管理员可使用自己配置的 DeepSeek 密钥运行真实开发；任务需要人工审批，可能产生模型费用。' : '当前网页展示模拟（Mock）规划、人工审批和审计记录，不会从网页调用真实模型或修改源码。'}</p>
           <div className="flow-line" aria-hidden="true"><i className="done" /><span /><i className="done" /><span /><i className="active" /><span /><i /></div>
           <div className="flow-labels" aria-hidden="true"><span>任务</span><span>规划</span><span>审批</span><span>记录</span></div>
         </div>
-        <small className="login-story__foot">流程演示不等于生产自动执行</small>
+        <small className="login-story__foot">{localControlledDevelopment ? '本机执行不会自动发布到服务器' : '流程演示不等于生产自动执行'}</small>
       </section>
       <section className="login-panel">
         <form className="login-card" onSubmit={submit} aria-describedby={error ? formErrorId : undefined}>
           <span className="eyebrow">欢迎回来</span>
           <h2>登录控制台</h2>
-          <p className="login-card__intro">使用你的账号继续；没有账号也可以自行注册。</p>
+          <p className="login-card__intro">{localControlledDevelopment ? '使用初始化脚本生成的本机管理员账号登录。' : '使用你的账号继续；没有账号也可以自行注册。'}</p>
           {registered && <p className="form-success" role="status">注册成功，请使用新账号登录。</p>}
           <label htmlFor="email">邮箱</label>
           <input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} aria-describedby={emailErrorId} />
@@ -68,7 +69,7 @@ export function LoginPage() {
           <button className="primary-button" type="submit" disabled={submitting}>
             {submitting ? <><span className="spinner spinner--small" />正在验证</> : '登录'}
           </button>
-          <div className="login-help"><span>还没有账号？ <Link to="/register">创建账号</Link></span><span>无法登录请联系管理员</span></div>
+          <div className="login-help">{!localControlledDevelopment && <span>还没有账号？ <Link to="/register">创建账号</Link></span>}<span>{localControlledDevelopment ? '密码位于 .forgeflow/local/secrets/bootstrap_admin_password' : '无法登录请联系管理员'}</span></div>
         </form>
       </section>
     </main>

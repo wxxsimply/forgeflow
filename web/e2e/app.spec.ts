@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+declare const process: { env: Record<string, string | undefined> };
+
 const ids = {
   user: '00000000-0000-4000-8000-000000000001', repo: '00000000-0000-4000-8000-000000000030',
   run: '00000000-0000-4000-8000-000000000010', trace: '00000000-0000-4000-8000-000000000011', approval: '00000000-0000-4000-8000-000000000020', artifact: '00000000-0000-4000-8000-000000000040',
@@ -98,7 +100,7 @@ test('operator completes login, create run, approve and report browser flow', as
   await page.getByRole('link', { name: '开始体验模拟流程' }).click();
   await expect(page).toHaveURL(/\/runs\/new$/);
   await expect(page.getByRole('heading', { name: '创建任务' })).toBeVisible();
-  await page.getByLabel('仓库').selectOption(ids.repo);
+  await page.getByLabel('仓库', { exact: true }).selectOption(ids.repo);
   await page.getByLabel('任务描述').fill('为订单接口增加幂等保护');
   await expectNoSeriousAccessibilityViolations(page);
   await page.getByRole('button', { name: '创建并查看任务' }).click();
@@ -169,13 +171,32 @@ test('failed run creation shows a safe request ID and retries with the same key'
   expect(state.createAttemptKeys[0]).toBe(state.createAttemptKeys[1]);
 });
 
+test('local controlled mode explains paid execution and submits one iteration', async ({ page }) => {
+  test.skip(process.env.VITE_LOCAL_CONTROLLED_DEVELOPMENT !== 'true', 'Only runs against the local controlled-mode build');
+  const state = workflowState('admin');
+  await page.route('**/api/v1/**', (route) => mockAPI(route, state));
+  await page.goto('/login');
+  await expect(page.getByText('本机运行 · 受控真实开发')).toBeVisible();
+  await expect(page.getByRole('link', { name: '创建账号' })).toHaveCount(0);
+  await login(page, state.user.email);
+  await page.getByRole('link', { name: '新建任务' }).click();
+  await expect(page.getByText('提交即可能产生模型费用')).toBeVisible();
+  await expect(page.getByText('本机受控模式固定为 1 次迭代，不会自动修复重试。')).toBeVisible();
+  await page.getByLabel('仓库', { exact: true }).selectOption(ids.repo);
+  await page.getByLabel('任务描述').fill('仅在测试仓库中增加一个边界条件测试');
+  await page.getByRole('button', { name: '创建并查看任务' }).click();
+  await expect(page).toHaveURL(new RegExp(`/runs/${ids.run}$`));
+  expect(state.createBodies).toHaveLength(1);
+  expect(state.createBodies[0].maxIterations).toBe(1);
+});
+
 type State = ReturnType<typeof workflowState>;
-function workflowState(role: 'viewer' | 'operator') {
+function workflowState(role: 'viewer' | 'operator' | 'admin') {
   const user = { id: ids.user, email: `${role}@example.com`, role, status: 'active', createdAt };
   const plan = { summary: '先增加幂等键校验，再补并发测试。', assumptions: [], filesLikelyAffected: ['internal/orders.go'], steps: [{ id: 'step-1', description: '实现幂等保护', acceptanceCriteria: ['重复请求返回相同结果'], dependsOn: [] }], risks: [{ level: 'medium', description: '并发竞争' }], testStrategy: ['并发集成测试'] };
   const approval = { request: { approvalId: ids.approval, runId: ids.run, actionType: 'plan', reason: '执行前需要人工确认计划', scope: ['internal/orders.go'], risk: 'medium', status: 'pending', requestedAt: createdAt }, runVersion: 4 };
   const run = { runId: ids.run, traceId: ids.trace, repositoryId: ids.repo, version: 4, status: 'waiting_for_plan_approval' as string, task: '为订单接口增加幂等保护', repositoryPath: 'D:/Code/orders', baseRevision: 'main', currentNodeId: 'plan-approval', completedNodeIds: ['start', 'planner', 'validate-plan'], plan, pendingApproval: approval.request as typeof approval.request | undefined, createdAt, updatedAt: '2026-08-10T08:02:00Z' };
-  return { authenticated: false, user, run, approval, emptyRuns: false, failNextCreate: false, createAttemptKeys: [] as string[] };
+  return { authenticated: false, user, run, approval, emptyRuns: false, failNextCreate: false, createAttemptKeys: [] as string[], createBodies: [] as Array<{ maxIterations: number }> };
 }
 
 async function login(page: Page, email: string) {
@@ -197,6 +218,7 @@ async function mockAPI(route: Route, state: State) {
   if (path.endsWith('/repositories') && request.method() === 'GET') return json(route, 200, { items: [{ id: ids.repo, ownerId: ids.user, name: 'orders', localPath: 'D:/Code/orders', defaultBranch: 'main', createdAt, updatedAt: createdAt }] });
   if (path.endsWith('/runs') && request.method() === 'POST') {
     state.createAttemptKeys.push(request.headers()['idempotency-key'] ?? '');
+    state.createBodies.push(request.postDataJSON());
     if (state.failNextCreate) {
       state.failNextCreate = false;
       return json(route, 503, { code: 'internal_error', message: 'private server detail', requestId: 'e2e-create-failed', details: {} });

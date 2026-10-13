@@ -653,7 +653,8 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.SandboxWorkspaceRoot) == "" {
 		return fmt.Errorf("FORGEFLOW_SANDBOX_WORKSPACE_ROOT cannot be empty")
 	}
-	if c.DockerEnabled && !sandboxImagePattern.MatchString(c.SandboxImage) {
+	localImageIDAllowed := c.Environment == "development" && c.WorkflowMode == "controlled_development" && localSandboxImageIDPattern.MatchString(c.SandboxImage)
+	if c.DockerEnabled && !sandboxImagePattern.MatchString(c.SandboxImage) && !localImageIDAllowed {
 		return fmt.Errorf("FORGEFLOW_SANDBOX_IMAGE must be pinned by sha256 when Docker is enabled")
 	}
 	if c.SandboxPIDsLimit <= 0 || c.SandboxTmpfsBytes <= 0 || c.SandboxMaxOutputBytes <= 0 {
@@ -688,6 +689,7 @@ func validateAssessmentAgent(role, model, prompt, reasoning string, maxOutput in
 }
 
 var sandboxImagePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._/:@-]*@sha256:[a-f0-9]{64}$`)
+var localSandboxImageIDPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
 func envOrDefault(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {

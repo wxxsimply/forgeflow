@@ -1,0 +1,30 @@
+name: forgeflow-local
+
+# Local database only. API, Worker and Web run as loopback-bound native
+# processes so no Docker socket is mounted into an application container.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: forgeflow
+      POSTGRES_DB: forgeflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeflow -d forgeflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+secrets:
+  postgres_password:
+    file: ../../.forgeflow/local/secrets/postgres_password
+
+volumes:
+  postgres-data:
